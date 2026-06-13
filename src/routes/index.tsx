@@ -22,7 +22,7 @@ export const Route = createFileRoute("/")({
 });
 
 type Client = { id: string; name: string };
-type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: string | null; inspection_number: string | null; notes: string | null };
+type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null };
 type Collaborator = { id: string; client_id: string; name: string; email: string | null };
 type LabelRecord = { id: string; client_name: string; product_name: string; responsible_name: string; issued_at: string; expires_on: string };
 
