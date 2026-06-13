@@ -77,14 +77,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "TiNutri Smart Label® | Etiquetas de Validade" },
+      { name: "description", content: "Emita etiquetas térmicas padronizadas de identificação e validade de alimentos em poucos segundos." },
+      { name: "author", content: "TiNutri" },
+      { property: "og:title", content: "TiNutri Smart Label®" },
+      { property: "og:description", content: "Etiquetas térmicas de validade simples, rápidas e padronizadas." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {

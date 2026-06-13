@@ -9,8 +9,9 @@ const inviteSchema = z.object({
   clientId: z.string().uuid(),
 });
 
-async function assertAdmin(userId: string, supabase: { from: (table: string) => any }) {
-  const { data } = await supabase
+async function assertAdmin(userId: string, supabase: { from: (table: string) => unknown }) {
+  const client = supabase as typeof import("@supabase/supabase-js").SupabaseClient.prototype;
+  const { data } = await client
     .from("user_roles")
     .select("role")
     .eq("user_id", userId)
@@ -29,9 +30,7 @@ export const claimFirstAdmin = createServerFn({ method: "POST" })
     if ((count ?? 0) > 0) throw new Error("O administrador inicial já foi configurado.");
 
     const email = typeof context.claims.email === "string" ? context.claims.email : "administrador@tinutri.app";
-    const name = typeof context.claims.user_metadata?.full_name === "string"
-      ? context.claims.user_metadata.full_name
-      : "Administrador TiNutri";
+    const name = "Administrador TiNutri";
     const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
       user_id: context.userId,
       name,
