@@ -9,19 +9,8 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 export default defineConfig({
   vite: {
     optimizeDeps: {
-      force: true,
-      include: [
-        "@lovable.dev/cloud-auth-js",
-        "@supabase/supabase-js",
-        "@tanstack/react-query",
-        "@tanstack/react-router",
-        "date-fns",
-        "date-fns/locale",
-        "lucide-react",
-        "react",
-        "react-dom",
-        "zod",
-      ],
+      noDiscovery: true,
+      include: [],
     },
   },
   tanstackStart: {
