@@ -103,8 +103,13 @@
 
 .thermal-label {
   box-sizing: border-box;
-  width: 50mm;
-  height: 30mm;
+  width: 50mm !important;
+  min-width: 50mm;
+  max-width: 50mm;
+  height: 30mm !important;
+  min-height: 30mm;
+  max-height: 30mm;
+  aspect-ratio: 5 / 3;
   overflow: hidden;
   background: var(--label-paper);
   color: var(--label-ink);
