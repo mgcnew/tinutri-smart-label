@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Building2, Clock3, History, LayoutDashboard, LogOut, Menu, PackagePlus, Pencil, Printer, Search, ShieldCheck, Tag, Trash2, Users, X } from "lucide-react";
+import { Building2, Clock3, Copy, History, LayoutDashboard, LogOut, Menu, PackagePlus, Pencil, Printer, Search, ShieldCheck, Tag, Trash2, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,8 @@ export const Route = createFileRoute("/")({
 type Client = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; active: boolean };
 type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null };
 type Collaborator = { id: string; client_id: string; name: string; email: string | null };
-type LabelRecord = { id: string; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; opened_on: string; issued_at: string; expires_on: string };
+type PrintableLabel = { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date };
+type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string };
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
 
 function Index() {
@@ -44,7 +45,8 @@ function Index() {
   const [selectedResponsible, setSelectedResponsible] = useState("");
   const [openedOn, setOpenedOn] = useState(format(new Date(), "yyyy-MM-dd"));
   const [lot, setLot] = useState("");
-  const [label, setLabel] = useState<{ product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date } | null>(null);
+  const [label, setLabel] = useState<PrintableLabel | null>(null);
+  const [labelDraft, setLabelDraft] = useState<{ product: string; responsible: string; opened: string; expires: string; lot: string } | null>(null);
 
   const refresh = async () => {
     const { data: auth } = await supabase.auth.getUser();
@@ -70,7 +72,7 @@ function Index() {
     setCollaborators((collaboratorRows ?? []) as Collaborator[]);
     if (ownClient) setSelectedClient(ownClient);
     if (currentRole === "admin") {
-      const { data: labels } = await supabase.from("issued_labels").select("id,client_name,product_name,responsible_name,lot_number,opened_on,issued_at,expires_on").order("issued_at", { ascending: false }).limit(100);
+       const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on").order("issued_at", { ascending: false }).limit(100);
       setHistory((labels ?? []) as LabelRecord[]);
     }
     setLoading(false);
@@ -85,6 +87,15 @@ function Index() {
   const responsible = collaborators.find((item) => item.id === selectedResponsible);
   const client = clients.find((item) => item.id === selectedClient);
   const expiresOn = useMemo(() => product && openedOn ? format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "dd/MM/yyyy") : "—", [product, openedOn]);
+  const previewLabel: PrintableLabel = {
+    product: labelDraft?.product || product?.name || "NOME DO PRODUTO",
+    opened: labelDraft?.opened ? format(new Date(`${labelDraft.opened}T12:00:00`), "dd/MM/yyyy") : openedOn ? format(new Date(`${openedOn}T12:00:00`), "dd/MM/yyyy") : "—",
+    expires: labelDraft?.expires ? format(new Date(`${labelDraft.expires}T12:00:00`), "dd/MM/yyyy") : expiresOn,
+    lot: (labelDraft?.lot ?? lot) || undefined,
+    inspection: product?.requires_inspection && product.inspection_type && product.inspection_number ? `${product.inspection_type}: ${product.inspection_number}` : undefined,
+    responsible: labelDraft?.responsible || responsible?.name || "RESPONSÁVEL",
+    issued: new Date(),
+  };
 
   if (loading) return <main className="grid min-h-screen place-items-center bg-background"><p className="font-semibold text-muted-foreground">Preparando sua estação…</p></main>;
 
@@ -105,18 +116,41 @@ function Index() {
   const issueLabel = async () => {
     setMessage("");
     if (!client || !product || !responsible) { setMessage("Selecione cliente, produto e responsável."); return; }
-    if (product.requires_lot && !lot.trim()) { setMessage("Este produto exige número de lote."); return; }
+    if (product.requires_lot && !(labelDraft?.lot ?? lot).trim()) { setMessage("Este produto exige número de lote."); return; }
     const issued = new Date();
-    const expiry = format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd");
-    const inspection = product.requires_inspection ? `${product.inspection_type}: ${product.inspection_number}` : undefined;
+    const effectiveOpened = labelDraft?.opened || openedOn;
+    const expiry = labelDraft?.expires || format(addDays(new Date(`${effectiveOpened}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd");
+    const inspection = product.requires_inspection && product.inspection_type && product.inspection_number ? `${product.inspection_type}: ${product.inspection_number}` : undefined;
+    const effectiveProduct = labelDraft?.product.trim() || product.name;
+    const effectiveResponsible = labelDraft?.responsible.trim() || responsible.name;
+    const effectiveLot = (labelDraft?.lot ?? lot).trim();
     const { error } = await supabase.from("issued_labels").insert({
       client_id: client.id, product_id: product.id, responsible_id: responsible.id, issued_by: userId,
-      client_name: client.name, product_name: product.name, responsible_name: responsible.name,
-      lot_number: lot.trim() || null, inspection_label: inspection ?? null, opened_on: openedOn, expires_on: expiry,
+      client_name: client.name, product_name: effectiveProduct, responsible_name: effectiveResponsible,
+      lot_number: effectiveLot || null, inspection_label: inspection ?? null, opened_on: effectiveOpened, expires_on: expiry,
     });
     if (error) { setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return; }
-    setLabel({ product: product.name, opened: format(new Date(`${openedOn}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${expiry}T12:00:00`), "dd/MM/yyyy"), lot: lot.trim() || undefined, inspection, responsible: responsible.name, issued });
+    setLabel({ product: effectiveProduct, opened: format(new Date(`${effectiveOpened}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${expiry}T12:00:00`), "dd/MM/yyyy"), lot: effectiveLot || undefined, inspection, responsible: effectiveResponsible, issued });
+    await refresh();
     setTimeout(() => window.print(), 120);
+  };
+
+  const reprintLabel = (record: LabelRecord) => {
+    setLabel({ product: record.product_name, opened: format(new Date(`${record.opened_on}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${record.expires_on}T12:00:00`), "dd/MM/yyyy"), lot: record.lot_number ?? undefined, inspection: record.inspection_label ?? undefined, responsible: record.responsible_name, issued: new Date(record.issued_at) });
+    setTab("emit");
+    setTimeout(() => window.print(), 180);
+  };
+
+  const duplicateLabel = (record: LabelRecord) => {
+    setSelectedClient(record.client_id);
+    setSelectedProduct(record.product_id ?? "");
+    setSelectedResponsible(record.responsible_id ?? "");
+    setOpenedOn(record.opened_on);
+    setLot(record.lot_number ?? "");
+    setLabel(null);
+    setLabelDraft({ product: record.product_name, responsible: record.responsible_name, opened: record.opened_on, expires: record.expires_on, lot: record.lot_number ?? "" });
+    setMessage("");
+    setTab("emit");
   };
 
   return (
@@ -152,7 +186,7 @@ function Index() {
             <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
               <div className="space-y-5 rounded-3xl border bg-card p-5 shadow-sm sm:p-7">
                 <Field label="Cliente"><select value={selectedClient} disabled={role === "operator"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
-                <Field label="Produto"><select value={selectedProduct} onChange={(e) => { setSelectedProduct(e.target.value); setLot(""); }}><option value="">Selecione o produto</option>{visibleProducts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
+                <Field label="Produto"><select value={selectedProduct} onChange={(e) => { setSelectedProduct(e.target.value); setLot(""); setLabelDraft(null); }}><option value="">Selecione o produto</option>{visibleProducts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
                 <div className="grid gap-5 sm:grid-cols-2">
                   <Field label="Data de abertura"><input type="date" value={openedOn} onChange={(e) => setOpenedOn(e.target.value)} /></Field>
                   <div className="rounded-2xl bg-secondary p-4"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Validade calculada</span><strong className="mt-1 block text-xl text-primary">{expiresOn}</strong></div>
@@ -160,16 +194,18 @@ function Index() {
                 {product?.requires_lot && <Field label="Número do lote" hint="Obrigatório para este produto"><input value={lot} maxLength={80} onChange={(e) => setLot(e.target.value)} placeholder="Ex.: 4587" /></Field>}
                 {product?.requires_inspection && <div className="rounded-2xl border border-primary/20 bg-secondary p-4 text-sm"><ShieldCheck className="mr-2 inline size-5 text-primary" /><strong>{product.inspection_type}/registro:</strong> {product.inspection_number}</div>}
                 <Field label="Responsável"><select value={selectedResponsible} onChange={(e) => setSelectedResponsible(e.target.value)}><option value="">Selecione o responsável</option>{visibleCollaborators.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
+                {product && responsible && !labelDraft && <Button variant="outline" className="w-full" onClick={() => setLabelDraft({ product: product.name, responsible: responsible.name, opened: openedOn, expires: format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd"), lot })}><Pencil /> Editar etiqueta antes de imprimir</Button>}
+                {labelDraft && <div className="grid gap-4 rounded-2xl border bg-secondary/50 p-4 sm:grid-cols-2"><div className="sm:col-span-2"><Field label="Nome na etiqueta"><input maxLength={120} value={labelDraft.product} onChange={(e) => setLabelDraft({ ...labelDraft, product: e.target.value })} /></Field></div><Field label="Aberto em"><input type="date" value={labelDraft.opened} onChange={(e) => setLabelDraft({ ...labelDraft, opened: e.target.value })} /></Field><Field label="Validade"><input type="date" value={labelDraft.expires} onChange={(e) => setLabelDraft({ ...labelDraft, expires: e.target.value })} /></Field><Field label="Lote"><input maxLength={80} value={labelDraft.lot} onChange={(e) => setLabelDraft({ ...labelDraft, lot: e.target.value })} /></Field><Field label="Responsável"><input maxLength={120} value={labelDraft.responsible} onChange={(e) => setLabelDraft({ ...labelDraft, responsible: e.target.value })} /></Field><div className="sm:col-span-2"><Button variant="ghost" size="sm" onClick={() => setLabelDraft(null)}>Cancelar edição</Button></div></div>}
                 {message && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm font-semibold text-destructive">{message}</p>}
                 <Button variant="kitchen" size="xl" className="w-full" onClick={issueLabel}><Printer /> Emitir etiqueta</Button>
               </div>
-              <div><p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · TAMANHO REAL 50 × 30 MM</p><ThermalLabel label={label ?? { product: product?.name ?? "NOME DO PRODUTO", opened: openedOn ? format(new Date(`${openedOn}T12:00:00`), "dd/MM/yyyy") : "—", expires: expiresOn, lot: lot || undefined, inspection: product?.requires_inspection ? `${product.inspection_type}: ${product.inspection_number}` : undefined, responsible: responsible?.name ?? "RESPONSÁVEL", issued: new Date() }} /></div>
+              <div><p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · TAMANHO REAL 50 × 30 MM</p><ThermalLabel label={label ?? previewLabel} /></div>
             </div>
           </section>}
           {tab === "clients" && <ClientsPanel clients={clients} refresh={refresh} />}
           {tab === "products" && <ProductsPanel clients={clients} products={products} refresh={refresh} />}
           {tab === "team" && <TeamPanel clients={clients} collaborators={collaborators} refresh={refresh} />}
-          {tab === "history" && <HistoryPanel history={history} />}
+          {tab === "history" && <HistoryPanel history={history} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
         </main>
       </div>
     </div>
@@ -193,7 +229,7 @@ function ThermalLabel({ label }: { label: { product: string; opened: string; exp
     </div>
     <div className="thermal-label__meta">
       <strong>LOTE: {(label.lot ?? "—").toUpperCase()}</strong>
-      {label.inspection && <span>SIF/SISP/SIM: {label.inspection.replace(/^\w+:\s*/, "")}</span>}
+      {label.inspection && <span>{label.inspection}</span>}
     </div>
     <footer className="thermal-label__footer">
       <div><span>RESPONSÁVEL</span><strong>{label.responsible.toUpperCase()}</strong></div>
@@ -356,4 +392,18 @@ function ProductsPanel({ clients, products, refresh }: { clients: Client[]; prod
 
 function TeamPanel({ clients, collaborators, refresh }: { clients: Client[]; collaborators: Collaborator[]; refresh: () => Promise<void> }) { const [clientId, setClientId] = useState(""); const [name, setName] = useState(""); const [msg, setMsg] = useState(""); return <section><PanelHeader eyebrow="Equipe" title="Colaboradores" description="Cadastre os responsáveis que aparecerão nas etiquetas."/><form className="mt-7 grid gap-4 rounded-2xl border bg-card p-5 sm:grid-cols-[1fr_1fr_auto] sm:items-end" onSubmit={async (e) => { e.preventDefault(); setMsg(""); const { error } = await supabase.from("collaborators").insert({ client_id: clientId, name: name.trim() }); if (error) { setMsg("Não foi possível cadastrar o colaborador."); return; } setName(""); setMsg("Colaborador cadastrado."); await refresh(); }}><Field label="Cliente"><select required value={clientId} onChange={(e) => setClientId(e.target.value)}><option value="">Selecione</option>{clients.filter(c => c.active).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field><Field label="Nome do colaborador"><input required minLength={2} maxLength={120} value={name} onChange={(e) => setName(e.target.value)}/></Field><Button type="submit" className="h-12">Cadastrar</Button>{msg && <p className="text-sm text-muted-foreground sm:col-span-3">{msg}</p>}</form><div className="mt-5 grid gap-3 sm:grid-cols-2">{collaborators.map((c) => <article key={c.id} className="rounded-2xl border bg-card p-5"><Users className="text-primary"/><strong className="mt-3 block">{c.name}</strong><p className="text-sm text-muted-foreground">{clients.find((client) => client.id === c.client_id)?.name}</p></article>)}</div></section> }
 
-function HistoryPanel({ history }: { history: LabelRecord[] }) { return <section><PanelHeader eyebrow="Registros" title="Etiquetas emitidas" description="Últimas 100 emissões registradas."/><div className="mt-7 overflow-hidden rounded-2xl border bg-card">{history.length === 0 ? <p className="p-8 text-center text-muted-foreground">Nenhuma etiqueta emitida ainda.</p> : history.map((h) => <article key={h.id} className="grid gap-3 border-b p-4 sm:grid-cols-[1.2fr_1fr_auto]"><div><strong>{h.product_name}</strong><p className="text-sm text-muted-foreground">{h.client_name}</p></div><div className="text-sm"><p>{h.responsible_name}</p><p className="text-xs text-muted-foreground">Lote: {h.lot_number || "—"} · Aberto: {format(new Date(`${h.opened_on}T12:00:00`), "dd/MM/yyyy")}</p><p className="text-xs text-muted-foreground">Validade: {format(new Date(`${h.expires_on}T12:00:00`), "dd/MM/yyyy")}</p></div><time className="flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="size-3"/>{format(new Date(h.issued_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</time></article>)}</div></section> }
+function HistoryPanel({ history, onReprint, onDuplicate }: { history: LabelRecord[]; onReprint: (record: LabelRecord) => void; onDuplicate: (record: LabelRecord) => void }) {
+  const [productQuery, setProductQuery] = useState("");
+  const [responsibleQuery, setResponsibleQuery] = useState("");
+  const [clientQuery, setClientQuery] = useState("");
+  const [dateQuery, setDateQuery] = useState("");
+  const normalized = (value: string) => value.toLocaleLowerCase("pt-BR").trim();
+  const filtered = history.filter((item) =>
+    normalized(item.product_name).includes(normalized(productQuery)) &&
+    normalized(item.responsible_name).includes(normalized(responsibleQuery)) &&
+    normalized(item.client_name).includes(normalized(clientQuery)) &&
+    (!dateQuery || item.issued_at.slice(0, 10) === dateQuery),
+  );
+
+  return <section><PanelHeader eyebrow="Registros" title="Etiquetas emitidas" description="Últimas 100 emissões registradas."/><div className="mt-7 grid gap-3 rounded-2xl border bg-card p-4 sm:grid-cols-2 xl:grid-cols-4"><Field label="Produto"><div className="relative"><Search className="absolute left-3 top-3.5 size-4 text-muted-foreground"/><input className="pl-9" value={productQuery} onChange={(event) => setProductQuery(event.target.value)} placeholder="Pesquisar produto"/></div></Field><Field label="Responsável"><input value={responsibleQuery} onChange={(event) => setResponsibleQuery(event.target.value)} placeholder="Pesquisar responsável"/></Field><Field label="Cliente"><input value={clientQuery} onChange={(event) => setClientQuery(event.target.value)} placeholder="Pesquisar cliente"/></Field><Field label="Data"><input type="date" value={dateQuery} onChange={(event) => setDateQuery(event.target.value)}/></Field></div><div className="mt-4 overflow-hidden rounded-2xl border bg-card">{filtered.length === 0 ? <p className="p-8 text-center text-muted-foreground">Nenhuma etiqueta encontrada.</p> : filtered.map((h) => <article key={h.id} className="grid gap-4 border-b p-4 md:grid-cols-[1.2fr_1fr_auto] md:items-center"><div><strong>{h.product_name}</strong><p className="text-sm text-muted-foreground">{h.client_name}</p></div><div className="text-sm"><p>{h.responsible_name}</p><p className="text-xs text-muted-foreground">Lote: {h.lot_number || "—"} · Aberto: {format(new Date(`${h.opened_on}T12:00:00`), "dd/MM/yyyy")}</p><p className="text-xs font-semibold text-foreground">Validade: {format(new Date(`${h.expires_on}T12:00:00`), "dd/MM/yyyy")}</p><time className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="size-3"/>{format(new Date(h.issued_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</time></div><div className="grid grid-cols-2 gap-2 md:grid-cols-1"><Button variant="outline" size="sm" onClick={() => onReprint(h)}><Printer/>Reimprimir</Button><Button variant="secondary" size="sm" onClick={() => onDuplicate(h)}><Copy/>Duplicar</Button></div></article>)}</div></section>;
+}
