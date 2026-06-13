@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Building2, Clock3, History, LogOut, PackagePlus, Printer, Settings2, ShieldCheck, Tag, Users } from "lucide-react";
+import { Building2, Clock3, History, LayoutDashboard, LogOut, Menu, PackagePlus, Printer, ShieldCheck, Tag, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
-import { claimFirstAdmin, inviteOperator } from "@/lib/admin.functions";
+import { claimFirstAdmin } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -24,7 +25,8 @@ export const Route = createFileRoute("/")({
 type Client = { id: string; name: string };
 type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null };
 type Collaborator = { id: string; client_id: string; name: string; email: string | null };
-type LabelRecord = { id: string; client_name: string; product_name: string; responsible_name: string; issued_at: string; expires_on: string };
+type LabelRecord = { id: string; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; opened_on: string; issued_at: string; expires_on: string };
+type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
 
 function Index() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -35,7 +37,7 @@ function Index() {
   const [products, setProducts] = useState<Product[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [history, setHistory] = useState<LabelRecord[]>([]);
-  const [tab, setTab] = useState<"emit" | "clients" | "products" | "team" | "history" | "settings">("emit");
+  const [tab, setTab] = useState<AppTab>("dashboard");
   const [message, setMessage] = useState("");
   const [selectedClient, setSelectedClient] = useState("");
   const [selectedProduct, setSelectedProduct] = useState("");
@@ -67,7 +69,7 @@ function Index() {
     setCollaborators((collaboratorRows ?? []) as Collaborator[]);
     if (ownClient) setSelectedClient(ownClient);
     if (currentRole === "admin") {
-      const { data: labels } = await supabase.from("issued_labels").select("id,client_name,product_name,responsible_name,issued_at,expires_on").order("issued_at", { ascending: false }).limit(100);
+      const { data: labels } = await supabase.from("issued_labels").select("id,client_name,product_name,responsible_name,lot_number,opened_on,issued_at,expires_on").order("issued_at", { ascending: false }).limit(100);
       setHistory((labels ?? []) as LabelRecord[]);
     }
     setLoading(false);
