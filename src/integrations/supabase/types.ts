@@ -14,16 +14,318 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clients: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      collaborators: {
+        Row: {
+          active: boolean
+          client_id: string
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          client_id: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          client_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborators_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      issued_labels: {
+        Row: {
+          client_id: string
+          client_name: string
+          expires_on: string
+          id: string
+          inspection_label: string | null
+          issued_at: string
+          issued_by: string
+          lot_number: string | null
+          opened_on: string
+          product_id: string | null
+          product_name: string
+          responsible_id: string | null
+          responsible_name: string
+        }
+        Insert: {
+          client_id: string
+          client_name: string
+          expires_on: string
+          id?: string
+          inspection_label?: string | null
+          issued_at?: string
+          issued_by: string
+          lot_number?: string | null
+          opened_on: string
+          product_id?: string | null
+          product_name: string
+          responsible_id?: string | null
+          responsible_name: string
+        }
+        Update: {
+          client_id?: string
+          client_name?: string
+          expires_on?: string
+          id?: string
+          inspection_label?: string | null
+          issued_at?: string
+          issued_by?: string
+          lot_number?: string | null
+          opened_on?: string
+          product_id?: string | null
+          product_name?: string
+          responsible_id?: string | null
+          responsible_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issued_labels_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issued_labels_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issued_labels_responsible_id_fkey"
+            columns: ["responsible_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      label_settings: {
+        Row: {
+          client_id: string
+          created_at: string
+          header_text: string
+          height_mm: number
+          id: string
+          show_logo: boolean
+          updated_at: string
+          width_mm: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          header_text?: string
+          height_mm?: number
+          id?: string
+          show_logo?: boolean
+          updated_at?: string
+          width_mm?: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          header_text?: string
+          height_mm?: number
+          id?: string
+          show_logo?: boolean
+          updated_at?: string
+          width_mm?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "label_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          active: boolean
+          category: string
+          client_id: string
+          created_at: string
+          id: string
+          inspection_number: string | null
+          inspection_type: Database["public"]["Enums"]["inspection_type"] | null
+          name: string
+          notes: string | null
+          requires_inspection: boolean
+          requires_lot: boolean
+          shelf_life_days: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category: string
+          client_id: string
+          created_at?: string
+          id?: string
+          inspection_number?: string | null
+          inspection_type?:
+            | Database["public"]["Enums"]["inspection_type"]
+            | null
+          name: string
+          notes?: string | null
+          requires_inspection?: boolean
+          requires_lot?: boolean
+          shelf_life_days: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          inspection_number?: string | null
+          inspection_type?:
+            | Database["public"]["Enums"]["inspection_type"]
+            | null
+          name?: string
+          notes?: string | null
+          requires_inspection?: boolean
+          requires_lot?: boolean
+          shelf_life_days?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          email: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      current_client_id: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "operator"
+      inspection_type: "SIF" | "SISP" | "SIM"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +452,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "operator"],
+      inspection_type: ["SIF", "SISP", "SIM"],
+    },
   },
 } as const
