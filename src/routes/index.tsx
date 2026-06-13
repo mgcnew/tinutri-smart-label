@@ -57,6 +57,7 @@ function Index() {
     ]);
     const currentRole = roles?.role as "admin" | "operator" | undefined;
     setRole(currentRole ?? null);
+    if (currentRole === "operator") setTab("emit");
     const ownClient = profile?.client_id ?? null;
     setProfileClientId(ownClient);
     const [{ data: clientRows }, { data: productRows }, { data: collaboratorRows }] = await Promise.all([
@@ -118,18 +119,31 @@ function Index() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 lg:pb-8">
-      <header className="border-b bg-card/95 px-4 py-4 backdrop-blur sm:px-7">
-        <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-30 border-b bg-card/95 px-4 py-3 backdrop-blur sm:px-7">
+        <div className="mx-auto grid max-w-7xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+          <div className="lg:hidden">
+            <Sheet>
+              <SheetTrigger asChild><Button variant="ghost" size="icon" aria-label="Abrir menu"><Menu /></Button></SheetTrigger>
+              <SheetContent side="left" className="w-[86%] max-w-xs p-5">
+                <SheetHeader className="border-b pb-5 text-left"><SheetTitle><Brand /></SheetTitle></SheetHeader>
+                <nav className="mt-6 space-y-2"><Nav role={role} tab={tab} setTab={setTab} closeOnSelect /></nav>
+              </SheetContent>
+            </Sheet>
+          </div>
           <Brand />
           <Button variant="ghost" size="icon" aria-label="Sair" onClick={async () => { await supabase.auth.signOut(); location.reload(); }}><LogOut /></Button>
         </div>
       </header>
-      <div className="mx-auto flex max-w-6xl gap-8 px-4 py-6 sm:px-7">
-        <nav className="hidden w-52 shrink-0 space-y-2 lg:block">
+      <div className="mx-auto flex max-w-7xl gap-8 px-4 py-6 sm:px-7 lg:py-8">
+        <aside className="hidden w-56 shrink-0 lg:block">
+          <p className="mb-3 px-3 text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">Menu principal</p>
+          <nav className="space-y-2">
           <Nav role={role} tab={tab} setTab={setTab} />
-        </nav>
+          </nav>
+        </aside>
         <main className="min-w-0 flex-1">
+          {tab === "dashboard" && <DashboardPanel clients={clients} products={products} collaborators={collaborators} history={history} setTab={setTab} />}
           {tab === "emit" && <section>
             <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">Estação de etiquetagem</p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Emitir nova etiqueta</h1>
@@ -155,10 +169,8 @@ function Index() {
           {tab === "products" && <ProductsPanel clients={clients} products={products} refresh={refresh} />}
           {tab === "team" && <TeamPanel clients={clients} collaborators={collaborators} refresh={refresh} />}
           {tab === "history" && <HistoryPanel history={history} />}
-          {tab === "settings" && <SettingsPanel clients={clients} />}
         </main>
       </div>
-      <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t bg-card px-1 py-2 lg:hidden"><MobileNav role={role} tab={tab} setTab={setTab} /></nav>
     </div>
   );
 }
