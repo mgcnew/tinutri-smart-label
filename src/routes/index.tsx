@@ -184,7 +184,7 @@ function Login() {
 function Brand({ inverse = false }: { inverse?: boolean }) { return <div className="flex min-w-0 items-center gap-3"><div className={`grid size-10 shrink-0 place-items-center rounded-xl ${inverse ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground"}`}><Tag className="size-5" /></div><div className="min-w-0"><strong className={`block truncate font-display text-lg leading-tight ${inverse ? "text-primary-foreground" : "text-foreground"}`}>TiNutri Smart Label®</strong><span className={`text-xs ${inverse ? "text-primary-foreground/65" : "text-muted-foreground"}`}>Validade simples. Segurança sempre.</span></div></div> }
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) { return <label className="block"><span className="mb-2 flex justify-between text-sm font-bold">{label}{hint && <small className="font-medium text-muted-foreground">{hint}</small>}</span>{children}</label> }
 function ThermalLabel({ label }: { label: { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date } }) {
-  return <div className="thermal-label" aria-label="Pré-visualização da etiqueta térmica de 50 por 30 milímetros">
+  return <div className="thermal-label !h-[30mm] !w-[50mm] min-h-[30mm] min-w-[50mm] max-h-[30mm] max-w-[50mm] shrink-0" aria-label="Pré-visualização da etiqueta térmica de 50 por 30 milímetros">
     <header className="thermal-label__brand">TiNutri Smart Label®</header>
     <strong className="thermal-label__product">{label.product.toUpperCase()}</strong>
     <div className="thermal-label__dates">
