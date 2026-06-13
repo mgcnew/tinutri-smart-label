@@ -227,7 +227,7 @@ function ThermalLabel({ label }: { label: { product: string; opened: string; exp
     </div>
     <div className="thermal-label__meta">
       <strong>LOTE: {(label.lot ?? "—").toUpperCase()}</strong>
-      {label.inspection && <span>SIF/SISP/SIM: {label.inspection.replace(/^\w+:\s*/, "")}</span>}
+      {label.inspection && <span>{label.inspection}</span>}
     </div>
     <footer className="thermal-label__footer">
       <div><span>RESPONSÁVEL</span><strong>{label.responsible.toUpperCase()}</strong></div>
