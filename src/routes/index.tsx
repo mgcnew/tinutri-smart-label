@@ -116,7 +116,7 @@ function Index() {
   const issueLabel = async () => {
     setMessage("");
     if (!client || !product || !responsible) { setMessage("Selecione cliente, produto e responsável."); return; }
-    if (product.requires_lot && !lot.trim()) { setMessage("Este produto exige número de lote."); return; }
+    if (product.requires_lot && !(labelDraft?.lot ?? lot).trim()) { setMessage("Este produto exige número de lote."); return; }
     const issued = new Date();
     const effectiveOpened = labelDraft?.opened || openedOn;
     const expiry = labelDraft?.expires || format(addDays(new Date(`${effectiveOpened}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd");
@@ -133,6 +133,22 @@ function Index() {
     setLabel({ product: effectiveProduct, opened: format(new Date(`${effectiveOpened}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${expiry}T12:00:00`), "dd/MM/yyyy"), lot: effectiveLot || undefined, inspection, responsible: effectiveResponsible, issued });
     await refresh();
     setTimeout(() => window.print(), 120);
+  };
+
+  const reprintLabel = (record: LabelRecord) => {
+    setLabel({ product: record.product_name, opened: format(new Date(`${record.opened_on}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${record.expires_on}T12:00:00`), "dd/MM/yyyy"), lot: record.lot_number ?? undefined, inspection: record.inspection_label ?? undefined, responsible: record.responsible_name, issued: new Date(record.issued_at) });
+    setTimeout(() => window.print(), 120);
+  };
+
+  const duplicateLabel = (record: LabelRecord) => {
+    setSelectedClient(record.client_id);
+    setSelectedProduct(record.product_id ?? "");
+    setSelectedResponsible(record.responsible_id ?? "");
+    setOpenedOn(record.opened_on);
+    setLot(record.lot_number ?? "");
+    setLabelDraft({ product: record.product_name, responsible: record.responsible_name, opened: record.opened_on, expires: record.expires_on, lot: record.lot_number ?? "" });
+    setMessage("");
+    setTab("emit");
   };
 
   return (
@@ -168,7 +184,7 @@ function Index() {
             <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
               <div className="space-y-5 rounded-3xl border bg-card p-5 shadow-sm sm:p-7">
                 <Field label="Cliente"><select value={selectedClient} disabled={role === "operator"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
-                <Field label="Produto"><select value={selectedProduct} onChange={(e) => { setSelectedProduct(e.target.value); setLot(""); }}><option value="">Selecione o produto</option>{visibleProducts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
+                <Field label="Produto"><select value={selectedProduct} onChange={(e) => { setSelectedProduct(e.target.value); setLot(""); setLabelDraft(null); }}><option value="">Selecione o produto</option>{visibleProducts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
                 <div className="grid gap-5 sm:grid-cols-2">
                   <Field label="Data de abertura"><input type="date" value={openedOn} onChange={(e) => setOpenedOn(e.target.value)} /></Field>
                   <div className="rounded-2xl bg-secondary p-4"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Validade calculada</span><strong className="mt-1 block text-xl text-primary">{expiresOn}</strong></div>
@@ -176,16 +192,18 @@ function Index() {
                 {product?.requires_lot && <Field label="Número do lote" hint="Obrigatório para este produto"><input value={lot} maxLength={80} onChange={(e) => setLot(e.target.value)} placeholder="Ex.: 4587" /></Field>}
                 {product?.requires_inspection && <div className="rounded-2xl border border-primary/20 bg-secondary p-4 text-sm"><ShieldCheck className="mr-2 inline size-5 text-primary" /><strong>{product.inspection_type}/registro:</strong> {product.inspection_number}</div>}
                 <Field label="Responsável"><select value={selectedResponsible} onChange={(e) => setSelectedResponsible(e.target.value)}><option value="">Selecione o responsável</option>{visibleCollaborators.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
+                {product && responsible && !labelDraft && <Button variant="outline" className="w-full" onClick={() => setLabelDraft({ product: product.name, responsible: responsible.name, opened: openedOn, expires: format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd"), lot })}><Pencil /> Editar etiqueta antes de imprimir</Button>}
+                {labelDraft && <div className="grid gap-4 rounded-2xl border bg-secondary/50 p-4 sm:grid-cols-2"><div className="sm:col-span-2"><Field label="Nome na etiqueta"><input maxLength={120} value={labelDraft.product} onChange={(e) => setLabelDraft({ ...labelDraft, product: e.target.value })} /></Field></div><Field label="Aberto em"><input type="date" value={labelDraft.opened} onChange={(e) => setLabelDraft({ ...labelDraft, opened: e.target.value })} /></Field><Field label="Validade"><input type="date" value={labelDraft.expires} onChange={(e) => setLabelDraft({ ...labelDraft, expires: e.target.value })} /></Field><Field label="Lote"><input maxLength={80} value={labelDraft.lot} onChange={(e) => setLabelDraft({ ...labelDraft, lot: e.target.value })} /></Field><Field label="Responsável"><input maxLength={120} value={labelDraft.responsible} onChange={(e) => setLabelDraft({ ...labelDraft, responsible: e.target.value })} /></Field><div className="sm:col-span-2"><Button variant="ghost" size="sm" onClick={() => setLabelDraft(null)}>Cancelar edição</Button></div></div>}
                 {message && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm font-semibold text-destructive">{message}</p>}
                 <Button variant="kitchen" size="xl" className="w-full" onClick={issueLabel}><Printer /> Emitir etiqueta</Button>
               </div>
-              <div><p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · TAMANHO REAL 50 × 30 MM</p><ThermalLabel label={label ?? { product: product?.name ?? "NOME DO PRODUTO", opened: openedOn ? format(new Date(`${openedOn}T12:00:00`), "dd/MM/yyyy") : "—", expires: expiresOn, lot: lot || undefined, inspection: product?.requires_inspection ? `${product.inspection_type}: ${product.inspection_number}` : undefined, responsible: responsible?.name ?? "RESPONSÁVEL", issued: new Date() }} /></div>
+              <div><p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · TAMANHO REAL 50 × 30 MM</p><ThermalLabel label={label ?? previewLabel} /></div>
             </div>
           </section>}
           {tab === "clients" && <ClientsPanel clients={clients} refresh={refresh} />}
           {tab === "products" && <ProductsPanel clients={clients} products={products} refresh={refresh} />}
           {tab === "team" && <TeamPanel clients={clients} collaborators={collaborators} refresh={refresh} />}
-          {tab === "history" && <HistoryPanel history={history} />}
+          {tab === "history" && <HistoryPanel history={history} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
         </main>
       </div>
     </div>
