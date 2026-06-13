@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Building2, Clock3, History, LayoutDashboard, LogOut, Menu, PackagePlus, Pencil, Printer, Search, ShieldCheck, Tag, Trash2, Users, X } from "lucide-react";
+import { Building2, Clock3, Copy, History, LayoutDashboard, LogOut, Menu, PackagePlus, Pencil, Printer, Search, ShieldCheck, Tag, Trash2, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,8 @@ export const Route = createFileRoute("/")({
 type Client = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; active: boolean };
 type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null };
 type Collaborator = { id: string; client_id: string; name: string; email: string | null };
-type LabelRecord = { id: string; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; opened_on: string; issued_at: string; expires_on: string };
+type PrintableLabel = { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date };
+type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string };
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
 
 function Index() {
@@ -44,7 +45,8 @@ function Index() {
   const [selectedResponsible, setSelectedResponsible] = useState("");
   const [openedOn, setOpenedOn] = useState(format(new Date(), "yyyy-MM-dd"));
   const [lot, setLot] = useState("");
-  const [label, setLabel] = useState<{ product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date } | null>(null);
+  const [label, setLabel] = useState<PrintableLabel | null>(null);
+  const [labelDraft, setLabelDraft] = useState<{ product: string; responsible: string; opened: string; expires: string; lot: string } | null>(null);
 
   const refresh = async () => {
     const { data: auth } = await supabase.auth.getUser();
@@ -70,7 +72,7 @@ function Index() {
     setCollaborators((collaboratorRows ?? []) as Collaborator[]);
     if (ownClient) setSelectedClient(ownClient);
     if (currentRole === "admin") {
-      const { data: labels } = await supabase.from("issued_labels").select("id,client_name,product_name,responsible_name,lot_number,opened_on,issued_at,expires_on").order("issued_at", { ascending: false }).limit(100);
+       const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on").order("issued_at", { ascending: false }).limit(100);
       setHistory((labels ?? []) as LabelRecord[]);
     }
     setLoading(false);
@@ -85,6 +87,15 @@ function Index() {
   const responsible = collaborators.find((item) => item.id === selectedResponsible);
   const client = clients.find((item) => item.id === selectedClient);
   const expiresOn = useMemo(() => product && openedOn ? format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "dd/MM/yyyy") : "—", [product, openedOn]);
+  const previewLabel: PrintableLabel = {
+    product: labelDraft?.product || product?.name || "NOME DO PRODUTO",
+    opened: labelDraft?.opened ? format(new Date(`${labelDraft.opened}T12:00:00`), "dd/MM/yyyy") : openedOn ? format(new Date(`${openedOn}T12:00:00`), "dd/MM/yyyy") : "—",
+    expires: labelDraft?.expires ? format(new Date(`${labelDraft.expires}T12:00:00`), "dd/MM/yyyy") : expiresOn,
+    lot: (labelDraft?.lot ?? lot) || undefined,
+    inspection: product?.requires_inspection && product.inspection_type && product.inspection_number ? `${product.inspection_type}: ${product.inspection_number}` : undefined,
+    responsible: labelDraft?.responsible || responsible?.name || "RESPONSÁVEL",
+    issued: new Date(),
+  };
 
   if (loading) return <main className="grid min-h-screen place-items-center bg-background"><p className="font-semibold text-muted-foreground">Preparando sua estação…</p></main>;
 
@@ -107,15 +118,20 @@ function Index() {
     if (!client || !product || !responsible) { setMessage("Selecione cliente, produto e responsável."); return; }
     if (product.requires_lot && !lot.trim()) { setMessage("Este produto exige número de lote."); return; }
     const issued = new Date();
-    const expiry = format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd");
-    const inspection = product.requires_inspection ? `${product.inspection_type}: ${product.inspection_number}` : undefined;
+    const effectiveOpened = labelDraft?.opened || openedOn;
+    const expiry = labelDraft?.expires || format(addDays(new Date(`${effectiveOpened}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd");
+    const inspection = product.requires_inspection && product.inspection_type && product.inspection_number ? `${product.inspection_type}: ${product.inspection_number}` : undefined;
+    const effectiveProduct = labelDraft?.product.trim() || product.name;
+    const effectiveResponsible = labelDraft?.responsible.trim() || responsible.name;
+    const effectiveLot = (labelDraft?.lot ?? lot).trim();
     const { error } = await supabase.from("issued_labels").insert({
       client_id: client.id, product_id: product.id, responsible_id: responsible.id, issued_by: userId,
-      client_name: client.name, product_name: product.name, responsible_name: responsible.name,
-      lot_number: lot.trim() || null, inspection_label: inspection ?? null, opened_on: openedOn, expires_on: expiry,
+      client_name: client.name, product_name: effectiveProduct, responsible_name: effectiveResponsible,
+      lot_number: effectiveLot || null, inspection_label: inspection ?? null, opened_on: effectiveOpened, expires_on: expiry,
     });
     if (error) { setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return; }
-    setLabel({ product: product.name, opened: format(new Date(`${openedOn}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${expiry}T12:00:00`), "dd/MM/yyyy"), lot: lot.trim() || undefined, inspection, responsible: responsible.name, issued });
+    setLabel({ product: effectiveProduct, opened: format(new Date(`${effectiveOpened}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${expiry}T12:00:00`), "dd/MM/yyyy"), lot: effectiveLot || undefined, inspection, responsible: effectiveResponsible, issued });
+    await refresh();
     setTimeout(() => window.print(), 120);
   };
 
