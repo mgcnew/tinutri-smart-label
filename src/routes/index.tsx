@@ -137,7 +137,8 @@ function Index() {
 
   const reprintLabel = (record: LabelRecord) => {
     setLabel({ product: record.product_name, opened: format(new Date(`${record.opened_on}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${record.expires_on}T12:00:00`), "dd/MM/yyyy"), lot: record.lot_number ?? undefined, inspection: record.inspection_label ?? undefined, responsible: record.responsible_name, issued: new Date(record.issued_at) });
-    setTimeout(() => window.print(), 120);
+    setTab("emit");
+    setTimeout(() => window.print(), 180);
   };
 
   const duplicateLabel = (record: LabelRecord) => {
@@ -146,6 +147,7 @@ function Index() {
     setSelectedResponsible(record.responsible_id ?? "");
     setOpenedOn(record.opened_on);
     setLot(record.lot_number ?? "");
+    setLabel(null);
     setLabelDraft({ product: record.product_name, responsible: record.responsible_name, opened: record.opened_on, expires: record.expires_on, lot: record.lot_number ?? "" });
     setMessage("");
     setTab("emit");
