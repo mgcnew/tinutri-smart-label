@@ -163,7 +163,7 @@ function Index() {
                 {message && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm font-semibold text-destructive">{message}</p>}
                 <Button variant="kitchen" size="xl" className="w-full" onClick={issueLabel}><Printer /> Emitir etiqueta</Button>
               </div>
-              <div><p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · 60 × 40 MM</p><ThermalLabel label={label ?? { product: product?.name ?? "PRODUTO", opened: openedOn ? format(new Date(`${openedOn}T12:00:00`), "dd/MM/yyyy") : "—", expires: expiresOn, lot: lot || undefined, inspection: product?.requires_inspection ? `${product.inspection_type}: ${product.inspection_number}` : undefined, responsible: responsible?.name ?? "RESPONSÁVEL", issued: new Date() }} /></div>
+              <div><p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · TAMANHO REAL 50 × 30 MM</p><ThermalLabel label={label ?? { product: product?.name ?? "NOME DO PRODUTO", opened: openedOn ? format(new Date(`${openedOn}T12:00:00`), "dd/MM/yyyy") : "—", expires: expiresOn, lot: lot || undefined, inspection: product?.requires_inspection ? `${product.inspection_type}: ${product.inspection_number}` : undefined, responsible: responsible?.name ?? "RESPONSÁVEL", issued: new Date() }} /></div>
             </div>
           </section>}
           {tab === "clients" && <ClientsPanel clients={clients} refresh={refresh} />}
@@ -183,7 +183,24 @@ function Login() {
 
 function Brand({ inverse = false }: { inverse?: boolean }) { return <div className="flex min-w-0 items-center gap-3"><div className={`grid size-10 shrink-0 place-items-center rounded-xl ${inverse ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground"}`}><Tag className="size-5" /></div><div className="min-w-0"><strong className={`block truncate font-display text-lg leading-tight ${inverse ? "text-primary-foreground" : "text-foreground"}`}>TiNutri Smart Label®</strong><span className={`text-xs ${inverse ? "text-primary-foreground/65" : "text-muted-foreground"}`}>Validade simples. Segurança sempre.</span></div></div> }
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) { return <label className="block"><span className="mb-2 flex justify-between text-sm font-bold">{label}{hint && <small className="font-medium text-muted-foreground">{hint}</small>}</span>{children}</label> }
-function ThermalLabel({ label }: { label: { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date } }) { const rows = [["PRODUTO", label.product], ["ABERTO EM", label.opened], ["VALIDADE", label.expires], ...(label.lot ? [["LOTE", label.lot]] : []), ...(label.inspection ? [["SIF/SISP/SIM", label.inspection.replace(/^\w+:\s*/, "")]] : []), ["RESPONSÁVEL", label.responsible], ["EMITIDO EM", format(label.issued, "dd/MM/yyyy")], ["HORÁRIO", format(label.issued, "HH:mm")]]; return <div className="thermal-label aspect-[3/2] w-full overflow-hidden border-2 border-foreground bg-card p-[4%] font-sans text-foreground shadow-xl"><div className="mb-[2%] flex items-center gap-2 border-b-2 border-foreground pb-[2%]"><Tag className="size-[5%] min-h-3 min-w-3" /><strong className="text-[clamp(10px,3.2vw,15px)] leading-none">TiNutri Smart Label®</strong></div><div className="space-y-[0.5%]">{rows.map(([key, value]) => <p key={key} className="truncate text-[clamp(8px,2.65vw,12px)] font-semibold leading-[1.22]"><strong>{key}:</strong> {value.toUpperCase()}</p>)}</div></div> }
+function ThermalLabel({ label }: { label: { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date } }) {
+  return <div className="thermal-label !h-[30mm] !w-[50mm] min-h-[30mm] min-w-[50mm] max-h-[30mm] max-w-[50mm] shrink-0" aria-label="Pré-visualização da etiqueta térmica de 50 por 30 milímetros">
+    <header className="thermal-label__brand">TiNutri Smart Label®</header>
+    <strong className="thermal-label__product">{label.product.toUpperCase()}</strong>
+    <div className="thermal-label__dates">
+      <div className="thermal-label__expiry"><span>VALIDADE</span><strong>{label.expires}</strong></div>
+      <div className="thermal-label__opened"><span>ABERTO EM</span><strong>{label.opened}</strong></div>
+    </div>
+    <div className="thermal-label__meta">
+      <strong>LOTE: {(label.lot ?? "—").toUpperCase()}</strong>
+      {label.inspection && <span>SIF/SISP/SIM: {label.inspection.replace(/^\w+:\s*/, "")}</span>}
+    </div>
+    <footer className="thermal-label__footer">
+      <div><span>RESPONSÁVEL</span><strong>{label.responsible.toUpperCase()}</strong></div>
+      <time>{format(label.issued, "HH:mm")}</time>
+    </footer>
+  </div>;
+}
 
 const navItems = [{ id: "dashboard", label: "Dashboard", icon: LayoutDashboard }, { id: "clients", label: "Clientes", icon: Building2 }, { id: "products", label: "Produtos", icon: PackagePlus }, { id: "team", label: "Colaboradores", icon: Users }, { id: "emit", label: "Emitir Etiquetas", icon: Printer }, { id: "history", label: "Histórico", icon: History }] as const;
 function Nav({ role, tab, setTab, closeOnSelect = false }: { role: string; tab: AppTab; setTab: (id: AppTab) => void; closeOnSelect?: boolean }) { return navItems.filter((item) => role === "admin" || item.id === "emit").map((item) => { const control = <Button key={item.id} variant={tab === item.id ? "secondary" : "ghost"} className="h-11 w-full justify-start" onClick={() => setTab(item.id)}><item.icon />{item.label}</Button>; return closeOnSelect ? <SheetClose asChild key={item.id}>{control}</SheetClose> : control; }); }
