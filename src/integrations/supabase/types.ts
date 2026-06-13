@@ -17,23 +17,35 @@ export type Database = {
       clients: {
         Row: {
           active: boolean
+          city: string
+          cnpj: string | null
           created_at: string
           id: string
+          legal_name: string | null
           name: string
+          state: string
           updated_at: string
         }
         Insert: {
           active?: boolean
+          city?: string
+          cnpj?: string | null
           created_at?: string
           id?: string
+          legal_name?: string | null
           name: string
+          state?: string
           updated_at?: string
         }
         Update: {
           active?: boolean
+          city?: string
+          cnpj?: string | null
           created_at?: string
           id?: string
+          legal_name?: string | null
           name?: string
+          state?: string
           updated_at?: string
         }
         Relationships: []
