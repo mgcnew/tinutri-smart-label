@@ -29,6 +29,23 @@ type PrintableLabel = { product: string; opened: string; expires: string; lot?: 
 type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string };
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
 
+function reservePrintWindow() {
+  return window.open("", "_blank", "popup=yes,width=420,height=320");
+}
+
+function printThermalLabel(label: PrintableLabel, printWindow = reservePrintWindow()) {
+  if (!printWindow) return false;
+  const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
+  const lot = escapeHtml((label.lot ?? "—").toUpperCase());
+  const inspection = label.inspection ? `<span>${escapeHtml(label.inspection)}</span>` : "";
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etiqueta TiNutri 50 × 30 mm</title><style>
+    @page{size:50mm 30mm;margin:0}*{box-sizing:border-box}html,body{width:50mm;height:30mm;margin:0;padding:0;overflow:hidden;background:#fff;color:#000}body{font-family:Arial,Helvetica,sans-serif}.label{width:50mm;height:30mm;padding:1.25mm 1.5mm 1mm;line-height:1}.brand{font-size:5.5pt;font-weight:700;letter-spacing:.01em}.product{display:block;overflow:hidden;margin-top:.8mm;font-size:9pt;line-height:1.05;white-space:nowrap;text-overflow:ellipsis}.dates{display:grid;grid-template-columns:1.2fr 1fr;gap:1.4mm;margin-top:1mm}.dates span,.footer span{display:block;font-size:4.5pt;font-weight:700}.dates strong{display:block;margin-top:.45mm}.expiry strong{font-size:17pt;font-weight:900;letter-spacing:-.055em}.opened strong{font-size:8.5pt}.meta{display:flex;align-items:baseline;gap:1.5mm;overflow:hidden;margin-top:.8mm;font-size:6pt;white-space:nowrap}.meta span{overflow:hidden;text-overflow:ellipsis}.footer{display:flex;align-items:end;justify-content:space-between;gap:1mm;margin-top:.75mm}.footer div{min-width:0}.footer strong{display:block;overflow:hidden;max-width:37mm;margin-top:.35mm;font-size:7pt;white-space:nowrap;text-overflow:ellipsis}.footer time{flex-shrink:0;font-size:8pt;font-weight:700}@media print{html,body,.label{width:50mm!important;height:30mm!important}.label{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+  </style></head><body><main class="label"><header class="brand">TiNutri Smart Label®</header><strong class="product">${escapeHtml(label.product.toUpperCase())}</strong><div class="dates"><div class="expiry"><span>VALIDADE</span><strong>${escapeHtml(label.expires)}</strong></div><div class="opened"><span>ABERTO EM</span><strong>${escapeHtml(label.opened)}</strong></div></div><div class="meta"><strong>LOTE: ${lot}</strong>${inspection}</div><footer class="footer"><div><span>RESPONSÁVEL</span><strong>${escapeHtml(label.responsible.toUpperCase())}</strong></div><time>${format(label.issued, "HH:mm")}</time></footer></main><script>window.addEventListener('load',()=>{window.focus();setTimeout(()=>window.print(),80)});<\/script></body></html>`);
+  printWindow.document.close();
+  return true;
+}
+
 function Index() {
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,21 +141,26 @@ function Index() {
     const effectiveProduct = labelDraft?.product.trim() || product.name;
     const effectiveResponsible = labelDraft?.responsible.trim() || responsible.name;
     const effectiveLot = (labelDraft?.lot ?? lot).trim();
+    const printWindow = reservePrintWindow();
+    if (!printWindow) { setMessage("Permita a abertura da janela de impressão no navegador."); return; }
+    printWindow.document.write("<!doctype html><title>Preparando etiqueta</title><p style='font-family:Arial,sans-serif'>Preparando etiqueta para impressão…</p>");
     const { error } = await supabase.from("issued_labels").insert({
       client_id: client.id, product_id: product.id, responsible_id: responsible.id, issued_by: userId,
       client_name: client.name, product_name: effectiveProduct, responsible_name: effectiveResponsible,
       lot_number: effectiveLot || null, inspection_label: inspection ?? null, opened_on: effectiveOpened, expires_on: expiry,
     });
-    if (error) { setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return; }
-    setLabel({ product: effectiveProduct, opened: format(new Date(`${effectiveOpened}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${expiry}T12:00:00`), "dd/MM/yyyy"), lot: effectiveLot || undefined, inspection, responsible: effectiveResponsible, issued });
+    if (error) { printWindow.close(); setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return; }
+    const issuedLabel = { product: effectiveProduct, opened: format(new Date(`${effectiveOpened}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${expiry}T12:00:00`), "dd/MM/yyyy"), lot: effectiveLot || undefined, inspection, responsible: effectiveResponsible, issued };
+    setLabel(issuedLabel);
+    printThermalLabel(issuedLabel, printWindow);
     await refresh();
-    setTimeout(() => window.print(), 120);
   };
 
   const reprintLabel = (record: LabelRecord) => {
-    setLabel({ product: record.product_name, opened: format(new Date(`${record.opened_on}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${record.expires_on}T12:00:00`), "dd/MM/yyyy"), lot: record.lot_number ?? undefined, inspection: record.inspection_label ?? undefined, responsible: record.responsible_name, issued: new Date(record.issued_at) });
+    const historicalLabel = { product: record.product_name, opened: format(new Date(`${record.opened_on}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${record.expires_on}T12:00:00`), "dd/MM/yyyy"), lot: record.lot_number ?? undefined, inspection: record.inspection_label ?? undefined, responsible: record.responsible_name, issued: new Date(record.issued_at) };
+    setLabel(historicalLabel);
     setTab("emit");
-    setTimeout(() => window.print(), 180);
+    if (!printThermalLabel(historicalLabel)) setMessage("Permita a abertura da janela de impressão no navegador.");
   };
 
   const duplicateLabel = (record: LabelRecord) => {
