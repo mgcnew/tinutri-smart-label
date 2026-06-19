@@ -197,8 +197,8 @@
 }
 
 @media print {
-  @page { size: 50mm 30mm; margin: 0; }
+  @page { size: 60mm 40mm; margin: 0; }
   body * { visibility: hidden !important; }
   .thermal-label, .thermal-label * { visibility: visible !important; }
-  .thermal-label { position: fixed !important; inset: 0 !important; width: 50mm !important; height: 30mm !important; margin: 0 !important; border: 0 !important; box-shadow: none !important; print-color-adjust: exact; }
+  .thermal-label { position: fixed !important; inset: 0 !important; width: 60mm !important; height: 40mm !important; margin: 0 !important; border: 0 !important; box-shadow: none !important; print-color-adjust: exact; }
 }
