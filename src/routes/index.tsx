@@ -30,7 +30,7 @@ type LabelRecord = { id: string; client_id: string; product_id: string | null; r
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
 
 function reservePrintWindow() {
-  return window.open("", "_blank", "popup=yes,width=420,height=320");
+  return window.open("", "_blank", "popup=yes,width=520,height=380");
 }
 
 function printThermalLabel(label: PrintableLabel, printWindow = reservePrintWindow()) {
@@ -39,9 +39,9 @@ function printThermalLabel(label: PrintableLabel, printWindow = reservePrintWind
   const lot = escapeHtml((label.lot ?? "—").toUpperCase());
   const inspection = label.inspection ? `<div class="insp">${escapeHtml(label.inspection.toUpperCase())}</div>` : "";
   printWindow.document.open();
-  printWindow.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etiqueta TiNutri 50 × 30 mm</title><style>
-    @page{size:50mm 30mm;margin:0}*{box-sizing:border-box}html,body{width:50mm;height:30mm;margin:0;padding:0;overflow:hidden;background:#fff;color:#000}body{font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:none;text-rendering:geometricPrecision}.label{width:50mm;height:30mm;padding:1mm 1.2mm;line-height:1;text-align:center;display:flex;flex-direction:column;align-items:stretch;gap:.35mm}.brand{font-size:5pt;font-weight:700;letter-spacing:.02em}.product{display:block;overflow:hidden;font-size:8.5pt;font-weight:800;line-height:1.05;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase}.dates{display:grid;grid-template-columns:1fr 1fr;gap:1mm;align-items:end}.dates .cell{display:flex;flex-direction:column;align-items:center;line-height:1}.dates .cell span{font-size:5pt;font-weight:700;letter-spacing:.04em}.fab strong{font-size:8pt;font-weight:700;margin-top:.3mm}.val strong{font-size:14pt;font-weight:900;letter-spacing:-.04em;margin-top:.15mm}.meta{display:flex;justify-content:center;gap:2mm;font-size:6pt;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden}.insp{font-size:5.5pt;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.footer{display:flex;align-items:end;justify-content:space-between;gap:1mm;margin-top:auto}.footer .resp{flex:1;min-width:0;text-align:left;line-height:1}.footer .resp span{display:block;font-size:4.5pt;font-weight:700;letter-spacing:.04em}.footer .resp strong{display:block;overflow:hidden;margin-top:.25mm;font-size:7pt;font-weight:800;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase}.footer time{flex-shrink:0;font-size:8pt;font-weight:700;font-variant-numeric:tabular-nums}@media print{html,body,.label{width:50mm!important;height:30mm!important}.label{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
-  </style></head><body><main class="label"><header class="brand">TiNutri Smart Label®</header><strong class="product">${escapeHtml(label.product.toUpperCase())}</strong><div class="dates"><div class="cell fab"><span>FAB:</span><strong>${escapeHtml(label.opened)}</strong></div><div class="cell val"><span>VAL:</span><strong>${escapeHtml(label.expires)}</strong></div></div><div class="meta"><span>LOTE: ${lot}</span></div>${inspection}<footer class="footer"><div class="resp"><span>RESPONSÁVEL:</span><strong>${escapeHtml(label.responsible.toUpperCase())}</strong></div><time>${format(label.issued, "HH:mm")}</time></footer></main><script>window.addEventListener('load',()=>{window.focus();setTimeout(()=>{window.print();setTimeout(()=>window.close(),400)},80)});<\/script></body></html>`);
+  printWindow.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etiqueta TiNutri 60 × 40 mm</title><style>
+    @page{size:60mm 40mm;margin:0}*{box-sizing:border-box}html,body{width:60mm;height:40mm;margin:0;padding:0;overflow:hidden;background:#fff;color:#000}body{font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:none;text-rendering:geometricPrecision}.label{width:60mm;height:40mm;padding:1.2mm 1.5mm;line-height:1;display:flex;flex-direction:column;align-items:stretch;gap:.2mm}.brand{font-size:5.5pt;font-weight:700;letter-spacing:.02em;text-align:center}.product{display:block;overflow:hidden;font-size:9pt;font-weight:800;line-height:1.1;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase;text-align:center;margin-top:.6mm}.expiry{margin-top:1mm;text-align:center}.expiry span{display:block;font-size:5pt;font-weight:700;letter-spacing:.04em}.expiry strong{display:block;font-size:20pt;font-weight:900;letter-spacing:-.03em;line-height:1;margin-top:.2mm}.fab{margin-top:.6mm}.fab span{font-size:4.5pt;font-weight:700;letter-spacing:.04em}.fab strong{font-size:8.5pt;font-weight:700}.lot{margin-top:.5mm;font-size:6.5pt;font-weight:700;text-transform:uppercase}.insp{font-size:5.5pt;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:.3mm}.footer{display:flex;align-items:baseline;justify-content:space-between;gap:1mm;margin-top:auto}.footer .resp{flex:1;min-width:0;text-align:left;line-height:1}.footer .resp span{display:block;font-size:4.5pt;font-weight:700;letter-spacing:.04em}.footer .resp strong{display:block;overflow:hidden;margin-top:.2mm;font-size:7.5pt;font-weight:800;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase}.footer time{flex-shrink:0;font-size:8.5pt;font-weight:700;font-variant-numeric:tabular-nums}@media print{html,body,.label{width:60mm!important;height:40mm!important}.label{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+  </style></head><body><main class="label"><header class="brand">TiNutri Smart Label®</header><strong class="product">${escapeHtml(label.product.toUpperCase())}</strong><div class="expiry"><span>VALIDADE</span><strong>${escapeHtml(label.expires)}</strong></div><div class="fab"><span>FAB:</span><strong>${escapeHtml(label.opened)}</strong></div><div class="lot">LOTE: ${lot}</div>${inspection}<footer class="footer"><div class="resp"><span>RESPONSÁVEL:</span><strong>${escapeHtml(label.responsible.toUpperCase())}</strong></div><time>${format(label.issued, "HH:mm")}</time></footer></main><script>window.addEventListener('load',()=>{window.focus();setTimeout(()=>{window.print();setTimeout(()=>window.close(),400)},80)});<\/script></body></html>`);
   printWindow.document.close();
   return true;
 }
@@ -221,7 +221,7 @@ function Index() {
                 {message && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm font-semibold text-destructive">{message}</p>}
                 <Button variant="kitchen" size="xl" className="w-full" onClick={issueLabel}><Printer /> Emitir etiqueta</Button>
               </div>
-              <div><p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · TAMANHO REAL 50 × 30 MM</p><ThermalLabel label={label ?? previewLabel} /></div>
+              <div><p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · TAMANHO REAL 60 × 40 MM</p><ThermalLabel label={label ?? previewLabel} /></div>
             </div>
           </section>}
           {tab === "clients" && <ClientsPanel clients={clients} refresh={refresh} />}
@@ -242,19 +242,21 @@ function Login() {
 function Brand({ inverse = false }: { inverse?: boolean }) { return <div className="flex min-w-0 items-center gap-3"><div className={`grid size-10 shrink-0 place-items-center rounded-xl ${inverse ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground"}`}><Tag className="size-5" /></div><div className="min-w-0"><strong className={`block truncate font-display text-lg leading-tight ${inverse ? "text-primary-foreground" : "text-foreground"}`}>TiNutri Smart Label®</strong><span className={`text-xs ${inverse ? "text-primary-foreground/65" : "text-muted-foreground"}`}>Validade simples. Segurança sempre.</span></div></div> }
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) { return <label className="block"><span className="mb-2 flex justify-between text-sm font-bold">{label}{hint && <small className="font-medium text-muted-foreground">{hint}</small>}</span>{children}</label> }
 function ThermalLabel({ label }: { label: { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date } }) {
-  return <div className="thermal-label !h-[30mm] !w-[50mm] min-h-[30mm] min-w-[50mm] max-h-[30mm] max-w-[50mm] shrink-0" aria-label="Pré-visualização da etiqueta térmica de 50 por 30 milímetros">
+  return <div className="thermal-label !h-[40mm] !w-[60mm] min-h-[40mm] min-w-[60mm] max-h-[40mm] max-w-[60mm] shrink-0" aria-label="Pré-visualização da etiqueta térmica de 60 por 40 milímetros">
     <header className="thermal-label__brand">TiNutri Smart Label®</header>
     <strong className="thermal-label__product">{label.product.toUpperCase()}</strong>
-    <div className="thermal-label__dates">
-      <div className="thermal-label__expiry"><span>VALIDADE</span><strong>{label.expires}</strong></div>
-      <div className="thermal-label__opened"><span>ABERTO EM</span><strong>{label.opened}</strong></div>
+    <div className="thermal-label__expiry-block">
+      <span>VALIDADE</span>
+      <strong>{label.expires}</strong>
     </div>
-    <div className="thermal-label__meta">
-      <strong>LOTE: {(label.lot ?? "—").toUpperCase()}</strong>
-      {label.inspection && <span>{label.inspection}</span>}
+    <div className="thermal-label__fab">
+      <span>FAB:</span>
+      <strong>{label.opened}</strong>
     </div>
+    <div className="thermal-label__lot">LOTE: {(label.lot ?? "—").toUpperCase()}</div>
+    {label.inspection && <div className="thermal-label__insp">{label.inspection}</div>}
     <footer className="thermal-label__footer">
-      <div><span>RESPONSÁVEL</span><strong>{label.responsible.toUpperCase()}</strong></div>
+      <div><span>RESPONSÁVEL:</span><strong>{label.responsible.toUpperCase()}</strong></div>
       <time>{format(label.issued, "HH:mm")}</time>
     </footer>
   </div>;
