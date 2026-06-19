@@ -221,7 +221,7 @@ function Index() {
                 {message && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm font-semibold text-destructive">{message}</p>}
                 <Button variant="kitchen" size="xl" className="w-full" onClick={issueLabel}><Printer /> Emitir etiqueta</Button>
               </div>
-              <div><p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · TAMANHO REAL 50 × 30 MM</p><ThermalLabel label={label ?? previewLabel} /></div>
+              <div><p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · TAMANHO REAL 60 × 40 MM</p><ThermalLabel label={label ?? previewLabel} /></div>
             </div>
           </section>}
           {tab === "clients" && <ClientsPanel clients={clients} refresh={refresh} />}
