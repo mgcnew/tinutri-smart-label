@@ -40,9 +40,7 @@ type QueueItem = {
 type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number };
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
 
-function reservePrintWindow() {
-  return window.open("", "_blank", "popup=yes,width=520,height=380");
-}
+const PRINTER_NOT_FOUND_MESSAGE = "Impressora não encontrada. Verifique a conexão Bluetooth ou Wi-Fi.";
 
 type PrinterType = "niimbot" | "elgin" | "bematech" | "zebra" | "tomate" | "argox" | "outra";
 type ConnectionMode = "browser" | "wifi" | "bluetooth" | "usb";
@@ -168,19 +166,13 @@ async function generateNiimbotPng(label: PrintableLabel, size: LabelSize, showTi
   return await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
 }
 
-async function exportNiimbotLabel(label: PrintableLabel, settings: PrinterSettings) {
+type NiimbotPreview = { url: string; filename: string };
+
+async function buildNiimbotPreview(label: PrintableLabel, settings: PrinterSettings): Promise<NiimbotPreview | null> {
   const blob = await generateNiimbotPng(label, settings.size, settings.showTime);
-  if (!blob) return false;
-  const url = URL.createObjectURL(blob);
+  if (!blob) return null;
   const safe = label.product.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "etiqueta";
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `niimbot-${safe}-${settings.size}mm.png`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-  return true;
+  return { url: URL.createObjectURL(blob), filename: `niimbot-${safe}-${settings.size}mm.png` };
 }
 
 function buildLabelHtml(label: PrintableLabel, showTime: boolean) {
@@ -192,8 +184,8 @@ function buildLabelHtml(label: PrintableLabel, showTime: boolean) {
   return `<main class="label"><header class="brand"><img src="${logoUrl}" alt="" class="logo"/><span>TiNutri Smart Label®</span></header><strong class="product">${escapeHtml(label.product.toUpperCase())}</strong>${lotLine}${inspection}<div class="dates"><div class="fab"><span>FAB:</span><strong>${escapeHtml(label.opened)}</strong></div><div class="expiry"><span>VALIDADE</span><strong>${escapeHtml(label.expires)}</strong></div></div><footer class="footer"><div class="resp"><span>RESPONSÁVEL:</span><strong>${escapeHtml(label.responsible.toUpperCase())}</strong></div>${timeBlock}</footer></main>`;
 }
 
-function printThermalBatch(items: { label: PrintableLabel; copies: number }[], settings: PrinterSettings, printWindow = reservePrintWindow()) {
-  if (!printWindow) return false;
+function printThermalBatch(items: { label: PrintableLabel; copies: number }[], settings: PrinterSettings): boolean {
+  if (typeof window === "undefined") return false;
   const { w, h } = sizeMm(settings.size);
   const scale = settings.size === "50x30" ? 0.78 : 1;
   const f = (pt: number) => +(pt * scale).toFixed(2);
@@ -201,12 +193,34 @@ function printThermalBatch(items: { label: PrintableLabel; copies: number }[], s
     const html = buildLabelHtml(label, settings.showTime);
     return Array.from({ length: Math.max(1, Math.min(200, Math.floor(copies))) }, () => html);
   }).join("");
-  printWindow.document.open();
-  printWindow.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etiqueta TiNutri ${w} × ${h} mm</title><style>
+  const doc = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etiqueta TiNutri ${w} × ${h} mm</title><style>
     @page{size:${w}mm ${h}mm;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000}body{font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:none;text-rendering:geometricPrecision}.label{width:${w}mm;height:${h}mm;padding:1.2mm 1.5mm;line-height:1;display:flex;flex-direction:column;align-items:stretch;gap:.2mm;page-break-after:always;break-after:page;overflow:hidden}.label:last-child{page-break-after:auto;break-after:auto}.brand{display:flex;align-items:center;justify-content:center;gap:1mm;font-size:${f(5.5)}pt;font-weight:800;letter-spacing:.02em}.brand .logo{height:${f(3.5)}mm;width:${f(3.5)}mm;object-fit:contain}.product{display:block;overflow:hidden;font-size:${f(9)}pt;font-weight:800;line-height:1.1;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase;text-align:center;margin-top:.4mm}.lot{margin-top:.4mm;font-size:${f(6.5)}pt;font-weight:700;text-transform:uppercase;text-align:center}.insp{font-size:${f(5.5)}pt;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;margin-top:.2mm}.dates{margin-top:.6mm;display:grid;grid-template-columns:1fr 1.2fr;gap:1.5mm;align-items:end}.dates span{display:block;font-size:${f(5)}pt;font-weight:700;letter-spacing:.04em}.fab strong{display:block;font-size:${f(8.5)}pt;font-weight:700}.expiry{text-align:right}.expiry strong{display:block;font-size:${f(18)}pt;font-weight:900;letter-spacing:-.03em;line-height:1;margin-top:.2mm}.footer{display:flex;align-items:baseline;justify-content:space-between;gap:1mm;margin-top:auto}.footer .resp{flex:1;min-width:0;text-align:left;line-height:1}.footer .resp span{display:block;font-size:${f(4.5)}pt;font-weight:700;letter-spacing:.04em}.footer .resp strong{display:block;overflow:hidden;margin-top:.2mm;font-size:${f(7.5)}pt;font-weight:800;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase}.footer time{flex-shrink:0;font-size:${f(8.5)}pt;font-weight:700;font-variant-numeric:tabular-nums}@media print{.label{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
-  </style></head><body>${pages}<script>window.addEventListener('load',()=>{window.focus();setTimeout(()=>{window.print();setTimeout(()=>window.close(),400)},120)});<\/script></body></html>`);
-  printWindow.document.close();
-  return true;
+  </style></head><body>${pages}</body></html>`;
+  try {
+    // Clean up any previous hidden print frame so we don't accumulate them.
+    document.querySelectorAll<HTMLIFrameElement>("iframe[data-tinutri-print]").forEach((node) => node.remove());
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("data-tinutri-print", "1");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;";
+    document.body.appendChild(iframe);
+    iframe.srcdoc = doc;
+    iframe.onload = () => {
+      try {
+        const win = iframe.contentWindow;
+        if (!win) return;
+        win.focus();
+        win.print();
+      } catch {
+        /* ignore — preserve session */
+      }
+      // Leave the iframe in place briefly so the print dialog can finish, then remove.
+      window.setTimeout(() => iframe.remove(), 4000);
+    };
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function Index() {
@@ -232,6 +246,9 @@ function Index() {
   const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_SETTINGS);
   const [showPrinterSettings, setShowPrinterSettings] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [niimbotPreview, setNiimbotPreview] = useState<NiimbotPreview | null>(null);
+
+  useEffect(() => () => { if (niimbotPreview) URL.revokeObjectURL(niimbotPreview.url); }, [niimbotPreview]);
 
   useEffect(() => { setPrinterSettings(loadSettings()); }, []);
   const updateSettings = (patch: Partial<PrinterSettings>) => {
@@ -353,13 +370,8 @@ function Index() {
     setQueue((q) => q.map((it) => it.id === id ? { ...it, copies: Math.max(1, Math.min(200, Math.floor(copies) || 1)) } : it));
 
   const dispatchPrint = async (items: QueueItem[]) => {
-    if (items.length === 0) return;
+    if (items.length === 0) return false;
     const isNiimbot = printerSettings.type === "niimbot";
-    const printWindow = isNiimbot ? null : reservePrintWindow();
-    if (!isNiimbot) {
-      if (!printWindow) { setMessage("Permita a abertura da janela de impressão no navegador."); return; }
-      printWindow.document.write("<!doctype html><title>Preparando etiqueta</title><p style='font-family:Arial,sans-serif'>Preparando etiquetas para impressão…</p>");
-    }
     // Persist em histórico
     const rows = items.map((it) => ({
       client_id: it.client_id, product_id: it.product_id, responsible_id: it.responsible_id, issued_by: userId,
@@ -368,36 +380,36 @@ function Index() {
       opened_on: it.opened_iso, expires_on: it.expires_iso, quantity: it.copies,
     }));
     const { error } = await supabase.from("issued_labels").insert(rows);
-    if (error) { printWindow?.close(); setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return; }
+    if (error) { setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return false; }
     if (isNiimbot) {
-      for (const it of items) {
-        for (let i = 0; i < it.copies; i++) {
-          await exportNiimbotLabel(it.label, printerSettings);
-        }
-      }
-      setMessage(`PNG ${printerSettings.size.replace("x", " × ")} mm gerado(s) para o app NiiMbot.`);
+      const preview = await buildNiimbotPreview(items[items.length - 1].label, printerSettings);
+      if (!preview) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
+      setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
+      setMessage(`Etiqueta pronta para o app NiiMbot. Toque em "Baixar PNG" para enviar à impressora.`);
     } else {
-      printThermalBatch(items.map((it) => ({ label: it.label, copies: it.copies })), printerSettings, printWindow!);
-      if (printerSettings.connection !== "browser") {
-        setMessage(`Conexão ${printerSettings.connection.toUpperCase()} não disponível no navegador — usando impressão do sistema como fallback.`);
-      }
+      const ok = printThermalBatch(items.map((it) => ({ label: it.label, copies: it.copies })), printerSettings);
+      if (!ok) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
+      setMessage(printerSettings.connection !== "browser"
+        ? `Enviando para a impressora ${printerSettings.type.toUpperCase()} via ${printerSettings.connection.toUpperCase()}…`
+        : "Etiqueta enviada para a impressora.");
     }
     setLabel(items[items.length - 1].label);
     await refresh();
+    return true;
   };
 
   const printNow = async () => {
     setMessage("");
     const item = buildCurrentItem();
     if (!item) return;
-    await dispatchPrint([item]);
-    setLabelDraft(null);
+    const ok = await dispatchPrint([item]);
+    if (ok) setLabelDraft(null);
   };
 
   const printQueue = async () => {
     if (queue.length === 0) return;
-    await dispatchPrint(queue);
-    setQueue([]);
+    const ok = await dispatchPrint(queue);
+    if (ok) setQueue([]);
   };
 
   const testPrint = async () => {
@@ -412,12 +424,14 @@ function Index() {
       issued: now,
     };
     if (printerSettings.type === "niimbot") {
-      const ok = await exportNiimbotLabel(sample, printerSettings);
-      setMessage(ok ? "Etiqueta de teste gerada (PNG NiiMbot)." : "Falha ao gerar a etiqueta de teste.");
+      const preview = await buildNiimbotPreview(sample, printerSettings);
+      if (!preview) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return; }
+      setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
+      setMessage('Etiqueta de teste pronta. Toque em "Baixar PNG" para enviar ao app NiiMbot.');
       return;
     }
     const ok = printThermalBatch([{ label: sample, copies: 1 }], printerSettings);
-    setMessage(ok ? "Etiqueta de teste enviada para impressão." : "Permita a abertura da janela de impressão no navegador.");
+    setMessage(ok ? "Etiqueta de teste enviada para impressão." : PRINTER_NOT_FOUND_MESSAGE);
   };
 
   const reprintLabel = (record: LabelRecord) => {
@@ -425,9 +439,13 @@ function Index() {
     setLabel(historicalLabel);
     setTab("emit");
     if (printerSettings.type === "niimbot") {
-      void exportNiimbotLabel(historicalLabel, printerSettings).then((ok) => setMessage(ok ? "PNG gerado para o app NiiMbot." : "Falha ao gerar PNG NiiMbot."));
+      void buildNiimbotPreview(historicalLabel, printerSettings).then((preview) => {
+        if (!preview) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return; }
+        setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
+        setMessage('Etiqueta pronta. Toque em "Baixar PNG" para enviar ao app NiiMbot.');
+      });
     } else if (!printThermalBatch([{ label: historicalLabel, copies: record.quantity || 1 }], printerSettings)) {
-      setMessage("Permita a abertura da janela de impressão no navegador.");
+      setMessage(PRINTER_NOT_FOUND_MESSAGE);
     }
   };
 
@@ -546,6 +564,17 @@ function Index() {
                 {product && responsible && !labelDraft && <Button variant="outline" className="w-full" onClick={() => setLabelDraft({ product: product.name, responsible: responsible.name, opened: openedOn, expires: format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd"), lot })}><Pencil /> Editar etiqueta antes de imprimir</Button>}
                 {labelDraft && <div className="grid gap-4 rounded-2xl border bg-secondary/50 p-4 sm:grid-cols-2"><div className="sm:col-span-2"><Field label="Nome na etiqueta"><input maxLength={120} value={labelDraft.product} onChange={(e) => setLabelDraft({ ...labelDraft, product: e.target.value })} /></Field></div><Field label="Aberto em"><input type="date" value={labelDraft.opened} onChange={(e) => setLabelDraft({ ...labelDraft, opened: e.target.value })} /></Field><Field label="Validade"><input type="date" value={labelDraft.expires} onChange={(e) => setLabelDraft({ ...labelDraft, expires: e.target.value })} /></Field><Field label="Lote"><input maxLength={80} value={labelDraft.lot} onChange={(e) => setLabelDraft({ ...labelDraft, lot: e.target.value })} /></Field><Field label="Responsável"><input maxLength={120} value={labelDraft.responsible} onChange={(e) => setLabelDraft({ ...labelDraft, responsible: e.target.value })} /></Field><div className="sm:col-span-2"><Button variant="ghost" size="sm" onClick={() => setLabelDraft(null)}>Cancelar edição</Button></div></div>}
                 {message && <p role="alert" className="rounded-xl bg-secondary p-3 text-sm font-semibold">{message}</p>}
+                {niimbotPreview && (
+                  <div className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-secondary p-3">
+                    <img src={niimbotPreview.url} alt="Pré-visualização NiiMbot" className="h-16 w-24 rounded-md border bg-white object-contain" />
+                    <div className="min-w-0 flex-1">
+                      <strong className="block text-sm">Etiqueta NiiMbot pronta</strong>
+                      <p className="truncate text-xs text-muted-foreground">{niimbotPreview.filename}</p>
+                    </div>
+                    <a href={niimbotPreview.url} download={niimbotPreview.filename} className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"><Printer className="size-4" /> Baixar PNG</a>
+                    <Button variant="ghost" size="icon" aria-label="Fechar" onClick={() => { URL.revokeObjectURL(niimbotPreview.url); setNiimbotPreview(null); }}><X /></Button>
+                  </div>
+                )}
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Button variant="outline" size="xl" className="w-full" onClick={addToQueue}><ListPlus /> Adicionar à fila</Button>
                   <Button variant="kitchen" size="xl" className="w-full" onClick={printNow}><Printer /> Imprimir agora</Button>
