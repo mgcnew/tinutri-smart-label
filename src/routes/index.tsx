@@ -247,6 +247,7 @@ function Index() {
   const [showPrinterSettings, setShowPrinterSettings] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [niimbotPreview, setNiimbotPreview] = useState<NiimbotPreview | null>(null);
+  const [lastFailedPrint, setLastFailedPrint] = useState<QueueItem[] | null>(null);
 
   useEffect(() => () => { if (niimbotPreview) URL.revokeObjectURL(niimbotPreview.url); }, [niimbotPreview]);
 
