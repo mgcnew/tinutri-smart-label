@@ -246,6 +246,9 @@ function Index() {
   const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_SETTINGS);
   const [showPrinterSettings, setShowPrinterSettings] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [niimbotPreview, setNiimbotPreview] = useState<NiimbotPreview | null>(null);
+
+  useEffect(() => () => { if (niimbotPreview) URL.revokeObjectURL(niimbotPreview.url); }, [niimbotPreview]);
 
   useEffect(() => { setPrinterSettings(loadSettings()); }, []);
   const updateSettings = (patch: Partial<PrinterSettings>) => {
@@ -367,13 +370,8 @@ function Index() {
     setQueue((q) => q.map((it) => it.id === id ? { ...it, copies: Math.max(1, Math.min(200, Math.floor(copies) || 1)) } : it));
 
   const dispatchPrint = async (items: QueueItem[]) => {
-    if (items.length === 0) return;
+    if (items.length === 0) return false;
     const isNiimbot = printerSettings.type === "niimbot";
-    const printWindow = isNiimbot ? null : reservePrintWindow();
-    if (!isNiimbot) {
-      if (!printWindow) { setMessage("Permita a abertura da janela de impressão no navegador."); return; }
-      printWindow.document.write("<!doctype html><title>Preparando etiqueta</title><p style='font-family:Arial,sans-serif'>Preparando etiquetas para impressão…</p>");
-    }
     // Persist em histórico
     const rows = items.map((it) => ({
       client_id: it.client_id, product_id: it.product_id, responsible_id: it.responsible_id, issued_by: userId,
@@ -382,36 +380,36 @@ function Index() {
       opened_on: it.opened_iso, expires_on: it.expires_iso, quantity: it.copies,
     }));
     const { error } = await supabase.from("issued_labels").insert(rows);
-    if (error) { printWindow?.close(); setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return; }
+    if (error) { setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return false; }
     if (isNiimbot) {
-      for (const it of items) {
-        for (let i = 0; i < it.copies; i++) {
-          await exportNiimbotLabel(it.label, printerSettings);
-        }
-      }
-      setMessage(`PNG ${printerSettings.size.replace("x", " × ")} mm gerado(s) para o app NiiMbot.`);
+      const preview = await buildNiimbotPreview(items[items.length - 1].label, printerSettings);
+      if (!preview) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
+      setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
+      setMessage(`Etiqueta pronta para o app NiiMbot. Toque em "Baixar PNG" para enviar à impressora.`);
     } else {
-      printThermalBatch(items.map((it) => ({ label: it.label, copies: it.copies })), printerSettings, printWindow!);
-      if (printerSettings.connection !== "browser") {
-        setMessage(`Conexão ${printerSettings.connection.toUpperCase()} não disponível no navegador — usando impressão do sistema como fallback.`);
-      }
+      const ok = printThermalBatch(items.map((it) => ({ label: it.label, copies: it.copies })), printerSettings);
+      if (!ok) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
+      setMessage(printerSettings.connection !== "browser"
+        ? `Enviando para a impressora ${printerSettings.type.toUpperCase()} via ${printerSettings.connection.toUpperCase()}…`
+        : "Etiqueta enviada para a impressora.");
     }
     setLabel(items[items.length - 1].label);
     await refresh();
+    return true;
   };
 
   const printNow = async () => {
     setMessage("");
     const item = buildCurrentItem();
     if (!item) return;
-    await dispatchPrint([item]);
-    setLabelDraft(null);
+    const ok = await dispatchPrint([item]);
+    if (ok) setLabelDraft(null);
   };
 
   const printQueue = async () => {
     if (queue.length === 0) return;
-    await dispatchPrint(queue);
-    setQueue([]);
+    const ok = await dispatchPrint(queue);
+    if (ok) setQueue([]);
   };
 
   const testPrint = async () => {
@@ -426,12 +424,14 @@ function Index() {
       issued: now,
     };
     if (printerSettings.type === "niimbot") {
-      const ok = await exportNiimbotLabel(sample, printerSettings);
-      setMessage(ok ? "Etiqueta de teste gerada (PNG NiiMbot)." : "Falha ao gerar a etiqueta de teste.");
+      const preview = await buildNiimbotPreview(sample, printerSettings);
+      if (!preview) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return; }
+      setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
+      setMessage('Etiqueta de teste pronta. Toque em "Baixar PNG" para enviar ao app NiiMbot.');
       return;
     }
     const ok = printThermalBatch([{ label: sample, copies: 1 }], printerSettings);
-    setMessage(ok ? "Etiqueta de teste enviada para impressão." : "Permita a abertura da janela de impressão no navegador.");
+    setMessage(ok ? "Etiqueta de teste enviada para impressão." : PRINTER_NOT_FOUND_MESSAGE);
   };
 
   const reprintLabel = (record: LabelRecord) => {
@@ -439,9 +439,13 @@ function Index() {
     setLabel(historicalLabel);
     setTab("emit");
     if (printerSettings.type === "niimbot") {
-      void exportNiimbotLabel(historicalLabel, printerSettings).then((ok) => setMessage(ok ? "PNG gerado para o app NiiMbot." : "Falha ao gerar PNG NiiMbot."));
+      void buildNiimbotPreview(historicalLabel, printerSettings).then((preview) => {
+        if (!preview) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return; }
+        setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
+        setMessage('Etiqueta pronta. Toque em "Baixar PNG" para enviar ao app NiiMbot.');
+      });
     } else if (!printThermalBatch([{ label: historicalLabel, copies: record.quantity || 1 }], printerSettings)) {
-      setMessage("Permita a abertura da janela de impressão no navegador.");
+      setMessage(PRINTER_NOT_FOUND_MESSAGE);
     }
   };
 
