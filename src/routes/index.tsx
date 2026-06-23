@@ -34,6 +34,102 @@ function reservePrintWindow() {
   return window.open("", "_blank", "popup=yes,width=520,height=380");
 }
 
+type PrinterMode = "standard" | "niimbot";
+const PRINTER_MODE_KEY = "tinutri.printer-mode";
+
+function loadPrinterMode(): PrinterMode {
+  if (typeof window === "undefined") return "standard";
+  return window.localStorage.getItem(PRINTER_MODE_KEY) === "niimbot" ? "niimbot" : "standard";
+}
+
+async function generateNiimbotPng(label: PrintableLabel): Promise<Blob | null> {
+  // 60 mm × 40 mm @ ~203 DPI (8 px/mm) → 480 × 320 px (tamanho real para NiiMbot)
+  const PX_PER_MM = 8;
+  const W = 60 * PX_PER_MM;
+  const H = 40 * PX_PER_MM;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#000000";
+  ctx.textBaseline = "top";
+
+  // Carrega o logo
+  const logo = new Image();
+  logo.crossOrigin = "anonymous";
+  logo.src = new URL(tinutriLogo, window.location.origin).toString();
+  await new Promise<void>((resolve) => { logo.onload = () => resolve(); logo.onerror = () => resolve(); });
+
+  // Cabeçalho: logo + marca
+  const headerY = 8;
+  const logoSize = 28;
+  try { if (logo.width) ctx.drawImage(logo, 10, headerY, logoSize, logoSize); } catch {}
+  ctx.font = "700 14px Arial, Helvetica, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("TiNutri Smart Label®", 10 + logoSize + 8, headerY + 8);
+
+  // Nome do produto
+  ctx.font = "800 22px Arial, Helvetica, sans-serif";
+  ctx.textAlign = "center";
+  const productName = label.product.toUpperCase();
+  // Quebra simples se exceder
+  let name = productName;
+  while (ctx.measureText(name).width > W - 20 && name.length > 4) name = name.slice(0, -2);
+  ctx.fillText(name === productName ? productName : name + "…", W / 2, 44);
+
+  let cursorY = 74;
+  ctx.textAlign = "left";
+  ctx.font = "700 13px Arial, Helvetica, sans-serif";
+  if (label.lot) { ctx.fillText(`LOTE: ${label.lot.toUpperCase()}`, 10, cursorY); cursorY += 16; }
+  if (label.inspection) { ctx.fillText(label.inspection.toUpperCase(), 10, cursorY); cursorY += 16; }
+
+  // FABRICAÇÃO (esquerda) - menor
+  ctx.font = "700 11px Arial, Helvetica, sans-serif";
+  ctx.fillText("FABRICAÇÃO:", 10, cursorY + 4);
+  ctx.font = "700 16px Arial, Helvetica, sans-serif";
+  ctx.fillText(label.opened, 10, cursorY + 18);
+
+  // VALIDADE (destaque máximo)
+  ctx.textAlign = "right";
+  ctx.font = "700 12px Arial, Helvetica, sans-serif";
+  ctx.fillText("VALIDADE:", W - 10, cursorY);
+  ctx.font = "900 36px Arial, Helvetica, sans-serif";
+  ctx.fillText(label.expires, W - 10, cursorY + 14);
+
+  // Rodapé: responsável + hora
+  ctx.textAlign = "left";
+  ctx.font = "700 10px Arial, Helvetica, sans-serif";
+  ctx.fillText("RESPONSÁVEL:", 10, H - 28);
+  ctx.font = "800 14px Arial, Helvetica, sans-serif";
+  ctx.fillText(label.responsible.toUpperCase().slice(0, 22), 10, H - 16);
+
+  ctx.textAlign = "right";
+  ctx.font = "700 10px Arial, Helvetica, sans-serif";
+  ctx.fillText("HORA:", W - 10, H - 28);
+  ctx.font = "800 16px Arial, Helvetica, sans-serif";
+  ctx.fillText(format(label.issued, "HH:mm"), W - 10, H - 16);
+
+  return await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+}
+
+async function exportNiimbotLabel(label: PrintableLabel) {
+  const blob = await generateNiimbotPng(label);
+  if (!blob) return false;
+  const url = URL.createObjectURL(blob);
+  const safe = label.product.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "etiqueta";
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `niimbot-${safe}-60x40mm.png`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  return true;
+}
+
 function printThermalLabel(label: PrintableLabel, quantity = 1, printWindow = reservePrintWindow()) {
   if (!printWindow) return false;
   const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
@@ -71,6 +167,13 @@ function Index() {
   const [quantity, setQuantity] = useState<string>("1");
   const [label, setLabel] = useState<PrintableLabel | null>(null);
   const [labelDraft, setLabelDraft] = useState<{ product: string; responsible: string; opened: string; expires: string; lot: string } | null>(null);
+  const [printerMode, setPrinterMode] = useState<PrinterMode>("standard");
+
+  useEffect(() => { setPrinterMode(loadPrinterMode()); }, []);
+  const updatePrinterMode = (mode: PrinterMode) => {
+    setPrinterMode(mode);
+    try { window.localStorage.setItem(PRINTER_MODE_KEY, mode); } catch {}
+  };
 
   const refresh = async () => {
     const { data: auth } = await supabase.auth.getUser();
@@ -150,18 +253,25 @@ function Index() {
     const effectiveProduct = labelDraft?.product.trim() || product.name;
     const effectiveResponsible = labelDraft?.responsible.trim() || responsible.name;
     const effectiveLot = (labelDraft?.lot ?? lot).trim();
-    const printWindow = reservePrintWindow();
-    if (!printWindow) { setMessage("Permita a abertura da janela de impressão no navegador."); return; }
-    printWindow.document.write("<!doctype html><title>Preparando etiqueta</title><p style='font-family:Arial,sans-serif'>Preparando etiqueta para impressão…</p>");
+    const printWindow = printerMode === "niimbot" ? null : reservePrintWindow();
+    if (printerMode === "standard") {
+      if (!printWindow) { setMessage("Permita a abertura da janela de impressão no navegador."); return; }
+      printWindow.document.write("<!doctype html><title>Preparando etiqueta</title><p style='font-family:Arial,sans-serif'>Preparando etiqueta para impressão…</p>");
+    }
     const { error } = await supabase.from("issued_labels").insert({
       client_id: client.id, product_id: product.id, responsible_id: responsible.id, issued_by: userId,
       client_name: client.name, product_name: effectiveProduct, responsible_name: effectiveResponsible,
       lot_number: effectiveLot || null, inspection_label: inspection ?? null, opened_on: effectiveOpened, expires_on: expiry, quantity: copies,
     });
-    if (error) { printWindow.close(); setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return; }
+    if (error) { printWindow?.close(); setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return; }
     const issuedLabel = { product: effectiveProduct, opened: format(new Date(`${effectiveOpened}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${expiry}T12:00:00`), "dd/MM/yyyy"), lot: effectiveLot || undefined, inspection, responsible: effectiveResponsible, issued };
     setLabel(issuedLabel);
-    printThermalLabel(issuedLabel, copies, printWindow);
+    if (printerMode === "niimbot") {
+      const ok = await exportNiimbotLabel(issuedLabel);
+      setMessage(ok ? "PNG 60×40 mm gerado para o app NiiMbot." : "Não foi possível gerar a imagem para o NiiMbot.");
+    } else {
+      printThermalLabel(issuedLabel, copies, printWindow!);
+    }
     await refresh();
   };
 
@@ -169,7 +279,11 @@ function Index() {
     const historicalLabel = { product: record.product_name, opened: format(new Date(`${record.opened_on}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${record.expires_on}T12:00:00`), "dd/MM/yyyy"), lot: record.lot_number ?? undefined, inspection: record.inspection_label ?? undefined, responsible: record.responsible_name, issued: new Date(record.issued_at) };
     setLabel(historicalLabel);
     setTab("emit");
-    if (!printThermalLabel(historicalLabel, record.quantity || 1)) setMessage("Permita a abertura da janela de impressão no navegador.");
+    if (printerMode === "niimbot") {
+      void exportNiimbotLabel(historicalLabel).then((ok) => setMessage(ok ? "PNG 60×40 mm gerado para o app NiiMbot." : "Não foi possível gerar a imagem para o NiiMbot."));
+    } else if (!printThermalLabel(historicalLabel, record.quantity || 1)) {
+      setMessage("Permita a abertura da janela de impressão no navegador.");
+    }
   };
 
   const duplicateLabel = (record: LabelRecord) => {
@@ -215,6 +329,20 @@ function Index() {
             <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">Estação de etiquetagem</p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Emitir nova etiqueta</h1>
             <p className="mt-2 text-muted-foreground">Selecione, confira e imprima. A validade é calculada automaticamente.</p>
+            <div className="mt-5 rounded-2xl border bg-card p-4 shadow-sm">
+              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">Impressora</p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:gap-3">
+                <label className={`flex flex-1 cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm font-semibold ${printerMode === "standard" ? "border-primary bg-secondary" : ""}`}>
+                  <input className="size-4 w-auto" type="radio" name="printer-mode" checked={printerMode === "standard"} onChange={() => updatePrinterMode("standard")} />
+                  Padrão (Elgin, Bematech, Zebra, Tomate)
+                </label>
+                <label className={`flex flex-1 cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm font-semibold ${printerMode === "niimbot" ? "border-primary bg-secondary" : ""}`}>
+                  <input className="size-4 w-auto" type="radio" name="printer-mode" checked={printerMode === "niimbot"} onChange={() => updatePrinterMode("niimbot")} />
+                  Modo de teste NiiMbot (gera PNG 60×40 mm)
+                </label>
+              </div>
+              {printerMode === "niimbot" && <p className="mt-2 text-xs text-muted-foreground">Ao emitir, será baixada uma imagem PNG em tamanho real para importar no aplicativo oficial da NiiMbot.</p>}
+            </div>
             <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
               <div className="space-y-5 rounded-3xl border bg-card p-5 shadow-sm sm:p-7">
                 <Field label="Cliente"><select value={selectedClient} disabled={role === "operator"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
