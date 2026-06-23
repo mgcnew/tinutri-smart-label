@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Building2, Clock3, Copy, History, LayoutDashboard, LogOut, Menu, PackagePlus, Pencil, Printer, Search, ShieldCheck, Tag, Trash2, Users, X } from "lucide-react";
+import { Building2, Clock3, Copy, History, LayoutDashboard, LogOut, Menu, PackagePlus, Pencil, Printer, Search, ShieldCheck, Trash2, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger 
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import { claimFirstAdmin } from "@/lib/admin.functions";
+import tinutriLogo from "@/assets/tinutri-logo.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -23,25 +24,29 @@ export const Route = createFileRoute("/")({
 });
 
 type Client = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; active: boolean };
-type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null };
-type Collaborator = { id: string; client_id: string; name: string; email: string | null };
+type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null; active: boolean };
+type Collaborator = { id: string; client_id: string; name: string; role_title: string | null; active: boolean };
 type PrintableLabel = { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date };
-type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string };
+type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number };
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
 
 function reservePrintWindow() {
   return window.open("", "_blank", "popup=yes,width=520,height=380");
 }
 
-function printThermalLabel(label: PrintableLabel, printWindow = reservePrintWindow()) {
+function printThermalLabel(label: PrintableLabel, quantity = 1, printWindow = reservePrintWindow()) {
   if (!printWindow) return false;
   const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
-  const lot = escapeHtml((label.lot ?? "—").toUpperCase());
+  const copies = Math.max(1, Math.min(200, Math.floor(quantity)));
+  const lotLine = label.lot ? `<div class="lot">LOTE: ${escapeHtml(label.lot.toUpperCase())}</div>` : "";
   const inspection = label.inspection ? `<div class="insp">${escapeHtml(label.inspection.toUpperCase())}</div>` : "";
+  const logoUrl = new URL(tinutriLogo, window.location.origin).toString();
+  const labelHtml = `<main class="label"><header class="brand"><img src="${logoUrl}" alt="" class="logo"/><span>TiNutri Smart Label®</span></header><strong class="product">${escapeHtml(label.product.toUpperCase())}</strong>${lotLine}${inspection}<div class="dates"><div class="fab"><span>FAB:</span><strong>${escapeHtml(label.opened)}</strong></div><div class="expiry"><span>VALIDADE</span><strong>${escapeHtml(label.expires)}</strong></div></div><footer class="footer"><div class="resp"><span>RESPONSÁVEL:</span><strong>${escapeHtml(label.responsible.toUpperCase())}</strong></div><time>${format(label.issued, "HH:mm")}</time></footer></main>`;
+  const pages = Array.from({ length: copies }, () => labelHtml).join("");
   printWindow.document.open();
   printWindow.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etiqueta TiNutri 60 × 40 mm</title><style>
-    @page{size:60mm 40mm;margin:0}*{box-sizing:border-box}html,body{width:60mm;height:40mm;margin:0;padding:0;overflow:hidden;background:#fff;color:#000}body{font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:none;text-rendering:geometricPrecision}.label{width:60mm;height:40mm;padding:1.2mm 1.5mm;line-height:1;display:flex;flex-direction:column;align-items:stretch;gap:.2mm}.brand{font-size:5.5pt;font-weight:700;letter-spacing:.02em;text-align:center}.product{display:block;overflow:hidden;font-size:9pt;font-weight:800;line-height:1.1;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase;text-align:center;margin-top:.6mm}.expiry{margin-top:1mm;text-align:center}.expiry span{display:block;font-size:5pt;font-weight:700;letter-spacing:.04em}.expiry strong{display:block;font-size:20pt;font-weight:900;letter-spacing:-.03em;line-height:1;margin-top:.2mm}.fab{margin-top:.6mm}.fab span{font-size:4.5pt;font-weight:700;letter-spacing:.04em}.fab strong{font-size:8.5pt;font-weight:700}.lot{margin-top:.5mm;font-size:6.5pt;font-weight:700;text-transform:uppercase}.insp{font-size:5.5pt;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:.3mm}.footer{display:flex;align-items:baseline;justify-content:space-between;gap:1mm;margin-top:auto}.footer .resp{flex:1;min-width:0;text-align:left;line-height:1}.footer .resp span{display:block;font-size:4.5pt;font-weight:700;letter-spacing:.04em}.footer .resp strong{display:block;overflow:hidden;margin-top:.2mm;font-size:7.5pt;font-weight:800;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase}.footer time{flex-shrink:0;font-size:8.5pt;font-weight:700;font-variant-numeric:tabular-nums}@media print{html,body,.label{width:60mm!important;height:40mm!important}.label{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
-  </style></head><body><main class="label"><header class="brand">TiNutri Smart Label®</header><strong class="product">${escapeHtml(label.product.toUpperCase())}</strong><div class="expiry"><span>VALIDADE</span><strong>${escapeHtml(label.expires)}</strong></div><div class="fab"><span>FAB:</span><strong>${escapeHtml(label.opened)}</strong></div><div class="lot">LOTE: ${lot}</div>${inspection}<footer class="footer"><div class="resp"><span>RESPONSÁVEL:</span><strong>${escapeHtml(label.responsible.toUpperCase())}</strong></div><time>${format(label.issued, "HH:mm")}</time></footer></main><script>window.addEventListener('load',()=>{window.focus();setTimeout(()=>{window.print();setTimeout(()=>window.close(),400)},80)});<\/script></body></html>`);
+    @page{size:60mm 40mm;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000}body{font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:none;text-rendering:geometricPrecision}.label{width:60mm;height:40mm;padding:1.2mm 1.5mm;line-height:1;display:flex;flex-direction:column;align-items:stretch;gap:.2mm;page-break-after:always;break-after:page;overflow:hidden}.label:last-child{page-break-after:auto;break-after:auto}.brand{display:flex;align-items:center;justify-content:center;gap:1mm;font-size:5.5pt;font-weight:800;letter-spacing:.02em}.brand .logo{height:3.5mm;width:3.5mm;object-fit:contain}.product{display:block;overflow:hidden;font-size:9pt;font-weight:800;line-height:1.1;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase;text-align:center;margin-top:.4mm}.lot{margin-top:.4mm;font-size:6.5pt;font-weight:700;text-transform:uppercase;text-align:center}.insp{font-size:5.5pt;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;margin-top:.2mm}.dates{margin-top:.6mm;display:grid;grid-template-columns:1fr 1.2fr;gap:1.5mm;align-items:end}.dates span{display:block;font-size:5pt;font-weight:700;letter-spacing:.04em}.fab strong{display:block;font-size:8.5pt;font-weight:700}.expiry{text-align:right}.expiry strong{display:block;font-size:18pt;font-weight:900;letter-spacing:-.03em;line-height:1;margin-top:.2mm}.footer{display:flex;align-items:baseline;justify-content:space-between;gap:1mm;margin-top:auto}.footer .resp{flex:1;min-width:0;text-align:left;line-height:1}.footer .resp span{display:block;font-size:4.5pt;font-weight:700;letter-spacing:.04em}.footer .resp strong{display:block;overflow:hidden;margin-top:.2mm;font-size:7.5pt;font-weight:800;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase}.footer time{flex-shrink:0;font-size:8.5pt;font-weight:700;font-variant-numeric:tabular-nums}@media print{.label{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+  </style></head><body>${pages}<script>window.addEventListener('load',()=>{window.focus();setTimeout(()=>{window.print();setTimeout(()=>window.close(),400)},120)});<\/script></body></html>`);
   printWindow.document.close();
   return true;
 }
