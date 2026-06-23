@@ -475,18 +475,60 @@ function Index() {
             <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Emitir nova etiqueta</h1>
             <p className="mt-2 text-muted-foreground">Selecione, confira e imprima. A validade é calculada automaticamente.</p>
             <div className="mt-5 rounded-2xl border bg-card p-4 shadow-sm">
-              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">Impressora</p>
-              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:gap-3">
-                <label className={`flex flex-1 cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm font-semibold ${printerMode === "standard" ? "border-primary bg-secondary" : ""}`}>
-                  <input className="size-4 w-auto" type="radio" name="printer-mode" checked={printerMode === "standard"} onChange={() => updatePrinterMode("standard")} />
-                  Padrão (Elgin, Bematech, Zebra, Tomate)
-                </label>
-                <label className={`flex flex-1 cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm font-semibold ${printerMode === "niimbot" ? "border-primary bg-secondary" : ""}`}>
-                  <input className="size-4 w-auto" type="radio" name="printer-mode" checked={printerMode === "niimbot"} onChange={() => updatePrinterMode("niimbot")} />
-                  Modo de teste NiiMbot (gera PNG 60×40 mm)
-                </label>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">Configuração da Impressora</p>
+                  <p className="mt-1 truncate text-sm font-semibold">
+                    {PRINTER_TYPES.find(t => t.id === printerSettings.type)?.label}
+                    {" · "}
+                    {CONNECTION_MODES.find(c => c.id === printerSettings.connection)?.label}
+                    {" · "}
+                    {printerSettings.size.replace("x", " × ")} mm
+                    {printerSettings.connection === "wifi" && printerSettings.ip ? ` · ${printerSettings.ip}` : ""}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setShowPrinterSettings(v => !v)}>
+                  <Settings2 /> {showPrinterSettings ? "Fechar" : "Configurar"}
+                </Button>
               </div>
-              {printerMode === "niimbot" && <p className="mt-2 text-xs text-muted-foreground">Ao emitir, será baixada uma imagem PNG em tamanho real para importar no aplicativo oficial da NiiMbot.</p>}
+              {showPrinterSettings && (
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <Field label="Tipo da impressora">
+                    <select value={printerSettings.type} onChange={(e) => updateSettings({ type: e.target.value as PrinterType })}>
+                      {PRINTER_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Modo de conexão">
+                    <select value={printerSettings.connection} onChange={(e) => updateSettings({ connection: e.target.value as ConnectionMode })}>
+                      {CONNECTION_MODES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="IP da impressora" hint="Ex.: 192.168.1.200">
+                    <input value={printerSettings.ip} placeholder="192.168.1.200" onChange={(e) => updateSettings({ ip: e.target.value })} />
+                  </Field>
+                  <Field label="Tamanho da etiqueta">
+                    <select value={printerSettings.size} onChange={(e) => updateSettings({ size: e.target.value as LabelSize })}>
+                      <option value="60x40">60 mm × 40 mm (padrão)</option>
+                      <option value="50x30">50 mm × 30 mm (opcional)</option>
+                    </select>
+                  </Field>
+                  <label className="flex items-center gap-3 rounded-xl border p-3 text-sm font-semibold sm:col-span-2">
+                    <input type="checkbox" className="size-4 w-auto" checked={printerSettings.showTime} onChange={(e) => updateSettings({ showTime: e.target.checked })} />
+                    Exibir a HORA na etiqueta
+                  </label>
+                  <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
+                    <Button variant="outline" onClick={testPrint}><Printer /> Testar impressão</Button>
+                    {printerSettings.connection !== "browser" && printerSettings.type !== "niimbot" && (
+                      <p className="text-xs text-muted-foreground">
+                        Conexão direta {printerSettings.connection.toUpperCase()} usará a impressão do sistema como fallback no navegador.
+                      </p>
+                    )}
+                    {printerSettings.type === "niimbot" && (
+                      <p className="text-xs text-muted-foreground">NiiMbot: a etiqueta será baixada como PNG para envio pelo app oficial.</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
               <div className="space-y-5 rounded-3xl border bg-card p-5 shadow-sm sm:p-7">
@@ -503,10 +545,51 @@ function Index() {
                 <Field label="Quantidade de etiquetas" hint="Imprime várias cópias em sequência"><input type="number" min={1} max={200} value={quantity} onChange={(e) => setQuantity(e.target.value)} /></Field>
                 {product && responsible && !labelDraft && <Button variant="outline" className="w-full" onClick={() => setLabelDraft({ product: product.name, responsible: responsible.name, opened: openedOn, expires: format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd"), lot })}><Pencil /> Editar etiqueta antes de imprimir</Button>}
                 {labelDraft && <div className="grid gap-4 rounded-2xl border bg-secondary/50 p-4 sm:grid-cols-2"><div className="sm:col-span-2"><Field label="Nome na etiqueta"><input maxLength={120} value={labelDraft.product} onChange={(e) => setLabelDraft({ ...labelDraft, product: e.target.value })} /></Field></div><Field label="Aberto em"><input type="date" value={labelDraft.opened} onChange={(e) => setLabelDraft({ ...labelDraft, opened: e.target.value })} /></Field><Field label="Validade"><input type="date" value={labelDraft.expires} onChange={(e) => setLabelDraft({ ...labelDraft, expires: e.target.value })} /></Field><Field label="Lote"><input maxLength={80} value={labelDraft.lot} onChange={(e) => setLabelDraft({ ...labelDraft, lot: e.target.value })} /></Field><Field label="Responsável"><input maxLength={120} value={labelDraft.responsible} onChange={(e) => setLabelDraft({ ...labelDraft, responsible: e.target.value })} /></Field><div className="sm:col-span-2"><Button variant="ghost" size="sm" onClick={() => setLabelDraft(null)}>Cancelar edição</Button></div></div>}
-                {message && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm font-semibold text-destructive">{message}</p>}
-                <Button variant="kitchen" size="xl" className="w-full" onClick={issueLabel}><Printer /> Emitir etiqueta</Button>
+                {message && <p role="alert" className="rounded-xl bg-secondary p-3 text-sm font-semibold">{message}</p>}
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button variant="outline" size="xl" className="w-full" onClick={addToQueue}><ListPlus /> Adicionar à fila</Button>
+                  <Button variant="kitchen" size="xl" className="w-full" onClick={printNow}><Printer /> Imprimir agora</Button>
+                </div>
               </div>
-              <div><p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · TAMANHO REAL 60 × 40 MM</p><ThermalLabel label={label ?? previewLabel} /></div>
+              <div className="space-y-4">
+                <div>
+                  <p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · {printerSettings.size.replace("x", " × ")} MM</p>
+                  <ThermalLabel label={label ?? previewLabel} />
+                </div>
+                <div className="rounded-2xl border bg-card p-4 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">Fila de impressão</p>
+                    <span className="text-xs font-semibold text-muted-foreground">{queue.length} item(ns)</span>
+                  </div>
+                  {queue.length === 0 ? (
+                    <p className="mt-3 text-sm text-muted-foreground">Adicione etiquetas à fila para imprimir várias de uma vez.</p>
+                  ) : (
+                    <ul className="mt-3 space-y-2">
+                      {queue.map((it) => (
+                        <li key={it.id} className="flex items-center gap-2 rounded-xl border bg-secondary/40 p-2">
+                          <div className="min-w-0 flex-1">
+                            <strong className="block truncate text-sm">{it.label.product}</strong>
+                            <p className="truncate text-xs text-muted-foreground">VAL {it.label.expires} · {it.label.responsible}{it.label.lot ? ` · Lote ${it.label.lot}` : ""}</p>
+                          </div>
+                          <input
+                            type="number"
+                            min={1}
+                            max={200}
+                            value={it.copies}
+                            onChange={(e) => updateQueueCopies(it.id, Number(e.target.value))}
+                            className="!w-16 !p-1 text-center text-sm"
+                            aria-label="Cópias"
+                          />
+                          <Button variant="ghost" size="icon" aria-label="Remover" onClick={() => removeFromQueue(it.id)}><Trash2 /></Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <Button variant="kitchen" size="lg" className="mt-3 w-full" disabled={queue.length === 0} onClick={printQueue}>
+                    <Printer /> Imprimir todas ({queue.reduce((sum, it) => sum + it.copies, 0)})
+                  </Button>
+                </div>
+              </div>
             </div>
           </section>}
           {tab === "clients" && <ClientsPanel clients={clients} refresh={refresh} />}
