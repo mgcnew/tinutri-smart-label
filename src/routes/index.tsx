@@ -323,6 +323,25 @@ function Index() {
 
   if (!userId) return <Login />;
 
+  // Empresa suspensa bloqueia uso operacional (dados preservados)
+  {
+    const ownClient = clients.find((c) => c.id === profileClientId);
+    if (ownClient && ownClient.status === "suspensa") {
+      return (
+        <main className="grid min-h-screen place-items-center bg-background p-5">
+          <section className="w-full max-w-md rounded-3xl border bg-card p-7 shadow-xl text-center">
+            <Brand />
+            <h1 className="mt-6 text-2xl font-bold">Acesso suspenso</h1>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Seu acesso foi temporariamente suspenso. Entre em contato com a TiNutri.
+            </p>
+            <Button className="mt-6 w-full" variant="outline" onClick={async () => { await supabase.auth.signOut(); location.reload(); }}>Sair</Button>
+          </section>
+        </main>
+      );
+    }
+  }
+
   if (!role) return (
     <main className="grid min-h-screen place-items-center bg-background p-5">
       <section className="w-full max-w-md rounded-3xl border bg-card p-7 shadow-xl">
