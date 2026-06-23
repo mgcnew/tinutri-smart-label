@@ -624,7 +624,7 @@ function Index() {
             </div>
             <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
               <div className="space-y-5 rounded-3xl border bg-card p-5 shadow-sm sm:p-7">
-                <Field label="Cliente"><select value={selectedClient} disabled={role === "operator"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
+                <Field label="Cliente"><select value={selectedClient} disabled={role === "operator" || role === "admin_cliente"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
                 <Field label="Produto"><select value={selectedProduct} onChange={(e) => { setSelectedProduct(e.target.value); setLot(""); setLabelDraft(null); const sel = products.find(p => p.id === e.target.value); setShelfDays(sel ? String(sel.shelf_life_days) : ""); }}><option value="">Selecione o produto</option>{visibleProducts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
                 <div className="grid gap-5 sm:grid-cols-3">
                   <Field label="Data de abertura"><input type="date" value={openedOn} onChange={(e) => setOpenedOn(e.target.value)} /></Field>
@@ -740,8 +740,47 @@ function ThermalLabel({ label }: { label: { product: string; opened: string; exp
   </div>;
 }
 
-const navItems = [{ id: "dashboard", label: "Dashboard", icon: LayoutDashboard }, { id: "clients", label: "Clientes", icon: Building2 }, { id: "products", label: "Produtos", icon: PackagePlus }, { id: "team", label: "Colaboradores", icon: Users }, { id: "emit", label: "Emitir Etiquetas", icon: Printer }, { id: "history", label: "Histórico", icon: History }] as const;
-function Nav({ role, tab, setTab, closeOnSelect = false }: { role: string; tab: AppTab; setTab: (id: AppTab) => void; closeOnSelect?: boolean }) { return navItems.filter((item) => role === "admin" || item.id === "emit").map((item) => { const control = <Button key={item.id} variant={tab === item.id ? "secondary" : "ghost"} className="h-11 w-full justify-start" onClick={() => setTab(item.id)}><item.icon />{item.label}</Button>; return closeOnSelect ? <SheetClose asChild key={item.id}>{control}</SheetClose> : control; }); }
+const navItems = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "clients", label: "Clientes", icon: Building2 },
+  { id: "products", label: "Produtos", icon: PackagePlus },
+  { id: "team", label: "Colaboradores", icon: Users },
+  { id: "emit", label: "Emitir Etiquetas", icon: Printer },
+  { id: "history", label: "Histórico", icon: History },
+] as const;
+
+const ROLE_TABS: Record<AppRole, AppTab[]> = {
+  admin_master: ["dashboard", "clients", "products", "team", "emit", "history"],
+  nutricionista: ["dashboard", "clients", "products", "team", "emit", "history"],
+  admin_cliente: ["dashboard", "products", "team", "emit", "history"],
+  operator: ["emit", "history"],
+};
+
+function Nav({ role, tab, setTab, closeOnSelect = false }: { role: AppRole; tab: AppTab; setTab: (id: AppTab) => void; closeOnSelect?: boolean }) {
+  const allowed = new Set<AppTab>(ROLE_TABS[role]);
+  return navItems.filter((item) => allowed.has(item.id)).map((item) => {
+    const control = <Button key={item.id} variant={tab === item.id ? "secondary" : "ghost"} className="h-11 w-full justify-start" onClick={() => setTab(item.id)}><item.icon />{item.label}</Button>;
+    return closeOnSelect ? <SheetClose asChild key={item.id}>{control}</SheetClose> : control;
+  });
+}
+
+const ROLE_LABEL: Record<AppRole, string> = {
+  admin_master: "Admin Master TiNutri",
+  nutricionista: "Nutricionista",
+  admin_cliente: "Admin Cliente",
+  operator: "Operador",
+};
+
+function UserStrip({ userName, role, clientName }: { userName: string; role: AppRole | null; clientName: string | null }) {
+  if (!role) return null;
+  return (
+    <div className="mx-auto mt-2 flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      {clientName && <span className="font-bold uppercase tracking-wide text-foreground">{clientName}</span>}
+      {userName && <span>· Usuário: <strong className="text-foreground">{userName}</strong></span>}
+      <span>· Perfil: <strong className="text-foreground">{ROLE_LABEL[role]}</strong></span>
+    </div>
+  );
+}
 
 function PanelHeader({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) { return <><p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">{eyebrow}</p><h1 className="mt-2 text-3xl font-bold">{title}</h1><p className="mt-2 text-muted-foreground">{description}</p></> }
 
