@@ -40,7 +40,7 @@ type QueueItem = {
 type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number };
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
 
-const PRINTER_NOT_FOUND_MESSAGE = "Impressora não encontrada. Verifique a conexão Bluetooth ou Wi-Fi.";
+const PRINTER_NOT_FOUND_MESSAGE = "Impressora não encontrada. Verifique a conexão Bluetooth, Wi-Fi ou a configuração da impressora.";
 
 type PrinterType = "niimbot" | "elgin" | "bematech" | "zebra" | "tomate" | "argox" | "outra";
 type ConnectionMode = "browser" | "wifi" | "bluetooth" | "usb";
