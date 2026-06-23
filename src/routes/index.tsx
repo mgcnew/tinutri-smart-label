@@ -166,19 +166,13 @@ async function generateNiimbotPng(label: PrintableLabel, size: LabelSize, showTi
   return await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
 }
 
-async function exportNiimbotLabel(label: PrintableLabel, settings: PrinterSettings) {
+type NiimbotPreview = { url: string; filename: string };
+
+async function buildNiimbotPreview(label: PrintableLabel, settings: PrinterSettings): Promise<NiimbotPreview | null> {
   const blob = await generateNiimbotPng(label, settings.size, settings.showTime);
-  if (!blob) return false;
-  const url = URL.createObjectURL(blob);
+  if (!blob) return null;
   const safe = label.product.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "etiqueta";
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `niimbot-${safe}-${settings.size}mm.png`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-  return true;
+  return { url: URL.createObjectURL(blob), filename: `niimbot-${safe}-${settings.size}mm.png` };
 }
 
 function buildLabelHtml(label: PrintableLabel, showTime: boolean) {
@@ -190,8 +184,8 @@ function buildLabelHtml(label: PrintableLabel, showTime: boolean) {
   return `<main class="label"><header class="brand"><img src="${logoUrl}" alt="" class="logo"/><span>TiNutri Smart Label®</span></header><strong class="product">${escapeHtml(label.product.toUpperCase())}</strong>${lotLine}${inspection}<div class="dates"><div class="fab"><span>FAB:</span><strong>${escapeHtml(label.opened)}</strong></div><div class="expiry"><span>VALIDADE</span><strong>${escapeHtml(label.expires)}</strong></div></div><footer class="footer"><div class="resp"><span>RESPONSÁVEL:</span><strong>${escapeHtml(label.responsible.toUpperCase())}</strong></div>${timeBlock}</footer></main>`;
 }
 
-function printThermalBatch(items: { label: PrintableLabel; copies: number }[], settings: PrinterSettings, printWindow = reservePrintWindow()) {
-  if (!printWindow) return false;
+function printThermalBatch(items: { label: PrintableLabel; copies: number }[], settings: PrinterSettings): boolean {
+  if (typeof window === "undefined") return false;
   const { w, h } = sizeMm(settings.size);
   const scale = settings.size === "50x30" ? 0.78 : 1;
   const f = (pt: number) => +(pt * scale).toFixed(2);
@@ -199,12 +193,34 @@ function printThermalBatch(items: { label: PrintableLabel; copies: number }[], s
     const html = buildLabelHtml(label, settings.showTime);
     return Array.from({ length: Math.max(1, Math.min(200, Math.floor(copies))) }, () => html);
   }).join("");
-  printWindow.document.open();
-  printWindow.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etiqueta TiNutri ${w} × ${h} mm</title><style>
+  const doc = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etiqueta TiNutri ${w} × ${h} mm</title><style>
     @page{size:${w}mm ${h}mm;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000}body{font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:none;text-rendering:geometricPrecision}.label{width:${w}mm;height:${h}mm;padding:1.2mm 1.5mm;line-height:1;display:flex;flex-direction:column;align-items:stretch;gap:.2mm;page-break-after:always;break-after:page;overflow:hidden}.label:last-child{page-break-after:auto;break-after:auto}.brand{display:flex;align-items:center;justify-content:center;gap:1mm;font-size:${f(5.5)}pt;font-weight:800;letter-spacing:.02em}.brand .logo{height:${f(3.5)}mm;width:${f(3.5)}mm;object-fit:contain}.product{display:block;overflow:hidden;font-size:${f(9)}pt;font-weight:800;line-height:1.1;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase;text-align:center;margin-top:.4mm}.lot{margin-top:.4mm;font-size:${f(6.5)}pt;font-weight:700;text-transform:uppercase;text-align:center}.insp{font-size:${f(5.5)}pt;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;margin-top:.2mm}.dates{margin-top:.6mm;display:grid;grid-template-columns:1fr 1.2fr;gap:1.5mm;align-items:end}.dates span{display:block;font-size:${f(5)}pt;font-weight:700;letter-spacing:.04em}.fab strong{display:block;font-size:${f(8.5)}pt;font-weight:700}.expiry{text-align:right}.expiry strong{display:block;font-size:${f(18)}pt;font-weight:900;letter-spacing:-.03em;line-height:1;margin-top:.2mm}.footer{display:flex;align-items:baseline;justify-content:space-between;gap:1mm;margin-top:auto}.footer .resp{flex:1;min-width:0;text-align:left;line-height:1}.footer .resp span{display:block;font-size:${f(4.5)}pt;font-weight:700;letter-spacing:.04em}.footer .resp strong{display:block;overflow:hidden;margin-top:.2mm;font-size:${f(7.5)}pt;font-weight:800;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase}.footer time{flex-shrink:0;font-size:${f(8.5)}pt;font-weight:700;font-variant-numeric:tabular-nums}@media print{.label{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
-  </style></head><body>${pages}<script>window.addEventListener('load',()=>{window.focus();setTimeout(()=>{window.print();setTimeout(()=>window.close(),400)},120)});<\/script></body></html>`);
-  printWindow.document.close();
-  return true;
+  </style></head><body>${pages}</body></html>`;
+  try {
+    // Clean up any previous hidden print frame so we don't accumulate them.
+    document.querySelectorAll<HTMLIFrameElement>("iframe[data-tinutri-print]").forEach((node) => node.remove());
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("data-tinutri-print", "1");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;";
+    document.body.appendChild(iframe);
+    iframe.srcdoc = doc;
+    iframe.onload = () => {
+      try {
+        const win = iframe.contentWindow;
+        if (!win) return;
+        win.focus();
+        win.print();
+      } catch {
+        /* ignore — preserve session */
+      }
+      // Leave the iframe in place briefly so the print dialog can finish, then remove.
+      window.setTimeout(() => iframe.remove(), 4000);
+    };
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function Index() {
