@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Building2, Clock3, Copy, History, LayoutDashboard, LogOut, Menu, PackagePlus, Pencil, Printer, Search, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import { Building2, Clock3, Copy, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Trash2, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,16 @@ type Client = { id: string; name: string; legal_name: string | null; cnpj: strin
 type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null; active: boolean };
 type Collaborator = { id: string; client_id: string; name: string; role_title: string | null; active: boolean };
 type PrintableLabel = { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date };
+type QueueItem = {
+  id: string;
+  label: PrintableLabel;
+  copies: number;
+  client_id: string;
+  product_id: string;
+  responsible_id: string;
+  opened_iso: string;
+  expires_iso: string;
+};
 type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number };
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
 
@@ -34,19 +44,59 @@ function reservePrintWindow() {
   return window.open("", "_blank", "popup=yes,width=520,height=380");
 }
 
-type PrinterMode = "standard" | "niimbot";
-const PRINTER_MODE_KEY = "tinutri.printer-mode";
+type PrinterType = "niimbot" | "elgin" | "bematech" | "zebra" | "tomate" | "argox" | "outra";
+type ConnectionMode = "browser" | "wifi" | "bluetooth" | "usb";
+type LabelSize = "60x40" | "50x30";
+type PrinterSettings = {
+  type: PrinterType;
+  connection: ConnectionMode;
+  ip: string;
+  size: LabelSize;
+  showTime: boolean;
+};
 
-function loadPrinterMode(): PrinterMode {
-  if (typeof window === "undefined") return "standard";
-  return window.localStorage.getItem(PRINTER_MODE_KEY) === "niimbot" ? "niimbot" : "standard";
+const PRINTER_SETTINGS_KEY = "tinutri.printer-settings";
+const PRINTER_MODE_LEGACY_KEY = "tinutri.printer-mode";
+const DEFAULT_SETTINGS: PrinterSettings = { type: "elgin", connection: "browser", ip: "", size: "60x40", showTime: true };
+
+const PRINTER_TYPES: { id: PrinterType; label: string }[] = [
+  { id: "niimbot", label: "NiiMbot" },
+  { id: "elgin", label: "Elgin" },
+  { id: "bematech", label: "Bematech" },
+  { id: "zebra", label: "Zebra" },
+  { id: "tomate", label: "Tomate" },
+  { id: "argox", label: "Argox" },
+  { id: "outra", label: "Outra impressora térmica" },
+];
+const CONNECTION_MODES: { id: ConnectionMode; label: string }[] = [
+  { id: "browser", label: "Impressão pelo navegador" },
+  { id: "wifi", label: "Wi-Fi / IP" },
+  { id: "bluetooth", label: "Bluetooth" },
+  { id: "usb", label: "USB" },
+];
+
+function loadSettings(): PrinterSettings {
+  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  try {
+    const raw = window.localStorage.getItem(PRINTER_SETTINGS_KEY);
+    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const legacy = window.localStorage.getItem(PRINTER_MODE_LEGACY_KEY);
+    if (legacy === "niimbot") return { ...DEFAULT_SETTINGS, type: "niimbot" };
+  } catch {}
+  return DEFAULT_SETTINGS;
 }
 
-async function generateNiimbotPng(label: PrintableLabel): Promise<Blob | null> {
-  // 60 mm × 40 mm @ ~203 DPI (8 px/mm) → 480 × 320 px (tamanho real para NiiMbot)
+function sizeMm(size: LabelSize) {
+  return size === "50x30" ? { w: 50, h: 30 } : { w: 60, h: 40 };
+}
+
+async function generateNiimbotPng(label: PrintableLabel, size: LabelSize, showTime: boolean): Promise<Blob | null> {
+  // tamanho real @ ~203 DPI (8 px/mm)
   const PX_PER_MM = 8;
-  const W = 60 * PX_PER_MM;
-  const H = 40 * PX_PER_MM;
+  const { w, h } = sizeMm(size);
+  const scale = size === "50x30" ? 0.75 : 1;
+  const W = w * PX_PER_MM;
+  const H = h * PX_PER_MM;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
@@ -63,66 +113,69 @@ async function generateNiimbotPng(label: PrintableLabel): Promise<Blob | null> {
   logo.src = new URL(tinutriLogo, window.location.origin).toString();
   await new Promise<void>((resolve) => { logo.onload = () => resolve(); logo.onerror = () => resolve(); });
 
+  const fs = (n: number) => Math.max(8, Math.round(n * scale));
   // Cabeçalho: logo + marca
   const headerY = 8;
-  const logoSize = 28;
+  const logoSize = Math.round(28 * scale);
   try { if (logo.width) ctx.drawImage(logo, 10, headerY, logoSize, logoSize); } catch {}
-  ctx.font = "700 14px Arial, Helvetica, sans-serif";
+  ctx.font = `700 ${fs(14)}px Arial, Helvetica, sans-serif`;
   ctx.textAlign = "left";
   ctx.fillText("TiNutri Smart Label®", 10 + logoSize + 8, headerY + 8);
 
   // Nome do produto
-  ctx.font = "800 22px Arial, Helvetica, sans-serif";
+  ctx.font = `800 ${fs(22)}px Arial, Helvetica, sans-serif`;
   ctx.textAlign = "center";
   const productName = label.product.toUpperCase();
   // Quebra simples se exceder
   let name = productName;
   while (ctx.measureText(name).width > W - 20 && name.length > 4) name = name.slice(0, -2);
-  ctx.fillText(name === productName ? productName : name + "…", W / 2, 44);
+  ctx.fillText(name === productName ? productName : name + "…", W / 2, Math.round(44 * scale));
 
-  let cursorY = 74;
+  let cursorY = Math.round(74 * scale);
   ctx.textAlign = "left";
-  ctx.font = "700 13px Arial, Helvetica, sans-serif";
-  if (label.lot) { ctx.fillText(`LOTE: ${label.lot.toUpperCase()}`, 10, cursorY); cursorY += 16; }
-  if (label.inspection) { ctx.fillText(label.inspection.toUpperCase(), 10, cursorY); cursorY += 16; }
+  ctx.font = `700 ${fs(13)}px Arial, Helvetica, sans-serif`;
+  if (label.lot) { ctx.fillText(`LOTE: ${label.lot.toUpperCase()}`, 10, cursorY); cursorY += fs(16); }
+  if (label.inspection) { ctx.fillText(label.inspection.toUpperCase(), 10, cursorY); cursorY += fs(16); }
 
   // FABRICAÇÃO (esquerda) - menor
-  ctx.font = "700 11px Arial, Helvetica, sans-serif";
+  ctx.font = `700 ${fs(11)}px Arial, Helvetica, sans-serif`;
   ctx.fillText("FABRICAÇÃO:", 10, cursorY + 4);
-  ctx.font = "700 16px Arial, Helvetica, sans-serif";
-  ctx.fillText(label.opened, 10, cursorY + 18);
+  ctx.font = `700 ${fs(16)}px Arial, Helvetica, sans-serif`;
+  ctx.fillText(label.opened, 10, cursorY + fs(18));
 
   // VALIDADE (destaque máximo)
   ctx.textAlign = "right";
-  ctx.font = "700 12px Arial, Helvetica, sans-serif";
+  ctx.font = `700 ${fs(12)}px Arial, Helvetica, sans-serif`;
   ctx.fillText("VALIDADE:", W - 10, cursorY);
-  ctx.font = "900 36px Arial, Helvetica, sans-serif";
-  ctx.fillText(label.expires, W - 10, cursorY + 14);
+  ctx.font = `900 ${fs(36)}px Arial, Helvetica, sans-serif`;
+  ctx.fillText(label.expires, W - 10, cursorY + fs(14));
 
   // Rodapé: responsável + hora
   ctx.textAlign = "left";
-  ctx.font = "700 10px Arial, Helvetica, sans-serif";
+  ctx.font = `700 ${fs(10)}px Arial, Helvetica, sans-serif`;
   ctx.fillText("RESPONSÁVEL:", 10, H - 28);
-  ctx.font = "800 14px Arial, Helvetica, sans-serif";
+  ctx.font = `800 ${fs(14)}px Arial, Helvetica, sans-serif`;
   ctx.fillText(label.responsible.toUpperCase().slice(0, 22), 10, H - 16);
 
-  ctx.textAlign = "right";
-  ctx.font = "700 10px Arial, Helvetica, sans-serif";
-  ctx.fillText("HORA:", W - 10, H - 28);
-  ctx.font = "800 16px Arial, Helvetica, sans-serif";
-  ctx.fillText(format(label.issued, "HH:mm"), W - 10, H - 16);
+  if (showTime) {
+    ctx.textAlign = "right";
+    ctx.font = `700 ${fs(10)}px Arial, Helvetica, sans-serif`;
+    ctx.fillText("HORA:", W - 10, H - 28);
+    ctx.font = `800 ${fs(16)}px Arial, Helvetica, sans-serif`;
+    ctx.fillText(format(label.issued, "HH:mm"), W - 10, H - 16);
+  }
 
   return await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
 }
 
-async function exportNiimbotLabel(label: PrintableLabel) {
-  const blob = await generateNiimbotPng(label);
+async function exportNiimbotLabel(label: PrintableLabel, settings: PrinterSettings) {
+  const blob = await generateNiimbotPng(label, settings.size, settings.showTime);
   if (!blob) return false;
   const url = URL.createObjectURL(blob);
   const safe = label.product.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "etiqueta";
   const a = document.createElement("a");
   a.href = url;
-  a.download = `niimbot-${safe}-60x40mm.png`;
+  a.download = `niimbot-${safe}-${settings.size}mm.png`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -130,18 +183,27 @@ async function exportNiimbotLabel(label: PrintableLabel) {
   return true;
 }
 
-function printThermalLabel(label: PrintableLabel, quantity = 1, printWindow = reservePrintWindow()) {
-  if (!printWindow) return false;
+function buildLabelHtml(label: PrintableLabel, showTime: boolean) {
   const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
-  const copies = Math.max(1, Math.min(200, Math.floor(quantity)));
   const lotLine = label.lot ? `<div class="lot">LOTE: ${escapeHtml(label.lot.toUpperCase())}</div>` : "";
   const inspection = label.inspection ? `<div class="insp">${escapeHtml(label.inspection.toUpperCase())}</div>` : "";
+  const timeBlock = showTime ? `<time>${format(label.issued, "HH:mm")}</time>` : "";
   const logoUrl = new URL(tinutriLogo, window.location.origin).toString();
-  const labelHtml = `<main class="label"><header class="brand"><img src="${logoUrl}" alt="" class="logo"/><span>TiNutri Smart Label®</span></header><strong class="product">${escapeHtml(label.product.toUpperCase())}</strong>${lotLine}${inspection}<div class="dates"><div class="fab"><span>FAB:</span><strong>${escapeHtml(label.opened)}</strong></div><div class="expiry"><span>VALIDADE</span><strong>${escapeHtml(label.expires)}</strong></div></div><footer class="footer"><div class="resp"><span>RESPONSÁVEL:</span><strong>${escapeHtml(label.responsible.toUpperCase())}</strong></div><time>${format(label.issued, "HH:mm")}</time></footer></main>`;
-  const pages = Array.from({ length: copies }, () => labelHtml).join("");
+  return `<main class="label"><header class="brand"><img src="${logoUrl}" alt="" class="logo"/><span>TiNutri Smart Label®</span></header><strong class="product">${escapeHtml(label.product.toUpperCase())}</strong>${lotLine}${inspection}<div class="dates"><div class="fab"><span>FAB:</span><strong>${escapeHtml(label.opened)}</strong></div><div class="expiry"><span>VALIDADE</span><strong>${escapeHtml(label.expires)}</strong></div></div><footer class="footer"><div class="resp"><span>RESPONSÁVEL:</span><strong>${escapeHtml(label.responsible.toUpperCase())}</strong></div>${timeBlock}</footer></main>`;
+}
+
+function printThermalBatch(items: { label: PrintableLabel; copies: number }[], settings: PrinterSettings, printWindow = reservePrintWindow()) {
+  if (!printWindow) return false;
+  const { w, h } = sizeMm(settings.size);
+  const scale = settings.size === "50x30" ? 0.78 : 1;
+  const f = (pt: number) => +(pt * scale).toFixed(2);
+  const pages = items.flatMap(({ label, copies }) => {
+    const html = buildLabelHtml(label, settings.showTime);
+    return Array.from({ length: Math.max(1, Math.min(200, Math.floor(copies))) }, () => html);
+  }).join("");
   printWindow.document.open();
-  printWindow.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etiqueta TiNutri 60 × 40 mm</title><style>
-    @page{size:60mm 40mm;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000}body{font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:none;text-rendering:geometricPrecision}.label{width:60mm;height:40mm;padding:1.2mm 1.5mm;line-height:1;display:flex;flex-direction:column;align-items:stretch;gap:.2mm;page-break-after:always;break-after:page;overflow:hidden}.label:last-child{page-break-after:auto;break-after:auto}.brand{display:flex;align-items:center;justify-content:center;gap:1mm;font-size:5.5pt;font-weight:800;letter-spacing:.02em}.brand .logo{height:3.5mm;width:3.5mm;object-fit:contain}.product{display:block;overflow:hidden;font-size:9pt;font-weight:800;line-height:1.1;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase;text-align:center;margin-top:.4mm}.lot{margin-top:.4mm;font-size:6.5pt;font-weight:700;text-transform:uppercase;text-align:center}.insp{font-size:5.5pt;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;margin-top:.2mm}.dates{margin-top:.6mm;display:grid;grid-template-columns:1fr 1.2fr;gap:1.5mm;align-items:end}.dates span{display:block;font-size:5pt;font-weight:700;letter-spacing:.04em}.fab strong{display:block;font-size:8.5pt;font-weight:700}.expiry{text-align:right}.expiry strong{display:block;font-size:18pt;font-weight:900;letter-spacing:-.03em;line-height:1;margin-top:.2mm}.footer{display:flex;align-items:baseline;justify-content:space-between;gap:1mm;margin-top:auto}.footer .resp{flex:1;min-width:0;text-align:left;line-height:1}.footer .resp span{display:block;font-size:4.5pt;font-weight:700;letter-spacing:.04em}.footer .resp strong{display:block;overflow:hidden;margin-top:.2mm;font-size:7.5pt;font-weight:800;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase}.footer time{flex-shrink:0;font-size:8.5pt;font-weight:700;font-variant-numeric:tabular-nums}@media print{.label{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+  printWindow.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etiqueta TiNutri ${w} × ${h} mm</title><style>
+    @page{size:${w}mm ${h}mm;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000}body{font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:none;text-rendering:geometricPrecision}.label{width:${w}mm;height:${h}mm;padding:1.2mm 1.5mm;line-height:1;display:flex;flex-direction:column;align-items:stretch;gap:.2mm;page-break-after:always;break-after:page;overflow:hidden}.label:last-child{page-break-after:auto;break-after:auto}.brand{display:flex;align-items:center;justify-content:center;gap:1mm;font-size:${f(5.5)}pt;font-weight:800;letter-spacing:.02em}.brand .logo{height:${f(3.5)}mm;width:${f(3.5)}mm;object-fit:contain}.product{display:block;overflow:hidden;font-size:${f(9)}pt;font-weight:800;line-height:1.1;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase;text-align:center;margin-top:.4mm}.lot{margin-top:.4mm;font-size:${f(6.5)}pt;font-weight:700;text-transform:uppercase;text-align:center}.insp{font-size:${f(5.5)}pt;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;margin-top:.2mm}.dates{margin-top:.6mm;display:grid;grid-template-columns:1fr 1.2fr;gap:1.5mm;align-items:end}.dates span{display:block;font-size:${f(5)}pt;font-weight:700;letter-spacing:.04em}.fab strong{display:block;font-size:${f(8.5)}pt;font-weight:700}.expiry{text-align:right}.expiry strong{display:block;font-size:${f(18)}pt;font-weight:900;letter-spacing:-.03em;line-height:1;margin-top:.2mm}.footer{display:flex;align-items:baseline;justify-content:space-between;gap:1mm;margin-top:auto}.footer .resp{flex:1;min-width:0;text-align:left;line-height:1}.footer .resp span{display:block;font-size:${f(4.5)}pt;font-weight:700;letter-spacing:.04em}.footer .resp strong{display:block;overflow:hidden;margin-top:.2mm;font-size:${f(7.5)}pt;font-weight:800;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase}.footer time{flex-shrink:0;font-size:${f(8.5)}pt;font-weight:700;font-variant-numeric:tabular-nums}@media print{.label{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
   </style></head><body>${pages}<script>window.addEventListener('load',()=>{window.focus();setTimeout(()=>{window.print();setTimeout(()=>window.close(),400)},120)});<\/script></body></html>`);
   printWindow.document.close();
   return true;
@@ -167,12 +229,17 @@ function Index() {
   const [quantity, setQuantity] = useState<string>("1");
   const [label, setLabel] = useState<PrintableLabel | null>(null);
   const [labelDraft, setLabelDraft] = useState<{ product: string; responsible: string; opened: string; expires: string; lot: string } | null>(null);
-  const [printerMode, setPrinterMode] = useState<PrinterMode>("standard");
+  const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_SETTINGS);
+  const [showPrinterSettings, setShowPrinterSettings] = useState(false);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
 
-  useEffect(() => { setPrinterMode(loadPrinterMode()); }, []);
-  const updatePrinterMode = (mode: PrinterMode) => {
-    setPrinterMode(mode);
-    try { window.localStorage.setItem(PRINTER_MODE_KEY, mode); } catch {}
+  useEffect(() => { setPrinterSettings(loadSettings()); }, []);
+  const updateSettings = (patch: Partial<PrinterSettings>) => {
+    setPrinterSettings((prev) => {
+      const next = { ...prev, ...patch };
+      try { window.localStorage.setItem(PRINTER_SETTINGS_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
   };
 
   const refresh = async () => {
@@ -241,10 +308,9 @@ function Index() {
     </main>
   );
 
-  const issueLabel = async () => {
-    setMessage("");
-    if (!client || !product || !responsible) { setMessage("Selecione cliente, produto e responsável."); return; }
-    if (product.requires_lot && !(labelDraft?.lot ?? lot).trim()) { setMessage("Este produto exige número de lote."); return; }
+  const buildCurrentItem = (): QueueItem | null => {
+    if (!client || !product || !responsible) { setMessage("Selecione cliente, produto e responsável."); return null; }
+    if (product.requires_lot && !(labelDraft?.lot ?? lot).trim()) { setMessage("Este produto exige número de lote."); return null; }
     const copies = Math.max(1, Math.min(200, Math.floor(Number(quantity) || 1)));
     const issued = new Date();
     const effectiveOpened = labelDraft?.opened || openedOn;
@@ -253,35 +319,114 @@ function Index() {
     const effectiveProduct = labelDraft?.product.trim() || product.name;
     const effectiveResponsible = labelDraft?.responsible.trim() || responsible.name;
     const effectiveLot = (labelDraft?.lot ?? lot).trim();
-    const printWindow = printerMode === "niimbot" ? null : reservePrintWindow();
-    if (printerMode === "standard") {
+    return {
+      id: crypto.randomUUID(),
+      copies,
+      client_id: client.id,
+      product_id: product.id,
+      responsible_id: responsible.id,
+      opened_iso: effectiveOpened,
+      expires_iso: expiry,
+      label: {
+        product: effectiveProduct,
+        opened: format(new Date(`${effectiveOpened}T12:00:00`), "dd/MM/yyyy"),
+        expires: format(new Date(`${expiry}T12:00:00`), "dd/MM/yyyy"),
+        lot: effectiveLot || undefined,
+        inspection,
+        responsible: effectiveResponsible,
+        issued,
+      },
+    };
+  };
+
+  const addToQueue = () => {
+    setMessage("");
+    const item = buildCurrentItem();
+    if (!item) return;
+    setQueue((q) => [...q, item]);
+    setLot(""); setLabelDraft(null); setQuantity("1");
+    setMessage(`Etiqueta adicionada à fila (${item.copies}× ${item.label.product}).`);
+  };
+
+  const removeFromQueue = (id: string) => setQueue((q) => q.filter((it) => it.id !== id));
+  const updateQueueCopies = (id: string, copies: number) =>
+    setQueue((q) => q.map((it) => it.id === id ? { ...it, copies: Math.max(1, Math.min(200, Math.floor(copies) || 1)) } : it));
+
+  const dispatchPrint = async (items: QueueItem[]) => {
+    if (items.length === 0) return;
+    const isNiimbot = printerSettings.type === "niimbot";
+    const printWindow = isNiimbot ? null : reservePrintWindow();
+    if (!isNiimbot) {
       if (!printWindow) { setMessage("Permita a abertura da janela de impressão no navegador."); return; }
-      printWindow.document.write("<!doctype html><title>Preparando etiqueta</title><p style='font-family:Arial,sans-serif'>Preparando etiqueta para impressão…</p>");
+      printWindow.document.write("<!doctype html><title>Preparando etiqueta</title><p style='font-family:Arial,sans-serif'>Preparando etiquetas para impressão…</p>");
     }
-    const { error } = await supabase.from("issued_labels").insert({
-      client_id: client.id, product_id: product.id, responsible_id: responsible.id, issued_by: userId,
-      client_name: client.name, product_name: effectiveProduct, responsible_name: effectiveResponsible,
-      lot_number: effectiveLot || null, inspection_label: inspection ?? null, opened_on: effectiveOpened, expires_on: expiry, quantity: copies,
-    });
+    // Persist em histórico
+    const rows = items.map((it) => ({
+      client_id: it.client_id, product_id: it.product_id, responsible_id: it.responsible_id, issued_by: userId,
+      client_name: clients.find(c => c.id === it.client_id)?.name ?? "", product_name: it.label.product, responsible_name: it.label.responsible,
+      lot_number: it.label.lot ?? null, inspection_label: it.label.inspection ?? null,
+      opened_on: it.opened_iso, expires_on: it.expires_iso, quantity: it.copies,
+    }));
+    const { error } = await supabase.from("issued_labels").insert(rows);
     if (error) { printWindow?.close(); setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return; }
-    const issuedLabel = { product: effectiveProduct, opened: format(new Date(`${effectiveOpened}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${expiry}T12:00:00`), "dd/MM/yyyy"), lot: effectiveLot || undefined, inspection, responsible: effectiveResponsible, issued };
-    setLabel(issuedLabel);
-    if (printerMode === "niimbot") {
-      const ok = await exportNiimbotLabel(issuedLabel);
-      setMessage(ok ? "PNG 60×40 mm gerado para o app NiiMbot." : "Não foi possível gerar a imagem para o NiiMbot.");
+    if (isNiimbot) {
+      for (const it of items) {
+        for (let i = 0; i < it.copies; i++) {
+          await exportNiimbotLabel(it.label, printerSettings);
+        }
+      }
+      setMessage(`PNG ${printerSettings.size.replace("x", " × ")} mm gerado(s) para o app NiiMbot.`);
     } else {
-      printThermalLabel(issuedLabel, copies, printWindow!);
+      printThermalBatch(items.map((it) => ({ label: it.label, copies: it.copies })), printerSettings, printWindow!);
+      if (printerSettings.connection !== "browser") {
+        setMessage(`Conexão ${printerSettings.connection.toUpperCase()} não disponível no navegador — usando impressão do sistema como fallback.`);
+      }
     }
+    setLabel(items[items.length - 1].label);
     await refresh();
+  };
+
+  const printNow = async () => {
+    setMessage("");
+    const item = buildCurrentItem();
+    if (!item) return;
+    await dispatchPrint([item]);
+    setLabelDraft(null);
+  };
+
+  const printQueue = async () => {
+    if (queue.length === 0) return;
+    await dispatchPrint(queue);
+    setQueue([]);
+  };
+
+  const testPrint = async () => {
+    const now = new Date();
+    const sample: PrintableLabel = {
+      product: "TESTE DE IMPRESSÃO",
+      opened: format(now, "dd/MM/yyyy"),
+      expires: format(addDays(now, 7), "dd/MM/yyyy"),
+      lot: "0001",
+      inspection: undefined,
+      responsible: "TINUTRI",
+      issued: now,
+    };
+    if (printerSettings.type === "niimbot") {
+      const ok = await exportNiimbotLabel(sample, printerSettings);
+      setMessage(ok ? "Etiqueta de teste gerada (PNG NiiMbot)." : "Falha ao gerar a etiqueta de teste.");
+      return;
+    }
+    const ok = printThermalBatch([{ label: sample, copies: 1 }], printerSettings);
+    setMessage(ok ? "Etiqueta de teste enviada para impressão." : "Permita a abertura da janela de impressão no navegador.");
   };
 
   const reprintLabel = (record: LabelRecord) => {
     const historicalLabel = { product: record.product_name, opened: format(new Date(`${record.opened_on}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${record.expires_on}T12:00:00`), "dd/MM/yyyy"), lot: record.lot_number ?? undefined, inspection: record.inspection_label ?? undefined, responsible: record.responsible_name, issued: new Date(record.issued_at) };
     setLabel(historicalLabel);
     setTab("emit");
-    if (printerMode === "niimbot") {
-      void exportNiimbotLabel(historicalLabel).then((ok) => setMessage(ok ? "PNG 60×40 mm gerado para o app NiiMbot." : "Não foi possível gerar a imagem para o NiiMbot."));
-    } else if (!printThermalLabel(historicalLabel, record.quantity || 1)) {
+    if (printerSettings.type === "niimbot") {
+      void exportNiimbotLabel(historicalLabel, printerSettings).then((ok) => setMessage(ok ? "PNG gerado para o app NiiMbot." : "Falha ao gerar PNG NiiMbot."));
+    } else if (!printThermalBatch([{ label: historicalLabel, copies: record.quantity || 1 }], printerSettings)) {
       setMessage("Permita a abertura da janela de impressão no navegador.");
     }
   };
@@ -330,18 +475,60 @@ function Index() {
             <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Emitir nova etiqueta</h1>
             <p className="mt-2 text-muted-foreground">Selecione, confira e imprima. A validade é calculada automaticamente.</p>
             <div className="mt-5 rounded-2xl border bg-card p-4 shadow-sm">
-              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">Impressora</p>
-              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:gap-3">
-                <label className={`flex flex-1 cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm font-semibold ${printerMode === "standard" ? "border-primary bg-secondary" : ""}`}>
-                  <input className="size-4 w-auto" type="radio" name="printer-mode" checked={printerMode === "standard"} onChange={() => updatePrinterMode("standard")} />
-                  Padrão (Elgin, Bematech, Zebra, Tomate)
-                </label>
-                <label className={`flex flex-1 cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm font-semibold ${printerMode === "niimbot" ? "border-primary bg-secondary" : ""}`}>
-                  <input className="size-4 w-auto" type="radio" name="printer-mode" checked={printerMode === "niimbot"} onChange={() => updatePrinterMode("niimbot")} />
-                  Modo de teste NiiMbot (gera PNG 60×40 mm)
-                </label>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">Configuração da Impressora</p>
+                  <p className="mt-1 truncate text-sm font-semibold">
+                    {PRINTER_TYPES.find(t => t.id === printerSettings.type)?.label}
+                    {" · "}
+                    {CONNECTION_MODES.find(c => c.id === printerSettings.connection)?.label}
+                    {" · "}
+                    {printerSettings.size.replace("x", " × ")} mm
+                    {printerSettings.connection === "wifi" && printerSettings.ip ? ` · ${printerSettings.ip}` : ""}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setShowPrinterSettings(v => !v)}>
+                  <Settings2 /> {showPrinterSettings ? "Fechar" : "Configurar"}
+                </Button>
               </div>
-              {printerMode === "niimbot" && <p className="mt-2 text-xs text-muted-foreground">Ao emitir, será baixada uma imagem PNG em tamanho real para importar no aplicativo oficial da NiiMbot.</p>}
+              {showPrinterSettings && (
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <Field label="Tipo da impressora">
+                    <select value={printerSettings.type} onChange={(e) => updateSettings({ type: e.target.value as PrinterType })}>
+                      {PRINTER_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Modo de conexão">
+                    <select value={printerSettings.connection} onChange={(e) => updateSettings({ connection: e.target.value as ConnectionMode })}>
+                      {CONNECTION_MODES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="IP da impressora" hint="Ex.: 192.168.1.200">
+                    <input value={printerSettings.ip} placeholder="192.168.1.200" onChange={(e) => updateSettings({ ip: e.target.value })} />
+                  </Field>
+                  <Field label="Tamanho da etiqueta">
+                    <select value={printerSettings.size} onChange={(e) => updateSettings({ size: e.target.value as LabelSize })}>
+                      <option value="60x40">60 mm × 40 mm (padrão)</option>
+                      <option value="50x30">50 mm × 30 mm (opcional)</option>
+                    </select>
+                  </Field>
+                  <label className="flex items-center gap-3 rounded-xl border p-3 text-sm font-semibold sm:col-span-2">
+                    <input type="checkbox" className="size-4 w-auto" checked={printerSettings.showTime} onChange={(e) => updateSettings({ showTime: e.target.checked })} />
+                    Exibir a HORA na etiqueta
+                  </label>
+                  <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
+                    <Button variant="outline" onClick={testPrint}><Printer /> Testar impressão</Button>
+                    {printerSettings.connection !== "browser" && printerSettings.type !== "niimbot" && (
+                      <p className="text-xs text-muted-foreground">
+                        Conexão direta {printerSettings.connection.toUpperCase()} usará a impressão do sistema como fallback no navegador.
+                      </p>
+                    )}
+                    {printerSettings.type === "niimbot" && (
+                      <p className="text-xs text-muted-foreground">NiiMbot: a etiqueta será baixada como PNG para envio pelo app oficial.</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
               <div className="space-y-5 rounded-3xl border bg-card p-5 shadow-sm sm:p-7">
@@ -358,10 +545,51 @@ function Index() {
                 <Field label="Quantidade de etiquetas" hint="Imprime várias cópias em sequência"><input type="number" min={1} max={200} value={quantity} onChange={(e) => setQuantity(e.target.value)} /></Field>
                 {product && responsible && !labelDraft && <Button variant="outline" className="w-full" onClick={() => setLabelDraft({ product: product.name, responsible: responsible.name, opened: openedOn, expires: format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd"), lot })}><Pencil /> Editar etiqueta antes de imprimir</Button>}
                 {labelDraft && <div className="grid gap-4 rounded-2xl border bg-secondary/50 p-4 sm:grid-cols-2"><div className="sm:col-span-2"><Field label="Nome na etiqueta"><input maxLength={120} value={labelDraft.product} onChange={(e) => setLabelDraft({ ...labelDraft, product: e.target.value })} /></Field></div><Field label="Aberto em"><input type="date" value={labelDraft.opened} onChange={(e) => setLabelDraft({ ...labelDraft, opened: e.target.value })} /></Field><Field label="Validade"><input type="date" value={labelDraft.expires} onChange={(e) => setLabelDraft({ ...labelDraft, expires: e.target.value })} /></Field><Field label="Lote"><input maxLength={80} value={labelDraft.lot} onChange={(e) => setLabelDraft({ ...labelDraft, lot: e.target.value })} /></Field><Field label="Responsável"><input maxLength={120} value={labelDraft.responsible} onChange={(e) => setLabelDraft({ ...labelDraft, responsible: e.target.value })} /></Field><div className="sm:col-span-2"><Button variant="ghost" size="sm" onClick={() => setLabelDraft(null)}>Cancelar edição</Button></div></div>}
-                {message && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm font-semibold text-destructive">{message}</p>}
-                <Button variant="kitchen" size="xl" className="w-full" onClick={issueLabel}><Printer /> Emitir etiqueta</Button>
+                {message && <p role="alert" className="rounded-xl bg-secondary p-3 text-sm font-semibold">{message}</p>}
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button variant="outline" size="xl" className="w-full" onClick={addToQueue}><ListPlus /> Adicionar à fila</Button>
+                  <Button variant="kitchen" size="xl" className="w-full" onClick={printNow}><Printer /> Imprimir agora</Button>
+                </div>
               </div>
-              <div><p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · TAMANHO REAL 60 × 40 MM</p><ThermalLabel label={label ?? previewLabel} /></div>
+              <div className="space-y-4">
+                <div>
+                  <p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · {printerSettings.size.replace("x", " × ")} MM</p>
+                  <ThermalLabel label={label ?? previewLabel} />
+                </div>
+                <div className="rounded-2xl border bg-card p-4 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">Fila de impressão</p>
+                    <span className="text-xs font-semibold text-muted-foreground">{queue.length} item(ns)</span>
+                  </div>
+                  {queue.length === 0 ? (
+                    <p className="mt-3 text-sm text-muted-foreground">Adicione etiquetas à fila para imprimir várias de uma vez.</p>
+                  ) : (
+                    <ul className="mt-3 space-y-2">
+                      {queue.map((it) => (
+                        <li key={it.id} className="flex items-center gap-2 rounded-xl border bg-secondary/40 p-2">
+                          <div className="min-w-0 flex-1">
+                            <strong className="block truncate text-sm">{it.label.product}</strong>
+                            <p className="truncate text-xs text-muted-foreground">VAL {it.label.expires} · {it.label.responsible}{it.label.lot ? ` · Lote ${it.label.lot}` : ""}</p>
+                          </div>
+                          <input
+                            type="number"
+                            min={1}
+                            max={200}
+                            value={it.copies}
+                            onChange={(e) => updateQueueCopies(it.id, Number(e.target.value))}
+                            className="!w-16 !p-1 text-center text-sm"
+                            aria-label="Cópias"
+                          />
+                          <Button variant="ghost" size="icon" aria-label="Remover" onClick={() => removeFromQueue(it.id)}><Trash2 /></Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <Button variant="kitchen" size="lg" className="mt-3 w-full" disabled={queue.length === 0} onClick={printQueue}>
+                    <Printer /> Imprimir todas ({queue.reduce((sum, it) => sum + it.copies, 0)})
+                  </Button>
+                </div>
+              </div>
             </div>
           </section>}
           {tab === "clients" && <ClientsPanel clients={clients} refresh={refresh} />}
