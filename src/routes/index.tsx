@@ -514,7 +514,12 @@ function Index() {
             </Sheet>
           </div>
           <Brand />
-          <Button variant="ghost" size="icon" aria-label="Sair" onClick={async () => { await supabase.auth.signOut(); location.reload(); }}><LogOut /></Button>
+          <div className="flex items-center gap-2 justify-self-end">
+            {role === "admin" && (
+              <Button asChild variant="outline" size="sm"><Link to="/admin">Área Master</Link></Button>
+            )}
+            <Button variant="ghost" size="icon" aria-label="Sair" onClick={async () => { await supabase.auth.signOut(); location.reload(); }}><LogOut /></Button>
+          </div>
         </div>
       </header>
       <div className="mx-auto flex max-w-7xl gap-8 px-4 py-6 sm:px-7 lg:py-8">
