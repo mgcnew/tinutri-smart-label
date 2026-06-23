@@ -67,6 +67,8 @@ function Index() {
   const [selectedResponsible, setSelectedResponsible] = useState("");
   const [openedOn, setOpenedOn] = useState(format(new Date(), "yyyy-MM-dd"));
   const [lot, setLot] = useState("");
+  const [shelfDays, setShelfDays] = useState<string>("");
+  const [quantity, setQuantity] = useState<string>("1");
   const [label, setLabel] = useState<PrintableLabel | null>(null);
   const [labelDraft, setLabelDraft] = useState<{ product: string; responsible: string; opened: string; expires: string; lot: string } | null>(null);
 
@@ -87,14 +89,14 @@ function Index() {
     const [{ data: clientRows }, { data: productRows }, { data: collaboratorRows }] = await Promise.all([
       supabase.from("clients").select("id,name,legal_name,cnpj,city,state,active").order("name"),
       supabase.from("products").select("*").eq("active", true).order("name"),
-      supabase.from("collaborators").select("id,client_id,name,email").eq("active", true).order("name"),
+      supabase.from("collaborators").select("id,client_id,name,role_title,active").eq("active", true).order("name"),
     ]);
     setClients((clientRows ?? []) as Client[]);
     setProducts((productRows ?? []) as Product[]);
     setCollaborators((collaboratorRows ?? []) as Collaborator[]);
     if (ownClient) setSelectedClient(ownClient);
     if (currentRole === "admin") {
-       const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on").order("issued_at", { ascending: false }).limit(100);
+       const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity").order("issued_at", { ascending: false }).limit(100);
       setHistory((labels ?? []) as LabelRecord[]);
     }
     setLoading(false);
@@ -108,7 +110,8 @@ function Index() {
   const product = products.find((item) => item.id === selectedProduct);
   const responsible = collaborators.find((item) => item.id === selectedResponsible);
   const client = clients.find((item) => item.id === selectedClient);
-  const expiresOn = useMemo(() => product && openedOn ? format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "dd/MM/yyyy") : "—", [product, openedOn]);
+  const effectiveShelfDays = Number(shelfDays) > 0 ? Number(shelfDays) : product?.shelf_life_days ?? 0;
+  const expiresOn = useMemo(() => product && openedOn ? format(addDays(new Date(`${openedOn}T12:00:00`), effectiveShelfDays), "dd/MM/yyyy") : "—", [product, openedOn, effectiveShelfDays]);
   const previewLabel: PrintableLabel = {
     product: labelDraft?.product || product?.name || "NOME DO PRODUTO",
     opened: labelDraft?.opened ? format(new Date(`${labelDraft.opened}T12:00:00`), "dd/MM/yyyy") : openedOn ? format(new Date(`${openedOn}T12:00:00`), "dd/MM/yyyy") : "—",
@@ -139,9 +142,10 @@ function Index() {
     setMessage("");
     if (!client || !product || !responsible) { setMessage("Selecione cliente, produto e responsável."); return; }
     if (product.requires_lot && !(labelDraft?.lot ?? lot).trim()) { setMessage("Este produto exige número de lote."); return; }
+    const copies = Math.max(1, Math.min(200, Math.floor(Number(quantity) || 1)));
     const issued = new Date();
     const effectiveOpened = labelDraft?.opened || openedOn;
-    const expiry = labelDraft?.expires || format(addDays(new Date(`${effectiveOpened}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd");
+    const expiry = labelDraft?.expires || format(addDays(new Date(`${effectiveOpened}T12:00:00`), effectiveShelfDays), "yyyy-MM-dd");
     const inspection = product.requires_inspection && product.inspection_type && product.inspection_number ? `${product.inspection_type}: ${product.inspection_number}` : undefined;
     const effectiveProduct = labelDraft?.product.trim() || product.name;
     const effectiveResponsible = labelDraft?.responsible.trim() || responsible.name;
@@ -152,12 +156,12 @@ function Index() {
     const { error } = await supabase.from("issued_labels").insert({
       client_id: client.id, product_id: product.id, responsible_id: responsible.id, issued_by: userId,
       client_name: client.name, product_name: effectiveProduct, responsible_name: effectiveResponsible,
-      lot_number: effectiveLot || null, inspection_label: inspection ?? null, opened_on: effectiveOpened, expires_on: expiry,
+      lot_number: effectiveLot || null, inspection_label: inspection ?? null, opened_on: effectiveOpened, expires_on: expiry, quantity: copies,
     });
     if (error) { printWindow.close(); setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return; }
     const issuedLabel = { product: effectiveProduct, opened: format(new Date(`${effectiveOpened}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${expiry}T12:00:00`), "dd/MM/yyyy"), lot: effectiveLot || undefined, inspection, responsible: effectiveResponsible, issued };
     setLabel(issuedLabel);
-    printThermalLabel(issuedLabel, printWindow);
+    printThermalLabel(issuedLabel, copies, printWindow);
     await refresh();
   };
 
@@ -165,7 +169,7 @@ function Index() {
     const historicalLabel = { product: record.product_name, opened: format(new Date(`${record.opened_on}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${record.expires_on}T12:00:00`), "dd/MM/yyyy"), lot: record.lot_number ?? undefined, inspection: record.inspection_label ?? undefined, responsible: record.responsible_name, issued: new Date(record.issued_at) };
     setLabel(historicalLabel);
     setTab("emit");
-    if (!printThermalLabel(historicalLabel)) setMessage("Permita a abertura da janela de impressão no navegador.");
+    if (!printThermalLabel(historicalLabel, record.quantity || 1)) setMessage("Permita a abertura da janela de impressão no navegador.");
   };
 
   const duplicateLabel = (record: LabelRecord) => {
@@ -174,6 +178,7 @@ function Index() {
     setSelectedResponsible(record.responsible_id ?? "");
     setOpenedOn(record.opened_on);
     setLot(record.lot_number ?? "");
+    setQuantity(String(record.quantity || 1));
     setLabel(null);
     setLabelDraft({ product: record.product_name, responsible: record.responsible_name, opened: record.opened_on, expires: record.expires_on, lot: record.lot_number ?? "" });
     setMessage("");
