@@ -573,7 +573,14 @@ function Index() {
                 <Field label="Quantidade de etiquetas" hint="Imprime várias cópias em sequência"><input type="number" min={1} max={200} value={quantity} onChange={(e) => setQuantity(e.target.value)} /></Field>
                 {product && responsible && !labelDraft && <Button variant="outline" className="w-full" onClick={() => setLabelDraft({ product: product.name, responsible: responsible.name, opened: openedOn, expires: format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd"), lot })}><Pencil /> Editar etiqueta antes de imprimir</Button>}
                 {labelDraft && <div className="grid gap-4 rounded-2xl border bg-secondary/50 p-4 sm:grid-cols-2"><div className="sm:col-span-2"><Field label="Nome na etiqueta"><input maxLength={120} value={labelDraft.product} onChange={(e) => setLabelDraft({ ...labelDraft, product: e.target.value })} /></Field></div><Field label="Aberto em"><input type="date" value={labelDraft.opened} onChange={(e) => setLabelDraft({ ...labelDraft, opened: e.target.value })} /></Field><Field label="Validade"><input type="date" value={labelDraft.expires} onChange={(e) => setLabelDraft({ ...labelDraft, expires: e.target.value })} /></Field><Field label="Lote"><input maxLength={80} value={labelDraft.lot} onChange={(e) => setLabelDraft({ ...labelDraft, lot: e.target.value })} /></Field><Field label="Responsável"><input maxLength={120} value={labelDraft.responsible} onChange={(e) => setLabelDraft({ ...labelDraft, responsible: e.target.value })} /></Field><div className="sm:col-span-2"><Button variant="ghost" size="sm" onClick={() => setLabelDraft(null)}>Cancelar edição</Button></div></div>}
-                {message && <p role="alert" className="rounded-xl bg-secondary p-3 text-sm font-semibold">{message}</p>}
+                {message && (
+                  <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary p-3 text-sm font-semibold">
+                    <span className="min-w-0 flex-1">{message}</span>
+                    {lastFailedPrint && lastFailedPrint.length > 0 && (
+                      <Button variant="kitchen" size="sm" onClick={retryLastPrint}><Printer /> Tentar novamente</Button>
+                    )}
+                  </div>
+                )}
                 {niimbotPreview && (
                   <div className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-secondary p-3">
                     <img src={niimbotPreview.url} alt="Pré-visualização NiiMbot" className="h-16 w-24 rounded-md border bg-white object-contain" />
