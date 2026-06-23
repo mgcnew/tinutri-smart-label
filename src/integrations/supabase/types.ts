@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action: string
+          client_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          metadata: Json
+          user_id: string | null
+          user_name: string | null
+        }
+        Insert: {
+          action: string
+          client_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Update: {
+          action?: string
+          client_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           active: boolean
@@ -24,6 +68,7 @@ export type Database = {
           legal_name: string | null
           name: string
           state: string
+          status: Database["public"]["Enums"]["client_status"]
           updated_at: string
         }
         Insert: {
@@ -35,6 +80,7 @@ export type Database = {
           legal_name?: string | null
           name: string
           state?: string
+          status?: Database["public"]["Enums"]["client_status"]
           updated_at?: string
         }
         Update: {
@@ -46,6 +92,7 @@ export type Database = {
           legal_name?: string | null
           name?: string
           state?: string
+          status?: Database["public"]["Enums"]["client_status"]
           updated_at?: string
         }
         Relationships: []
@@ -103,6 +150,7 @@ export type Database = {
           inspection_label: string | null
           issued_at: string
           issued_by: string
+          issued_by_user_id: string | null
           lot_number: string | null
           opened_on: string
           product_id: string | null
@@ -119,6 +167,7 @@ export type Database = {
           inspection_label?: string | null
           issued_at?: string
           issued_by: string
+          issued_by_user_id?: string | null
           lot_number?: string | null
           opened_on: string
           product_id?: string | null
@@ -135,6 +184,7 @@ export type Database = {
           inspection_label?: string | null
           issued_at?: string
           issued_by?: string
+          issued_by_user_id?: string | null
           lot_number?: string | null
           opened_on?: string
           product_id?: string | null
@@ -208,12 +258,42 @@ export type Database = {
           },
         ]
       }
+      nutritionist_clients: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          nutritionist_user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          nutritionist_user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          nutritionist_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nutritionist_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           active: boolean
           category: string
           client_id: string
           created_at: string
+          created_by: string | null
           id: string
           inspection_number: string | null
           inspection_type: Database["public"]["Enums"]["inspection_type"] | null
@@ -223,12 +303,14 @@ export type Database = {
           requires_lot: boolean
           shelf_life_days: number
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           active?: boolean
           category: string
           client_id: string
           created_at?: string
+          created_by?: string | null
           id?: string
           inspection_number?: string | null
           inspection_type?:
@@ -240,12 +322,14 @@ export type Database = {
           requires_lot?: boolean
           shelf_life_days: number
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           active?: boolean
           category?: string
           client_id?: string
           created_at?: string
+          created_by?: string | null
           id?: string
           inspection_number?: string | null
           inspection_type?:
@@ -257,6 +341,7 @@ export type Database = {
           requires_lot?: boolean
           shelf_life_days?: number
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -335,7 +420,13 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      app_role: "admin" | "operator"
+      app_role:
+        | "admin"
+        | "operator"
+        | "admin_master"
+        | "nutricionista"
+        | "admin_cliente"
+      client_status: "ativa" | "inativa" | "suspensa"
       inspection_type: "SIF" | "SISP" | "SIM"
     }
     CompositeTypes: {
@@ -464,7 +555,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "operator"],
+      app_role: [
+        "admin",
+        "operator",
+        "admin_master",
+        "nutricionista",
+        "admin_cliente",
+      ],
+      client_status: ["ativa", "inativa", "suspensa"],
       inspection_type: ["SIF", "SISP", "SIM"],
     },
   },

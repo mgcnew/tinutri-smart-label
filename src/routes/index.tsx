@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Building2, Clock3, Copy, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Trash2, Users, X } from "lucide-react";
@@ -23,7 +23,8 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Client = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; active: boolean };
+type ClientStatus = "ativa" | "inativa" | "suspensa";
+type Client = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; active: boolean; status: ClientStatus };
 type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null; active: boolean };
 type Collaborator = { id: string; client_id: string; name: string; role_title: string | null; active: boolean };
 type PrintableLabel = { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date };
@@ -269,13 +270,16 @@ function Index() {
       supabase.from("user_roles").select("role").eq("user_id", id).maybeSingle(),
       supabase.from("profiles").select("client_id").eq("user_id", id).maybeSingle(),
     ]);
-    const currentRole = roles?.role as "admin" | "operator" | undefined;
+    const rawRole = roles?.role as string | undefined;
+    // admin antigo + admin_master + admin_cliente + nutricionista => visão "admin"
+    const currentRole: "admin" | "operator" | undefined =
+      rawRole === "operator" ? "operator" : rawRole ? "admin" : undefined;
     setRole(currentRole ?? null);
     if (currentRole === "operator") setTab("emit");
     const ownClient = profile?.client_id ?? null;
     setProfileClientId(ownClient);
     const [{ data: clientRows }, { data: productRows }, { data: collaboratorRows }] = await Promise.all([
-      supabase.from("clients").select("id,name,legal_name,cnpj,city,state,active").order("name"),
+      supabase.from("clients").select("id,name,legal_name,cnpj,city,state,active,status").order("name"),
       supabase.from("products").select("*").eq("active", true).order("name"),
       supabase.from("collaborators").select("id,client_id,name,role_title,active").eq("active", true).order("name"),
     ]);
@@ -283,6 +287,11 @@ function Index() {
     setProducts((productRows ?? []) as Product[]);
     setCollaborators((collaboratorRows ?? []) as Collaborator[]);
     if (ownClient) setSelectedClient(ownClient);
+    const suspendedOwn = (clientRows ?? []).find((c) => c.id === ownClient && (c as { status?: string }).status === "suspensa");
+    if (suspendedOwn) {
+      setLoading(false);
+      return;
+    }
     if (currentRole === "admin") {
        const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity").order("issued_at", { ascending: false }).limit(100);
       setHistory((labels ?? []) as LabelRecord[]);
@@ -313,6 +322,25 @@ function Index() {
   if (loading) return <main className="grid min-h-screen place-items-center bg-background"><p className="font-semibold text-muted-foreground">Preparando sua estação…</p></main>;
 
   if (!userId) return <Login />;
+
+  // Empresa suspensa bloqueia uso operacional (dados preservados)
+  {
+    const ownClient = clients.find((c) => c.id === profileClientId);
+    if (ownClient && ownClient.status === "suspensa") {
+      return (
+        <main className="grid min-h-screen place-items-center bg-background p-5">
+          <section className="w-full max-w-md rounded-3xl border bg-card p-7 shadow-xl text-center">
+            <Brand />
+            <h1 className="mt-6 text-2xl font-bold">Acesso suspenso</h1>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Seu acesso foi temporariamente suspenso. Entre em contato com a TiNutri.
+            </p>
+            <Button className="mt-6 w-full" variant="outline" onClick={async () => { await supabase.auth.signOut(); location.reload(); }}>Sair</Button>
+          </section>
+        </main>
+      );
+    }
+  }
 
   if (!role) return (
     <main className="grid min-h-screen place-items-center bg-background p-5">
@@ -486,7 +514,12 @@ function Index() {
             </Sheet>
           </div>
           <Brand />
-          <Button variant="ghost" size="icon" aria-label="Sair" onClick={async () => { await supabase.auth.signOut(); location.reload(); }}><LogOut /></Button>
+          <div className="flex items-center gap-2 justify-self-end">
+            {role === "admin" && (
+              <Button asChild variant="outline" size="sm"><Link to="/admin">Área Master</Link></Button>
+            )}
+            <Button variant="ghost" size="icon" aria-label="Sair" onClick={async () => { await supabase.auth.signOut(); location.reload(); }}><LogOut /></Button>
+          </div>
         </div>
       </header>
       <div className="mx-auto flex max-w-7xl gap-8 px-4 py-6 sm:px-7 lg:py-8">
@@ -650,7 +683,7 @@ function Index() {
 
 function Login() {
   const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [error, setError] = useState("");
-  return <main className="grid min-h-screen bg-primary lg:grid-cols-2"><section className="hidden flex-col justify-between p-12 text-primary-foreground lg:flex"><Brand inverse /><div><p className="text-sm font-bold uppercase tracking-[0.2em] text-primary-foreground/70">Segurança dos alimentos</p><h1 className="mt-4 max-w-xl text-5xl font-bold leading-tight">Identificação correta, em poucos segundos.</h1><p className="mt-5 max-w-md text-lg text-primary-foreground/75">Etiquetas padronizadas para uma operação mais segura, ágil e confiável.</p></div><p className="text-sm text-primary-foreground/60">TiNutri Consultoria · RDC 216 e CVS-5</p></section><section className="grid place-items-center bg-background p-5"><div className="w-full max-w-md rounded-3xl border bg-card p-7 shadow-2xl sm:p-9"><div className="lg:hidden"><Brand /></div><h2 className="mt-8 text-3xl font-bold">Acesse sua estação</h2><p className="mt-2 text-sm text-muted-foreground">Use o acesso fornecido pela TiNutri.</p><form className="mt-7 space-y-4" onSubmit={async (event) => { event.preventDefault(); setError(""); const result = await supabase.auth.signInWithPassword({ email, password }); if (result.error) setError("E-mail ou senha inválidos."); else location.reload(); }}><Field label="E-mail"><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></Field><Field label="Senha"><input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /></Field>{error && <p role="alert" className="text-sm text-destructive">{error}</p>}<Button size="xl" className="w-full" type="submit">Entrar</Button></form><div className="my-5 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />OU<span className="h-px flex-1 bg-border" /></div><Button variant="outline" size="xl" className="w-full" onClick={async () => { const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin }); if (result.error) setError("Não foi possível entrar com Google."); }}>Continuar com Google</Button></div></section></main>;
+  return <main className="grid min-h-screen bg-primary lg:grid-cols-2"><section className="hidden flex-col justify-between p-12 text-primary-foreground lg:flex"><Brand inverse /><div><p className="text-sm font-bold uppercase tracking-[0.2em] text-primary-foreground/70">Segurança dos alimentos</p><h1 className="mt-4 max-w-xl text-5xl font-bold leading-tight">Identificação correta, em poucos segundos.</h1><p className="mt-5 max-w-md text-lg text-primary-foreground/75">Etiquetas padronizadas para uma operação mais segura, ágil e confiável.</p></div><p className="text-sm text-primary-foreground/60">TiNutri Consultoria · RDC 216 e CVS-5</p></section><section className="grid place-items-center bg-background p-5"><div className="w-full max-w-md rounded-3xl border bg-card p-7 shadow-2xl sm:p-9"><div className="lg:hidden"><Brand /></div><h2 className="mt-8 text-3xl font-bold">Acesse sua estação</h2><p className="mt-2 text-sm text-muted-foreground">Use o acesso fornecido pela TiNutri.</p><form className="mt-7 space-y-4" onSubmit={async (event) => { event.preventDefault(); setError(""); const result = await supabase.auth.signInWithPassword({ email, password }); if (result.error) setError("E-mail ou senha inválidos."); else location.reload(); }}><Field label="E-mail"><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></Field><Field label="Senha"><input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /></Field>{error && <p role="alert" className="text-sm text-destructive">{error}</p>}<Button size="xl" className="w-full" type="submit">Entrar</Button><button type="button" className="block w-full text-center text-xs font-semibold text-muted-foreground underline" onClick={async () => { if (!email) { setError("Informe seu e-mail acima para receber o link."); return; } setError(""); const { error: rpErr } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` }); setError(rpErr ? "Não foi possível enviar o link de redefinição." : "Enviamos um link de redefinição para seu e-mail."); }}>Esqueci minha senha</button></form><div className="my-5 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />OU<span className="h-px flex-1 bg-border" /></div><Button variant="outline" size="xl" className="w-full" onClick={async () => { const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin }); if (result.error) setError("Não foi possível entrar com Google."); }}>Continuar com Google</Button></div></section></main>;
 }
 
 function Brand({ inverse = false }: { inverse?: boolean }) { return <div className="flex min-w-0 items-center gap-3"><img src={tinutriLogo} alt="TiNutri" width={40} height={40} className="size-10 shrink-0 rounded-xl object-contain" loading="lazy" /><div className="min-w-0"><strong className={`block truncate font-display text-lg leading-tight ${inverse ? "text-primary-foreground" : "text-foreground"}`}>TiNutri Smart Label®</strong><span className={`text-xs ${inverse ? "text-primary-foreground/65" : "text-muted-foreground"}`}>Validade simples. Segurança sempre.</span></div></div> }

@@ -125,7 +125,21 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <div className="flex min-h-screen flex-col">
+        <div className="flex-1"><Outlet /></div>
+        <AppFooter />
+      </div>
     </QueryClientProvider>
+  );
+}
+
+function AppFooter() {
+  return (
+    <footer className="border-t bg-card/60 px-5 py-4 text-center text-xs leading-relaxed text-muted-foreground">
+      <p className="font-semibold text-foreground">TiNutri Smart Label®</p>
+      <p className="italic">Validade simples. Segurança sempre.</p>
+      <p className="mt-1">Desenvolvido por TiNutri Soluções em Consultoria de Alimentos.</p>
+      <p>© 2026 TiNutri Smart Label® · Todos os direitos reservados.</p>
+    </footer>
   );
 }
