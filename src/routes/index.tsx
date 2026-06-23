@@ -329,6 +329,20 @@ function Index() {
             <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">Estação de etiquetagem</p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Emitir nova etiqueta</h1>
             <p className="mt-2 text-muted-foreground">Selecione, confira e imprima. A validade é calculada automaticamente.</p>
+            <div className="mt-5 rounded-2xl border bg-card p-4 shadow-sm">
+              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">Impressora</p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:gap-3">
+                <label className={`flex flex-1 cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm font-semibold ${printerMode === "standard" ? "border-primary bg-secondary" : ""}`}>
+                  <input className="size-4 w-auto" type="radio" name="printer-mode" checked={printerMode === "standard"} onChange={() => updatePrinterMode("standard")} />
+                  Padrão (Elgin, Bematech, Zebra, Tomate)
+                </label>
+                <label className={`flex flex-1 cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm font-semibold ${printerMode === "niimbot" ? "border-primary bg-secondary" : ""}`}>
+                  <input className="size-4 w-auto" type="radio" name="printer-mode" checked={printerMode === "niimbot"} onChange={() => updatePrinterMode("niimbot")} />
+                  Modo de teste NiiMbot (gera PNG 60×40 mm)
+                </label>
+              </div>
+              {printerMode === "niimbot" && <p className="mt-2 text-xs text-muted-foreground">Ao emitir, será baixada uma imagem PNG em tamanho real para importar no aplicativo oficial da NiiMbot.</p>}
+            </div>
             <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
               <div className="space-y-5 rounded-3xl border bg-card p-5 shadow-sm sm:p-7">
                 <Field label="Cliente"><select value={selectedClient} disabled={role === "operator"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
