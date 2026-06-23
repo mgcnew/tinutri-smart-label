@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 import {
   assignNutritionistClient,
   createUser,
@@ -34,11 +35,20 @@ function AdminMaster() {
   const [activity, setActivity] = useState<ActivityRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [tab, setTab] = useState<"empresas" | "usuarios" | "carteira" | "atividades">("empresas");
 
   const refresh = async () => {
     setError(null);
     try {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) { setAuthorized(false); setLoading(false); return; }
+      const { data: roleRow } = await supabase.from("user_roles").select("role").eq("user_id", uid).maybeSingle();
+      const raw = roleRow?.role as string | undefined;
+      const isMaster = raw === "admin_master" || raw === "admin";
+      setAuthorized(isMaster);
+      if (!isMaster) { setLoading(false); return; }
       const [c, u, k, s, a] = await Promise.all([
         listAllClients(),
         listAllUsers(),
@@ -60,6 +70,15 @@ function AdminMaster() {
   useEffect(() => { void refresh(); }, []);
 
   if (loading) return <main className="grid min-h-screen place-items-center bg-background"><p className="font-semibold text-muted-foreground">Carregando área master…</p></main>;
+  if (authorized === false) return (
+    <main className="grid min-h-screen place-items-center bg-background p-5">
+      <section className="w-full max-w-md rounded-3xl border bg-card p-7 text-center shadow-xl">
+        <h1 className="text-2xl font-bold">Acesso não autorizado.</h1>
+        <p className="mt-3 text-sm text-muted-foreground">Esta área é restrita ao time TiNutri.</p>
+        <Button asChild className="mt-6 w-full"><Link to="/">Voltar para o início</Link></Button>
+      </section>
+    </main>
+  );
 
   return (
     <main className="mx-auto w-full max-w-6xl space-y-6 p-5">
