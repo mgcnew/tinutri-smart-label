@@ -545,12 +545,13 @@ function Index() {
           </div>
           <Brand />
           <div className="flex items-center gap-2 justify-self-end">
-            {role === "admin" && (
+            {role === "admin_master" && (
               <Button asChild variant="outline" size="sm"><Link to="/admin">Área Master</Link></Button>
             )}
             <Button variant="ghost" size="icon" aria-label="Sair" onClick={async () => { await supabase.auth.signOut(); location.reload(); }}><LogOut /></Button>
           </div>
         </div>
+        <UserStrip userName={userName} role={role} clientName={clients.find((c) => c.id === (profileClientId ?? selectedClient))?.name ?? null} />
       </header>
       <div className="mx-auto flex max-w-7xl gap-8 px-4 py-6 sm:px-7 lg:py-8">
         <aside className="hidden w-56 shrink-0 lg:block">
