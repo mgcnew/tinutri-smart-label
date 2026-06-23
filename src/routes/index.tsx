@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Building2, Clock3, Copy, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Trash2, Users, X } from "lucide-react";
@@ -23,7 +23,8 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Client = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; active: boolean };
+type ClientStatus = "ativa" | "inativa" | "suspensa";
+type Client = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; active: boolean; status: ClientStatus };
 type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null; active: boolean };
 type Collaborator = { id: string; client_id: string; name: string; role_title: string | null; active: boolean };
 type PrintableLabel = { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date };
@@ -269,13 +270,16 @@ function Index() {
       supabase.from("user_roles").select("role").eq("user_id", id).maybeSingle(),
       supabase.from("profiles").select("client_id").eq("user_id", id).maybeSingle(),
     ]);
-    const currentRole = roles?.role as "admin" | "operator" | undefined;
+    const rawRole = roles?.role as string | undefined;
+    // admin antigo + admin_master + admin_cliente + nutricionista => visão "admin"
+    const currentRole: "admin" | "operator" | undefined =
+      rawRole === "operator" ? "operator" : rawRole ? "admin" : undefined;
     setRole(currentRole ?? null);
     if (currentRole === "operator") setTab("emit");
     const ownClient = profile?.client_id ?? null;
     setProfileClientId(ownClient);
     const [{ data: clientRows }, { data: productRows }, { data: collaboratorRows }] = await Promise.all([
-      supabase.from("clients").select("id,name,legal_name,cnpj,city,state,active").order("name"),
+      supabase.from("clients").select("id,name,legal_name,cnpj,city,state,active,status").order("name"),
       supabase.from("products").select("*").eq("active", true).order("name"),
       supabase.from("collaborators").select("id,client_id,name,role_title,active").eq("active", true).order("name"),
     ]);
@@ -283,6 +287,11 @@ function Index() {
     setProducts((productRows ?? []) as Product[]);
     setCollaborators((collaboratorRows ?? []) as Collaborator[]);
     if (ownClient) setSelectedClient(ownClient);
+    const suspendedOwn = (clientRows ?? []).find((c) => c.id === ownClient && (c as { status?: string }).status === "suspensa");
+    if (suspendedOwn) {
+      setLoading(false);
+      return;
+    }
     if (currentRole === "admin") {
        const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity").order("issued_at", { ascending: false }).limit(100);
       setHistory((labels ?? []) as LabelRecord[]);
