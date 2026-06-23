@@ -40,7 +40,7 @@ type QueueItem = {
 type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number };
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
 
-const PRINTER_NOT_FOUND_MESSAGE = "Impressora não encontrada. Verifique a conexão Bluetooth ou Wi-Fi.";
+const PRINTER_NOT_FOUND_MESSAGE = "Impressora não encontrada. Verifique a conexão Bluetooth, Wi-Fi ou a configuração da impressora.";
 
 type PrinterType = "niimbot" | "elgin" | "bematech" | "zebra" | "tomate" | "argox" | "outra";
 type ConnectionMode = "browser" | "wifi" | "bluetooth" | "usb";
@@ -247,6 +247,7 @@ function Index() {
   const [showPrinterSettings, setShowPrinterSettings] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [niimbotPreview, setNiimbotPreview] = useState<NiimbotPreview | null>(null);
+  const [lastFailedPrint, setLastFailedPrint] = useState<QueueItem[] | null>(null);
 
   useEffect(() => () => { if (niimbotPreview) URL.revokeObjectURL(niimbotPreview.url); }, [niimbotPreview]);
 
@@ -380,26 +381,27 @@ function Index() {
       opened_on: it.opened_iso, expires_on: it.expires_iso, quantity: it.copies,
     }));
     const { error } = await supabase.from("issued_labels").insert(rows);
-    if (error) { setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return false; }
+    if (error) { setLastFailedPrint(items); setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return false; }
     if (isNiimbot) {
       const preview = await buildNiimbotPreview(items[items.length - 1].label, printerSettings);
-      if (!preview) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
+      if (!preview) { setLastFailedPrint(items); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
       setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
       setMessage(`Etiqueta pronta para o app NiiMbot. Toque em "Baixar PNG" para enviar à impressora.`);
     } else {
       const ok = printThermalBatch(items.map((it) => ({ label: it.label, copies: it.copies })), printerSettings);
-      if (!ok) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
+      if (!ok) { setLastFailedPrint(items); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
       setMessage(printerSettings.connection !== "browser"
         ? `Enviando para a impressora ${printerSettings.type.toUpperCase()} via ${printerSettings.connection.toUpperCase()}…`
         : "Etiqueta enviada para a impressora.");
     }
     setLabel(items[items.length - 1].label);
+    setLastFailedPrint(null);
     await refresh();
     return true;
   };
 
   const printNow = async () => {
-    setMessage("");
+    setMessage(""); setLastFailedPrint(null);
     const item = buildCurrentItem();
     if (!item) return;
     const ok = await dispatchPrint([item]);
@@ -408,8 +410,16 @@ function Index() {
 
   const printQueue = async () => {
     if (queue.length === 0) return;
+    setMessage(""); setLastFailedPrint(null);
     const ok = await dispatchPrint(queue);
     if (ok) setQueue([]);
+  };
+
+  const retryLastPrint = async () => {
+    const items = lastFailedPrint;
+    if (!items || items.length === 0) return;
+    setMessage("Tentando imprimir novamente…");
+    await dispatchPrint(items);
   };
 
   const testPrint = async () => {
@@ -563,7 +573,14 @@ function Index() {
                 <Field label="Quantidade de etiquetas" hint="Imprime várias cópias em sequência"><input type="number" min={1} max={200} value={quantity} onChange={(e) => setQuantity(e.target.value)} /></Field>
                 {product && responsible && !labelDraft && <Button variant="outline" className="w-full" onClick={() => setLabelDraft({ product: product.name, responsible: responsible.name, opened: openedOn, expires: format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd"), lot })}><Pencil /> Editar etiqueta antes de imprimir</Button>}
                 {labelDraft && <div className="grid gap-4 rounded-2xl border bg-secondary/50 p-4 sm:grid-cols-2"><div className="sm:col-span-2"><Field label="Nome na etiqueta"><input maxLength={120} value={labelDraft.product} onChange={(e) => setLabelDraft({ ...labelDraft, product: e.target.value })} /></Field></div><Field label="Aberto em"><input type="date" value={labelDraft.opened} onChange={(e) => setLabelDraft({ ...labelDraft, opened: e.target.value })} /></Field><Field label="Validade"><input type="date" value={labelDraft.expires} onChange={(e) => setLabelDraft({ ...labelDraft, expires: e.target.value })} /></Field><Field label="Lote"><input maxLength={80} value={labelDraft.lot} onChange={(e) => setLabelDraft({ ...labelDraft, lot: e.target.value })} /></Field><Field label="Responsável"><input maxLength={120} value={labelDraft.responsible} onChange={(e) => setLabelDraft({ ...labelDraft, responsible: e.target.value })} /></Field><div className="sm:col-span-2"><Button variant="ghost" size="sm" onClick={() => setLabelDraft(null)}>Cancelar edição</Button></div></div>}
-                {message && <p role="alert" className="rounded-xl bg-secondary p-3 text-sm font-semibold">{message}</p>}
+                {message && (
+                  <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary p-3 text-sm font-semibold">
+                    <span className="min-w-0 flex-1">{message}</span>
+                    {lastFailedPrint && lastFailedPrint.length > 0 && (
+                      <Button variant="kitchen" size="sm" onClick={retryLastPrint}><Printer /> Tentar novamente</Button>
+                    )}
+                  </div>
+                )}
                 {niimbotPreview && (
                   <div className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-secondary p-3">
                     <img src={niimbotPreview.url} alt="Pré-visualização NiiMbot" className="h-16 w-24 rounded-md border bg-white object-contain" />
