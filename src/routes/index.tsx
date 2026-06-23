@@ -227,9 +227,11 @@ function printThermalBatch(items: { label: PrintableLabel; copies: number }[], s
 
 function Index() {
   const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<"admin" | "operator" | null>(null);
+  const [role, setRole] = useState<AppRole | null>(null);
   const [profileClientId, setProfileClientId] = useState<string | null>(null);
+  const [carteira, setCarteira] = useState<string[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
