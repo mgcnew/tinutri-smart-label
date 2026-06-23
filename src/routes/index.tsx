@@ -40,6 +40,7 @@ type QueueItem = {
 };
 type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number };
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
+type AppRole = "admin_master" | "nutricionista" | "admin_cliente" | "operator";
 
 const PRINTER_NOT_FOUND_MESSAGE = "Impressora não encontrada. Verifique a conexão Bluetooth, Wi-Fi ou a configuração da impressora.";
 
@@ -226,9 +227,11 @@ function printThermalBatch(items: { label: PrintableLabel; copies: number }[], s
 
 function Index() {
   const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<"admin" | "operator" | null>(null);
+  const [role, setRole] = useState<AppRole | null>(null);
   const [profileClientId, setProfileClientId] = useState<string | null>(null);
+  const [carteira, setCarteira] = useState<string[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
@@ -268,34 +271,61 @@ function Index() {
     if (!id) { setLoading(false); return; }
     const [{ data: roles }, { data: profile }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", id).maybeSingle(),
-      supabase.from("profiles").select("client_id").eq("user_id", id).maybeSingle(),
+      supabase.from("profiles").select("client_id,name,email").eq("user_id", id).maybeSingle(),
     ]);
     const rawRole = roles?.role as string | undefined;
-    // admin antigo + admin_master + admin_cliente + nutricionista => visão "admin"
-    const currentRole: "admin" | "operator" | undefined =
-      rawRole === "operator" ? "operator" : rawRole ? "admin" : undefined;
+    const currentRole: AppRole | undefined =
+      rawRole === "operator" ? "operator"
+      : rawRole === "nutricionista" ? "nutricionista"
+      : rawRole === "admin_cliente" ? "admin_cliente"
+      : (rawRole === "admin_master" || rawRole === "admin") ? "admin_master"
+      : undefined;
     setRole(currentRole ?? null);
+    setUserName(profile?.name ?? profile?.email ?? "");
+    // Tab padrão por perfil
     if (currentRole === "operator") setTab("emit");
+    else if (currentRole === "admin_cliente" || currentRole === "nutricionista") setTab("dashboard");
     const ownClient = profile?.client_id ?? null;
     setProfileClientId(ownClient);
+    // Carteira da nutricionista
+    let carteiraIds: string[] = [];
+    if (currentRole === "nutricionista") {
+      const { data: cart } = await supabase.from("nutritionist_clients").select("client_id").eq("nutritionist_user_id", id);
+      carteiraIds = (cart ?? []).map((r) => r.client_id as string);
+      setCarteira(carteiraIds);
+    } else {
+      setCarteira([]);
+    }
     const [{ data: clientRows }, { data: productRows }, { data: collaboratorRows }] = await Promise.all([
       supabase.from("clients").select("id,name,legal_name,cnpj,city,state,active,status").order("name"),
       supabase.from("products").select("*").eq("active", true).order("name"),
       supabase.from("collaborators").select("id,client_id,name,role_title,active").eq("active", true).order("name"),
     ]);
-    setClients((clientRows ?? []) as Client[]);
-    setProducts((productRows ?? []) as Product[]);
-    setCollaborators((collaboratorRows ?? []) as Collaborator[]);
+    // Filtrar conforme perfil (segurança em profundidade — RLS já restringe no banco)
+    const allClients = (clientRows ?? []) as Client[];
+    const allProducts = (productRows ?? []) as Product[];
+    const allCollab = (collaboratorRows ?? []) as Collaborator[];
+    const allowedClientIds: string[] | null =
+      currentRole === "admin_master" ? null
+      : currentRole === "nutricionista" ? carteiraIds
+      : ownClient ? [ownClient] : [];
+    const filterByClient = <T extends { client_id?: string; id?: string }>(rows: T[], keyIsId = false): T[] => {
+      if (allowedClientIds === null) return rows;
+      const set = new Set(allowedClientIds);
+      return rows.filter((r) => set.has((keyIsId ? r.id : r.client_id) as string));
+    };
+    setClients(allowedClientIds === null ? allClients : allClients.filter((c) => allowedClientIds!.includes(c.id)));
+    setProducts(filterByClient(allProducts));
+    setCollaborators(filterByClient(allCollab));
     if (ownClient) setSelectedClient(ownClient);
-    const suspendedOwn = (clientRows ?? []).find((c) => c.id === ownClient && (c as { status?: string }).status === "suspensa");
+    const suspendedOwn = allClients.find((c) => c.id === ownClient && c.status === "suspensa");
     if (suspendedOwn) {
       setLoading(false);
       return;
     }
-    if (currentRole === "admin") {
-       const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity").order("issued_at", { ascending: false }).limit(100);
-      setHistory((labels ?? []) as LabelRecord[]);
-    }
+    // Histórico — RLS faz o filtro no banco; operador/admin_cliente verão somente seu cliente
+    const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity").order("issued_at", { ascending: false }).limit(200);
+    setHistory((labels ?? []) as LabelRecord[]);
     setLoading(false);
   };
 
@@ -515,12 +545,13 @@ function Index() {
           </div>
           <Brand />
           <div className="flex items-center gap-2 justify-self-end">
-            {role === "admin" && (
+            {role === "admin_master" && (
               <Button asChild variant="outline" size="sm"><Link to="/admin">Área Master</Link></Button>
             )}
             <Button variant="ghost" size="icon" aria-label="Sair" onClick={async () => { await supabase.auth.signOut(); location.reload(); }}><LogOut /></Button>
           </div>
         </div>
+        <UserStrip userName={userName} role={role} clientName={clients.find((c) => c.id === (profileClientId ?? selectedClient))?.name ?? null} />
       </header>
       <div className="mx-auto flex max-w-7xl gap-8 px-4 py-6 sm:px-7 lg:py-8">
         <aside className="hidden w-56 shrink-0 lg:block">
@@ -593,7 +624,7 @@ function Index() {
             </div>
             <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
               <div className="space-y-5 rounded-3xl border bg-card p-5 shadow-sm sm:p-7">
-                <Field label="Cliente"><select value={selectedClient} disabled={role === "operator"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
+                <Field label="Cliente"><select value={selectedClient} disabled={role === "operator" || role === "admin_cliente"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
                 <Field label="Produto"><select value={selectedProduct} onChange={(e) => { setSelectedProduct(e.target.value); setLot(""); setLabelDraft(null); const sel = products.find(p => p.id === e.target.value); setShelfDays(sel ? String(sel.shelf_life_days) : ""); }}><option value="">Selecione o produto</option>{visibleProducts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
                 <div className="grid gap-5 sm:grid-cols-3">
                   <Field label="Data de abertura"><input type="date" value={openedOn} onChange={(e) => setOpenedOn(e.target.value)} /></Field>
@@ -709,8 +740,47 @@ function ThermalLabel({ label }: { label: { product: string; opened: string; exp
   </div>;
 }
 
-const navItems = [{ id: "dashboard", label: "Dashboard", icon: LayoutDashboard }, { id: "clients", label: "Clientes", icon: Building2 }, { id: "products", label: "Produtos", icon: PackagePlus }, { id: "team", label: "Colaboradores", icon: Users }, { id: "emit", label: "Emitir Etiquetas", icon: Printer }, { id: "history", label: "Histórico", icon: History }] as const;
-function Nav({ role, tab, setTab, closeOnSelect = false }: { role: string; tab: AppTab; setTab: (id: AppTab) => void; closeOnSelect?: boolean }) { return navItems.filter((item) => role === "admin" || item.id === "emit").map((item) => { const control = <Button key={item.id} variant={tab === item.id ? "secondary" : "ghost"} className="h-11 w-full justify-start" onClick={() => setTab(item.id)}><item.icon />{item.label}</Button>; return closeOnSelect ? <SheetClose asChild key={item.id}>{control}</SheetClose> : control; }); }
+const navItems = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "clients", label: "Clientes", icon: Building2 },
+  { id: "products", label: "Produtos", icon: PackagePlus },
+  { id: "team", label: "Colaboradores", icon: Users },
+  { id: "emit", label: "Emitir Etiquetas", icon: Printer },
+  { id: "history", label: "Histórico", icon: History },
+] as const;
+
+const ROLE_TABS: Record<AppRole, AppTab[]> = {
+  admin_master: ["dashboard", "clients", "products", "team", "emit", "history"],
+  nutricionista: ["dashboard", "clients", "products", "team", "emit", "history"],
+  admin_cliente: ["dashboard", "products", "team", "emit", "history"],
+  operator: ["emit", "history"],
+};
+
+function Nav({ role, tab, setTab, closeOnSelect = false }: { role: AppRole; tab: AppTab; setTab: (id: AppTab) => void; closeOnSelect?: boolean }) {
+  const allowed = new Set<AppTab>(ROLE_TABS[role]);
+  return navItems.filter((item) => allowed.has(item.id)).map((item) => {
+    const control = <Button key={item.id} variant={tab === item.id ? "secondary" : "ghost"} className="h-11 w-full justify-start" onClick={() => setTab(item.id)}><item.icon />{item.label}</Button>;
+    return closeOnSelect ? <SheetClose asChild key={item.id}>{control}</SheetClose> : control;
+  });
+}
+
+const ROLE_LABEL: Record<AppRole, string> = {
+  admin_master: "Admin Master TiNutri",
+  nutricionista: "Nutricionista",
+  admin_cliente: "Admin Cliente",
+  operator: "Operador",
+};
+
+function UserStrip({ userName, role, clientName }: { userName: string; role: AppRole | null; clientName: string | null }) {
+  if (!role) return null;
+  return (
+    <div className="mx-auto mt-2 flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      {clientName && <span className="font-bold uppercase tracking-wide text-foreground">{clientName}</span>}
+      {userName && <span>· Usuário: <strong className="text-foreground">{userName}</strong></span>}
+      <span>· Perfil: <strong className="text-foreground">{ROLE_LABEL[role]}</strong></span>
+    </div>
+  );
+}
 
 function PanelHeader({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) { return <><p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">{eyebrow}</p><h1 className="mt-2 text-3xl font-bold">{title}</h1><p className="mt-2 text-muted-foreground">{description}</p></> }
 
