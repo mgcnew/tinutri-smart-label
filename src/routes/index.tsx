@@ -777,11 +777,26 @@ const ROLE_LABEL: Record<AppRole, string> = {
 
 function UserStrip({ userName, role, clientName }: { userName: string; role: AppRole | null; clientName: string | null }) {
   if (!role) return null;
+  const isMaster = role === "admin_master";
+  if (isMaster) {
+    return (
+      <div className="mx-auto mt-2 flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        {clientName && <span className="font-bold uppercase tracking-wide text-foreground">{clientName}</span>}
+        {userName && <span>· Usuário: <strong className="text-foreground">{userName}</strong></span>}
+        <span>· Perfil: <strong className="text-foreground">{ROLE_LABEL[role]}</strong></span>
+      </div>
+    );
+  }
   return (
-    <div className="mx-auto mt-2 flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-      {clientName && <span className="font-bold uppercase tracking-wide text-foreground">{clientName}</span>}
-      {userName && <span>· Usuário: <strong className="text-foreground">{userName}</strong></span>}
-      <span>· Perfil: <strong className="text-foreground">{ROLE_LABEL[role]}</strong></span>
+    <div className="mx-auto mt-2 max-w-7xl">
+      <div className="flex items-center gap-2 text-lg font-extrabold uppercase tracking-wide text-foreground sm:text-xl">
+        <span aria-hidden>🏢</span>
+        <span>Empresa: {clientName ?? "—"}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+        {userName && <span>Usuário: <strong className="text-foreground">{userName}</strong></span>}
+        <span>· Perfil: <strong className="text-foreground">{ROLE_LABEL[role]}</strong></span>
+      </div>
     </div>
   );
 }
