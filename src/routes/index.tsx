@@ -381,26 +381,27 @@ function Index() {
       opened_on: it.opened_iso, expires_on: it.expires_iso, quantity: it.copies,
     }));
     const { error } = await supabase.from("issued_labels").insert(rows);
-    if (error) { setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return false; }
+    if (error) { setLastFailedPrint(items); setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return false; }
     if (isNiimbot) {
       const preview = await buildNiimbotPreview(items[items.length - 1].label, printerSettings);
-      if (!preview) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
+      if (!preview) { setLastFailedPrint(items); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
       setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
       setMessage(`Etiqueta pronta para o app NiiMbot. Toque em "Baixar PNG" para enviar à impressora.`);
     } else {
       const ok = printThermalBatch(items.map((it) => ({ label: it.label, copies: it.copies })), printerSettings);
-      if (!ok) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
+      if (!ok) { setLastFailedPrint(items); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
       setMessage(printerSettings.connection !== "browser"
         ? `Enviando para a impressora ${printerSettings.type.toUpperCase()} via ${printerSettings.connection.toUpperCase()}…`
         : "Etiqueta enviada para a impressora.");
     }
     setLabel(items[items.length - 1].label);
+    setLastFailedPrint(null);
     await refresh();
     return true;
   };
 
   const printNow = async () => {
-    setMessage("");
+    setMessage(""); setLastFailedPrint(null);
     const item = buildCurrentItem();
     if (!item) return;
     const ok = await dispatchPrint([item]);
@@ -409,8 +410,16 @@ function Index() {
 
   const printQueue = async () => {
     if (queue.length === 0) return;
+    setMessage(""); setLastFailedPrint(null);
     const ok = await dispatchPrint(queue);
     if (ok) setQueue([]);
+  };
+
+  const retryLastPrint = async () => {
+    const items = lastFailedPrint;
+    if (!items || items.length === 0) return;
+    setMessage("Tentando imprimir novamente…");
+    await dispatchPrint(items);
   };
 
   const testPrint = async () => {
