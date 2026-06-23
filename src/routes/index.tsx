@@ -167,6 +167,13 @@ function Index() {
   const [quantity, setQuantity] = useState<string>("1");
   const [label, setLabel] = useState<PrintableLabel | null>(null);
   const [labelDraft, setLabelDraft] = useState<{ product: string; responsible: string; opened: string; expires: string; lot: string } | null>(null);
+  const [printerMode, setPrinterMode] = useState<PrinterMode>("standard");
+
+  useEffect(() => { setPrinterMode(loadPrinterMode()); }, []);
+  const updatePrinterMode = (mode: PrinterMode) => {
+    setPrinterMode(mode);
+    try { window.localStorage.setItem(PRINTER_MODE_KEY, mode); } catch {}
+  };
 
   const refresh = async () => {
     const { data: auth } = await supabase.auth.getUser();
@@ -246,18 +253,25 @@ function Index() {
     const effectiveProduct = labelDraft?.product.trim() || product.name;
     const effectiveResponsible = labelDraft?.responsible.trim() || responsible.name;
     const effectiveLot = (labelDraft?.lot ?? lot).trim();
-    const printWindow = reservePrintWindow();
-    if (!printWindow) { setMessage("Permita a abertura da janela de impressão no navegador."); return; }
-    printWindow.document.write("<!doctype html><title>Preparando etiqueta</title><p style='font-family:Arial,sans-serif'>Preparando etiqueta para impressão…</p>");
+    const printWindow = printerMode === "niimbot" ? null : reservePrintWindow();
+    if (printerMode === "standard") {
+      if (!printWindow) { setMessage("Permita a abertura da janela de impressão no navegador."); return; }
+      printWindow.document.write("<!doctype html><title>Preparando etiqueta</title><p style='font-family:Arial,sans-serif'>Preparando etiqueta para impressão…</p>");
+    }
     const { error } = await supabase.from("issued_labels").insert({
       client_id: client.id, product_id: product.id, responsible_id: responsible.id, issued_by: userId,
       client_name: client.name, product_name: effectiveProduct, responsible_name: effectiveResponsible,
       lot_number: effectiveLot || null, inspection_label: inspection ?? null, opened_on: effectiveOpened, expires_on: expiry, quantity: copies,
     });
-    if (error) { printWindow.close(); setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return; }
+    if (error) { printWindow?.close(); setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return; }
     const issuedLabel = { product: effectiveProduct, opened: format(new Date(`${effectiveOpened}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${expiry}T12:00:00`), "dd/MM/yyyy"), lot: effectiveLot || undefined, inspection, responsible: effectiveResponsible, issued };
     setLabel(issuedLabel);
-    printThermalLabel(issuedLabel, copies, printWindow);
+    if (printerMode === "niimbot") {
+      const ok = await exportNiimbotLabel(issuedLabel);
+      setMessage(ok ? "PNG 60×40 mm gerado para o app NiiMbot." : "Não foi possível gerar a imagem para o NiiMbot.");
+    } else {
+      printThermalLabel(issuedLabel, copies, printWindow!);
+    }
     await refresh();
   };
 
@@ -265,7 +279,11 @@ function Index() {
     const historicalLabel = { product: record.product_name, opened: format(new Date(`${record.opened_on}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${record.expires_on}T12:00:00`), "dd/MM/yyyy"), lot: record.lot_number ?? undefined, inspection: record.inspection_label ?? undefined, responsible: record.responsible_name, issued: new Date(record.issued_at) };
     setLabel(historicalLabel);
     setTab("emit");
-    if (!printThermalLabel(historicalLabel, record.quantity || 1)) setMessage("Permita a abertura da janela de impressão no navegador.");
+    if (printerMode === "niimbot") {
+      void exportNiimbotLabel(historicalLabel).then((ok) => setMessage(ok ? "PNG 60×40 mm gerado para o app NiiMbot." : "Não foi possível gerar a imagem para o NiiMbot."));
+    } else if (!printThermalLabel(historicalLabel, record.quantity || 1)) {
+      setMessage("Permita a abertura da janela de impressão no navegador.");
+    }
   };
 
   const duplicateLabel = (record: LabelRecord) => {
