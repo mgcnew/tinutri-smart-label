@@ -564,6 +564,17 @@ function Index() {
                 {product && responsible && !labelDraft && <Button variant="outline" className="w-full" onClick={() => setLabelDraft({ product: product.name, responsible: responsible.name, opened: openedOn, expires: format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd"), lot })}><Pencil /> Editar etiqueta antes de imprimir</Button>}
                 {labelDraft && <div className="grid gap-4 rounded-2xl border bg-secondary/50 p-4 sm:grid-cols-2"><div className="sm:col-span-2"><Field label="Nome na etiqueta"><input maxLength={120} value={labelDraft.product} onChange={(e) => setLabelDraft({ ...labelDraft, product: e.target.value })} /></Field></div><Field label="Aberto em"><input type="date" value={labelDraft.opened} onChange={(e) => setLabelDraft({ ...labelDraft, opened: e.target.value })} /></Field><Field label="Validade"><input type="date" value={labelDraft.expires} onChange={(e) => setLabelDraft({ ...labelDraft, expires: e.target.value })} /></Field><Field label="Lote"><input maxLength={80} value={labelDraft.lot} onChange={(e) => setLabelDraft({ ...labelDraft, lot: e.target.value })} /></Field><Field label="Responsável"><input maxLength={120} value={labelDraft.responsible} onChange={(e) => setLabelDraft({ ...labelDraft, responsible: e.target.value })} /></Field><div className="sm:col-span-2"><Button variant="ghost" size="sm" onClick={() => setLabelDraft(null)}>Cancelar edição</Button></div></div>}
                 {message && <p role="alert" className="rounded-xl bg-secondary p-3 text-sm font-semibold">{message}</p>}
+                {niimbotPreview && (
+                  <div className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-secondary p-3">
+                    <img src={niimbotPreview.url} alt="Pré-visualização NiiMbot" className="h-16 w-24 rounded-md border bg-white object-contain" />
+                    <div className="min-w-0 flex-1">
+                      <strong className="block text-sm">Etiqueta NiiMbot pronta</strong>
+                      <p className="truncate text-xs text-muted-foreground">{niimbotPreview.filename}</p>
+                    </div>
+                    <a href={niimbotPreview.url} download={niimbotPreview.filename} className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"><Printer className="size-4" /> Baixar PNG</a>
+                    <Button variant="ghost" size="icon" aria-label="Fechar" onClick={() => { URL.revokeObjectURL(niimbotPreview.url); setNiimbotPreview(null); }}><X /></Button>
+                  </div>
+                )}
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Button variant="outline" size="xl" className="w-full" onClick={addToQueue}><ListPlus /> Adicionar à fila</Button>
                   <Button variant="kitchen" size="xl" className="w-full" onClick={printNow}><Printer /> Imprimir agora</Button>
