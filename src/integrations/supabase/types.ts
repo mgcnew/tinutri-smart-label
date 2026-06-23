@@ -58,6 +58,7 @@ export type Database = {
           email: string | null
           id: string
           name: string
+          role_title: string | null
           updated_at: string
           user_id: string | null
         }
@@ -68,6 +69,7 @@ export type Database = {
           email?: string | null
           id?: string
           name: string
+          role_title?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -78,6 +80,7 @@ export type Database = {
           email?: string | null
           id?: string
           name?: string
+          role_title?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -104,6 +107,7 @@ export type Database = {
           opened_on: string
           product_id: string | null
           product_name: string
+          quantity: number
           responsible_id: string | null
           responsible_name: string
         }
@@ -119,6 +123,7 @@ export type Database = {
           opened_on: string
           product_id?: string | null
           product_name: string
+          quantity?: number
           responsible_id?: string | null
           responsible_name: string
         }
@@ -134,6 +139,7 @@ export type Database = {
           opened_on?: string
           product_id?: string | null
           product_name?: string
+          quantity?: number
           responsible_id?: string | null
           responsible_name?: string
         }
