@@ -280,11 +280,15 @@ function Index() {
       : rawRole === "admin_cliente" ? "admin_cliente"
       : (rawRole === "admin_master" || rawRole === "admin") ? "admin_master"
       : undefined;
-    setRole(currentRole ?? null);
     setUserName(profile?.name ?? profile?.email ?? "");
-    // Tab padrão por perfil
-    if (currentRole === "operator") setTab("emit");
-    else if (currentRole === "admin_cliente" || currentRole === "nutricionista") setTab("dashboard");
+    // Tab padrão por perfil — aplicar apenas na primeira carga (evita resetar a aba após imprimir/salvar)
+    setRole((prevRole) => {
+      if (prevRole === null && currentRole) {
+        if (currentRole === "operator") setTab("emit");
+        else if (currentRole === "admin_cliente" || currentRole === "nutricionista") setTab("dashboard");
+      }
+      return currentRole ?? null;
+    });
     const ownClient = profile?.client_id ?? null;
     setProfileClientId(ownClient);
     // Carteira da nutricionista
