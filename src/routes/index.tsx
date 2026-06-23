@@ -271,34 +271,61 @@ function Index() {
     if (!id) { setLoading(false); return; }
     const [{ data: roles }, { data: profile }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", id).maybeSingle(),
-      supabase.from("profiles").select("client_id").eq("user_id", id).maybeSingle(),
+      supabase.from("profiles").select("client_id,name,email").eq("user_id", id).maybeSingle(),
     ]);
     const rawRole = roles?.role as string | undefined;
-    // admin antigo + admin_master + admin_cliente + nutricionista => visão "admin"
-    const currentRole: "admin" | "operator" | undefined =
-      rawRole === "operator" ? "operator" : rawRole ? "admin" : undefined;
+    const currentRole: AppRole | undefined =
+      rawRole === "operator" ? "operator"
+      : rawRole === "nutricionista" ? "nutricionista"
+      : rawRole === "admin_cliente" ? "admin_cliente"
+      : (rawRole === "admin_master" || rawRole === "admin") ? "admin_master"
+      : undefined;
     setRole(currentRole ?? null);
+    setUserName(profile?.name ?? profile?.email ?? "");
+    // Tab padrão por perfil
     if (currentRole === "operator") setTab("emit");
+    else if (currentRole === "admin_cliente" || currentRole === "nutricionista") setTab("dashboard");
     const ownClient = profile?.client_id ?? null;
     setProfileClientId(ownClient);
+    // Carteira da nutricionista
+    let carteiraIds: string[] = [];
+    if (currentRole === "nutricionista") {
+      const { data: cart } = await supabase.from("nutritionist_clients").select("client_id").eq("nutritionist_user_id", id);
+      carteiraIds = (cart ?? []).map((r) => r.client_id as string);
+      setCarteira(carteiraIds);
+    } else {
+      setCarteira([]);
+    }
     const [{ data: clientRows }, { data: productRows }, { data: collaboratorRows }] = await Promise.all([
       supabase.from("clients").select("id,name,legal_name,cnpj,city,state,active,status").order("name"),
       supabase.from("products").select("*").eq("active", true).order("name"),
       supabase.from("collaborators").select("id,client_id,name,role_title,active").eq("active", true).order("name"),
     ]);
-    setClients((clientRows ?? []) as Client[]);
-    setProducts((productRows ?? []) as Product[]);
-    setCollaborators((collaboratorRows ?? []) as Collaborator[]);
+    // Filtrar conforme perfil (segurança em profundidade — RLS já restringe no banco)
+    const allClients = (clientRows ?? []) as Client[];
+    const allProducts = (productRows ?? []) as Product[];
+    const allCollab = (collaboratorRows ?? []) as Collaborator[];
+    const allowedClientIds: string[] | null =
+      currentRole === "admin_master" ? null
+      : currentRole === "nutricionista" ? carteiraIds
+      : ownClient ? [ownClient] : [];
+    const filterByClient = <T extends { client_id?: string; id?: string }>(rows: T[], keyIsId = false): T[] => {
+      if (allowedClientIds === null) return rows;
+      const set = new Set(allowedClientIds);
+      return rows.filter((r) => set.has((keyIsId ? r.id : r.client_id) as string));
+    };
+    setClients(allowedClientIds === null ? allClients : allClients.filter((c) => allowedClientIds!.includes(c.id)));
+    setProducts(filterByClient(allProducts));
+    setCollaborators(filterByClient(allCollab));
     if (ownClient) setSelectedClient(ownClient);
-    const suspendedOwn = (clientRows ?? []).find((c) => c.id === ownClient && (c as { status?: string }).status === "suspensa");
+    const suspendedOwn = allClients.find((c) => c.id === ownClient && c.status === "suspensa");
     if (suspendedOwn) {
       setLoading(false);
       return;
     }
-    if (currentRole === "admin") {
-       const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity").order("issued_at", { ascending: false }).limit(100);
-      setHistory((labels ?? []) as LabelRecord[]);
-    }
+    // Histórico — RLS faz o filtro no banco; operador/admin_cliente verão somente seu cliente
+    const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity").order("issued_at", { ascending: false }).limit(200);
+    setHistory((labels ?? []) as LabelRecord[]);
     setLoading(false);
   };
 
