@@ -163,53 +163,86 @@ export type Database = {
         Row: {
           client_id: string
           client_name: string
+          closed_at: string | null
+          closed_by: string | null
+          closed_reason: string | null
+          expires_at: string | null
           expires_on: string
           id: string
           inspection_label: string | null
           issued_at: string
           issued_by: string
           issued_by_user_id: string | null
+          label_kind: Database["public"]["Enums"]["label_kind"]
+          label_status: Database["public"]["Enums"]["label_lifecycle"]
+          location: string | null
           lot_number: string | null
+          opened_at: string | null
           opened_on: string
           product_id: string | null
           product_name: string
+          public_token: string
           quantity: number
           responsible_id: string | null
           responsible_name: string
+          sector: string | null
+          storage_condition: string | null
         }
         Insert: {
           client_id: string
           client_name: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closed_reason?: string | null
+          expires_at?: string | null
           expires_on: string
           id?: string
           inspection_label?: string | null
           issued_at?: string
           issued_by: string
           issued_by_user_id?: string | null
+          label_kind?: Database["public"]["Enums"]["label_kind"]
+          label_status?: Database["public"]["Enums"]["label_lifecycle"]
+          location?: string | null
           lot_number?: string | null
+          opened_at?: string | null
           opened_on: string
           product_id?: string | null
           product_name: string
+          public_token?: string
           quantity?: number
           responsible_id?: string | null
           responsible_name: string
+          sector?: string | null
+          storage_condition?: string | null
         }
         Update: {
           client_id?: string
           client_name?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closed_reason?: string | null
+          expires_at?: string | null
           expires_on?: string
           id?: string
           inspection_label?: string | null
           issued_at?: string
           issued_by?: string
           issued_by_user_id?: string | null
+          label_kind?: Database["public"]["Enums"]["label_kind"]
+          label_status?: Database["public"]["Enums"]["label_lifecycle"]
+          location?: string | null
           lot_number?: string | null
+          opened_at?: string | null
           opened_on?: string
           product_id?: string | null
           product_name?: string
+          public_token?: string
           quantity?: number
           responsible_id?: string | null
           responsible_name?: string
+          sector?: string | null
+          storage_condition?: string | null
         }
         Relationships: [
           {
@@ -315,11 +348,13 @@ export type Database = {
           id: string
           inspection_number: string | null
           inspection_type: Database["public"]["Enums"]["inspection_type"] | null
+          label_kind: Database["public"]["Enums"]["label_kind"]
           name: string
           notes: string | null
           requires_inspection: boolean
           requires_lot: boolean
           shelf_life_days: number
+          storage_condition: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -334,11 +369,13 @@ export type Database = {
           inspection_type?:
             | Database["public"]["Enums"]["inspection_type"]
             | null
+          label_kind?: Database["public"]["Enums"]["label_kind"]
           name: string
           notes?: string | null
           requires_inspection?: boolean
           requires_lot?: boolean
           shelf_life_days: number
+          storage_condition?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -353,11 +390,13 @@ export type Database = {
           inspection_type?:
             | Database["public"]["Enums"]["inspection_type"]
             | null
+          label_kind?: Database["public"]["Enums"]["label_kind"]
           name?: string
           notes?: string | null
           requires_inspection?: boolean
           requires_lot?: boolean
           shelf_life_days?: number
+          storage_condition?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -435,7 +474,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_label_by_token: {
+        Args: { _token: string }
+        Returns: {
+          client_name: string
+          expires_at: string
+          id: string
+          inspection_label: string
+          issued_at: string
+          label_kind: Database["public"]["Enums"]["label_kind"]
+          label_status: Database["public"]["Enums"]["label_lifecycle"]
+          location: string
+          lot_number: string
+          opened_at: string
+          product_name: string
+          public_token: string
+          responsible_name: string
+          sector: string
+          storage_condition: string
+        }[]
+      }
     }
     Enums: {
       app_role:
@@ -447,6 +505,13 @@ export type Database = {
         | "gerente"
       client_status: "ativa" | "inativa" | "suspensa"
       inspection_type: "SIF" | "SISP" | "SIM"
+      label_kind: "manipulado" | "aberto" | "fracionado" | "recebido"
+      label_lifecycle:
+        | "ativa"
+        | "utilizada"
+        | "consumida"
+        | "descartada"
+        | "cancelada"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -584,6 +649,14 @@ export const Constants = {
       ],
       client_status: ["ativa", "inativa", "suspensa"],
       inspection_type: ["SIF", "SISP", "SIM"],
+      label_kind: ["manipulado", "aberto", "fracionado", "recebido"],
+      label_lifecycle: [
+        "ativa",
+        "utilizada",
+        "consumida",
+        "descartada",
+        "cancelada",
+      ],
     },
   },
 } as const
