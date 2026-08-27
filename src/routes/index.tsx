@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
+import { ClientQrCard } from "@/components/ClientQrCard";
+import { CLIENT_CODE_KEY } from "./e.$code";
 import { claimFirstAdmin } from "@/lib/admin.functions";
 import tinutriLogo from "@/assets/tinutri-logo.png";
 
@@ -24,7 +26,7 @@ export const Route = createFileRoute("/")({
 });
 
 type ClientStatus = "ativa" | "inativa" | "suspensa";
-type Client = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; active: boolean; status: ClientStatus };
+type Client = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; active: boolean; status: ClientStatus; responsible_name: string | null; email: string | null; phone: string | null; address: string | null; plan: string; public_code: string; created_at?: string };
 type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null; active: boolean };
 type Collaborator = { id: string; client_id: string; name: string; role_title: string | null; active: boolean };
 type PrintableLabel = { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date };
@@ -40,7 +42,7 @@ type QueueItem = {
 };
 type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number };
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
-type AppRole = "admin_master" | "nutricionista" | "admin_cliente" | "operator";
+type AppRole = "admin_master" | "nutricionista" | "admin_cliente" | "gerente" | "operator";
 
 const PRINTER_NOT_FOUND_MESSAGE = "Impressora não encontrada. Verifique a conexão Bluetooth, Wi-Fi ou a configuração da impressora.";
 
@@ -278,6 +280,7 @@ function Index() {
       rawRole === "operator" ? "operator"
       : rawRole === "nutricionista" ? "nutricionista"
       : rawRole === "admin_cliente" ? "admin_cliente"
+      : rawRole === "gerente" ? "gerente"
       : (rawRole === "admin_master" || rawRole === "admin") ? "admin_master"
       : undefined;
     setUserName(profile?.name ?? profile?.email ?? "");
@@ -285,7 +288,7 @@ function Index() {
     setRole((prevRole) => {
       if (prevRole === null && currentRole) {
         if (currentRole === "operator") setTab("emit");
-        else if (currentRole === "admin_cliente" || currentRole === "nutricionista") setTab("dashboard");
+        else if (currentRole === "admin_cliente" || currentRole === "gerente" || currentRole === "nutricionista") setTab("dashboard");
       }
       return currentRole ?? null;
     });
@@ -301,7 +304,7 @@ function Index() {
       setCarteira([]);
     }
     const [{ data: clientRows }, { data: productRows }, { data: collaboratorRows }] = await Promise.all([
-      supabase.from("clients").select("id,name,legal_name,cnpj,city,state,active,status").order("name"),
+      supabase.from("clients").select("id,name,legal_name,cnpj,city,state,active,status,responsible_name,email,phone,address,plan,public_code,created_at").order("name"),
       supabase.from("products").select("*").eq("active", true).order("name"),
       supabase.from("collaborators").select("id,client_id,name,role_title,active").eq("active", true).order("name"),
     ]);
@@ -322,6 +325,17 @@ function Index() {
     setProducts(filterByClient(allProducts));
     setCollaborators(filterByClient(allCollab));
     if (ownClient) setSelectedClient(ownClient);
+    // QR Code do estabelecimento: valida se o usuário realmente pertence/tem acesso àquele cliente
+    try {
+      const pendingCode = window.localStorage.getItem(CLIENT_CODE_KEY);
+      if (pendingCode) {
+        window.localStorage.removeItem(CLIENT_CODE_KEY);
+        const visible = allowedClientIds === null ? allClients : allClients.filter((c) => allowedClientIds!.includes(c.id));
+        const target = visible.find((c) => c.public_code === pendingCode);
+        if (target) { setSelectedClient(target.id); setTab("emit"); setMessage(`Ambiente de ${target.name} aberto.`); }
+        else setMessage("Você não tem acesso ao estabelecimento deste QR Code.");
+      }
+    } catch { /* ignore */ }
     const suspendedOwn = allClients.find((c) => c.id === ownClient && c.status === "suspensa");
     if (suspendedOwn) {
       setLoading(false);
@@ -757,6 +771,7 @@ const ROLE_TABS: Record<AppRole, AppTab[]> = {
   admin_master: ["dashboard", "clients", "products", "team", "emit", "history"],
   nutricionista: ["dashboard", "clients", "products", "team", "emit", "history"],
   admin_cliente: ["dashboard", "products", "team", "emit", "history"],
+  gerente: ["dashboard", "products", "team", "emit", "history"],
   operator: ["emit", "history"],
 };
 
@@ -772,7 +787,8 @@ const ROLE_LABEL: Record<AppRole, string> = {
   admin_master: "Admin Master TiNutri",
   nutricionista: "Nutricionista",
   admin_cliente: "Admin Cliente",
-  operator: "Operador",
+  gerente: "Gerente",
+  operator: "Colaborador",
 };
 
 function UserStrip({ userName, role, clientName }: { userName: string; role: AppRole | null; clientName: string | null }) {
@@ -813,7 +829,7 @@ function ClientsPanel({ clients, refresh }: { clients: Client[]; refresh: () => 
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", legal_name: "", cnpj: "", city: "", state: "", active: true });
+  const [form, setForm] = useState({ name: "", legal_name: "", cnpj: "", city: "", state: "", responsible_name: "", email: "", phone: "", address: "", plan: "essencial", active: true });
   const [message, setMessage] = useState("");
 
   const filtered = clients.filter(c =>
@@ -825,7 +841,7 @@ function ClientsPanel({ clients, refresh }: { clients: Client[]; refresh: () => 
   );
 
   const resetForm = () => {
-    setForm({ name: "", legal_name: "", cnpj: "", city: "", state: "", active: true });
+    setForm({ name: "", legal_name: "", cnpj: "", city: "", state: "", responsible_name: "", email: "", phone: "", address: "", plan: "essencial", active: true });
     setEditingId(null);
     setShowForm(false);
     setMessage("");
@@ -838,6 +854,11 @@ function ClientsPanel({ clients, refresh }: { clients: Client[]; refresh: () => 
       cnpj: client.cnpj || "",
       city: client.city,
       state: client.state,
+      responsible_name: client.responsible_name || "",
+      email: client.email || "",
+      phone: client.phone || "",
+      address: client.address || "",
+      plan: client.plan || "essencial",
       active: client.active,
     });
     setEditingId(client.id);
@@ -858,7 +879,13 @@ function ClientsPanel({ clients, refresh }: { clients: Client[]; refresh: () => 
       cnpj: form.cnpj.trim() || null,
       city: form.city.trim(),
       state: form.state.trim(),
+      responsible_name: form.responsible_name.trim() || null,
+      email: form.email.trim() || null,
+      phone: form.phone.trim() || null,
+      address: form.address.trim() || null,
+      plan: form.plan,
       active: form.active,
+      status: (form.active ? "ativa" : "inativa") as ClientStatus,
     };
     if (editingId) {
       const { error } = await supabase.from("clients").update(payload).eq("id", editingId);
@@ -906,6 +933,17 @@ function ClientsPanel({ clients, refresh }: { clients: Client[]; refresh: () => 
               {BRAZILIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </Field>
+          <Field label="Responsável"><input maxLength={120} value={form.responsible_name} onChange={(e) => setForm(p => ({ ...p, responsible_name: e.target.value }))} placeholder="Nome do responsável" /></Field>
+          <Field label="E-mail"><input type="email" maxLength={160} value={form.email} onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))} placeholder="contato@empresa.com.br" /></Field>
+          <Field label="Telefone"><input maxLength={30} value={form.phone} onChange={(e) => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="(00) 00000-0000" /></Field>
+          <Field label="Plano">
+            <select value={form.plan} onChange={(e) => setForm(p => ({ ...p, plan: e.target.value }))}>
+              <option value="essencial">Essencial</option>
+              <option value="profissional">Profissional</option>
+              <option value="premium">Premium</option>
+            </select>
+          </Field>
+          <Field label="Endereço"><input maxLength={200} value={form.address} onChange={(e) => setForm(p => ({ ...p, address: e.target.value }))} placeholder="Rua, número, bairro" /></Field>
           <label className="flex items-center gap-3 font-semibold sm:col-span-2">
             <input className="size-5 w-auto" type="checkbox" checked={form.active} onChange={(e) => setForm(p => ({ ...p, active: e.target.checked }))} />
             Cliente ativo
@@ -932,7 +970,13 @@ function ClientsPanel({ clients, refresh }: { clients: Client[]; refresh: () => 
                 <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
                   {c.cnpj && <span>CNPJ: {c.cnpj}</span>}
                   {c.city && <span>{c.city} · {c.state}</span>}
+                  {c.responsible_name && <span>Resp.: {c.responsible_name}</span>}
+                  {c.phone && <span>{c.phone}</span>}
+                  {c.plan && <span className="uppercase">Plano: {c.plan}</span>}
+                  {c.created_at && <span>Desde {format(new Date(c.created_at), "dd/MM/yyyy")}</span>}
                 </div>
+                <p className="mt-1 text-[10px] text-muted-foreground">ID: {c.id}</p>
+                {c.public_code && <ClientQrCard clientName={c.name} publicCode={c.public_code} />}
               </div>
               <div className="flex shrink-0 gap-1">
                 <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => startEdit(c)}><Pencil className="size-4" /></Button>
