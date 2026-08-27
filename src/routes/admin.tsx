@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 
+import { ClientQrCard } from "@/components/ClientQrCard";
+
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -22,7 +24,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminMaster,
 });
 
-type ClientRow = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; status: "ativa" | "inativa" | "suspensa" };
+type ClientRow = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; status: "ativa" | "inativa" | "suspensa"; responsible_name?: string | null; email?: string | null; phone?: string | null; address?: string | null; plan?: string | null; public_code?: string | null };
 type UserRow = { user_id: string; name: string; email: string; client_id: string | null; role: string | null };
 type Stats = Awaited<ReturnType<typeof masterStats>>;
 type ActivityRow = Awaited<ReturnType<typeof listActivity>>[number];
@@ -127,8 +129,8 @@ function Stat({ label, value }: { label: string; value: number }) {
 }
 
 function EmpresasTab({ clients, stats, onChanged }: { clients: ClientRow[]; stats: Stats | null; onChanged: () => Promise<void> }) {
-  const [form, setForm] = useState<{ id?: string; name: string; legal_name: string; cnpj: string; city: string; state: string; status: ClientRow["status"] }>(
-    { name: "", legal_name: "", cnpj: "", city: "", state: "", status: "ativa" }
+  const [form, setForm] = useState<{ id?: string; name: string; legal_name: string; cnpj: string; city: string; state: string; responsible_name: string; email: string; phone: string; address: string; plan: string; status: ClientRow["status"] }>(
+    { name: "", legal_name: "", cnpj: "", city: "", state: "", responsible_name: "", email: "", phone: "", address: "", plan: "essencial", status: "ativa" }
   );
   const [saving, setSaving] = useState(false);
   const perClient = useMemo(() => new Map((stats?.perClient ?? []).map((x) => [x.id, x])), [stats]);
@@ -138,12 +140,12 @@ function EmpresasTab({ clients, stats, onChanged }: { clients: ClientRow[]; stat
     setSaving(true);
     try {
       await upsertClient({ data: { ...form, legal_name: form.legal_name || null, cnpj: form.cnpj || null } });
-      setForm({ name: "", legal_name: "", cnpj: "", city: "", state: "", status: "ativa" });
+      setForm({ name: "", legal_name: "", cnpj: "", city: "", state: "", responsible_name: "", email: "", phone: "", address: "", plan: "essencial", status: "ativa" });
       await onChanged();
     } finally { setSaving(false); }
   };
 
-  const edit = (c: ClientRow) => setForm({ id: c.id, name: c.name, legal_name: c.legal_name ?? "", cnpj: c.cnpj ?? "", city: c.city, state: c.state, status: c.status });
+  const edit = (c: ClientRow) => setForm({ id: c.id, name: c.name, legal_name: c.legal_name ?? "", cnpj: c.cnpj ?? "", city: c.city, state: c.state, responsible_name: c.responsible_name ?? "", email: c.email ?? "", phone: c.phone ?? "", address: c.address ?? "", plan: c.plan ?? "essencial", status: c.status });
 
   return (
     <section className="space-y-4">
@@ -153,6 +155,17 @@ function EmpresasTab({ clients, stats, onChanged }: { clients: ClientRow[]; stat
         <Field label="CNPJ"><input value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} /></Field>
         <Field label="Cidade"><input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></Field>
         <Field label="UF"><input maxLength={2} value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} /></Field>
+        <Field label="Responsável"><input value={form.responsible_name} onChange={(e) => setForm({ ...form, responsible_name: e.target.value })} /></Field>
+        <Field label="E-mail"><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+        <Field label="Telefone"><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
+        <Field label="Endereço"><input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>
+        <Field label="Plano">
+          <select value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })}>
+            <option value="essencial">Essencial</option>
+            <option value="profissional">Profissional</option>
+            <option value="premium">Premium</option>
+          </select>
+        </Field>
         <Field label="Status">
           <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ClientRow["status"] })}>
             <option value="ativa">Ativa</option>
@@ -162,7 +175,7 @@ function EmpresasTab({ clients, stats, onChanged }: { clients: ClientRow[]; stat
         </Field>
         <div className="sm:col-span-2 lg:col-span-3 flex gap-2">
           <Button type="submit" disabled={saving}>{form.id ? "Salvar alterações" : "Cadastrar empresa"}</Button>
-          {form.id && <Button type="button" variant="ghost" onClick={() => setForm({ name: "", legal_name: "", cnpj: "", city: "", state: "", status: "ativa" })}>Cancelar</Button>}
+          {form.id && <Button type="button" variant="ghost" onClick={() => setForm({ name: "", legal_name: "", cnpj: "", city: "", state: "", responsible_name: "", email: "", phone: "", address: "", plan: "essencial", status: "ativa" })}>Cancelar</Button>}
         </div>
       </form>
 
@@ -176,7 +189,7 @@ function EmpresasTab({ clients, stats, onChanged }: { clients: ClientRow[]; stat
               const s = perClient.get(c.id);
               return (
                 <tr key={c.id} className="border-t">
-                  <td className="p-3 font-semibold">{c.name}<div className="text-xs text-muted-foreground">{c.legal_name}</div></td>
+                  <td className="p-3 font-semibold">{c.name}<div className="text-xs text-muted-foreground">{c.legal_name}</div>{c.public_code && <ClientQrCard clientName={c.name} publicCode={c.public_code} />}</td>
                   <td className="p-3">{c.cnpj ?? "—"}</td>
                   <td className="p-3">{c.city}/{c.state}</td>
                   <td className="p-3"><StatusBadge status={c.status} /></td>
@@ -206,10 +219,10 @@ function StatusBadge({ status }: { status: ClientRow["status"] }) {
 }
 
 function UsuariosTab({ clients, users, onChanged }: { clients: ClientRow[]; users: UserRow[]; onChanged: () => Promise<void> }) {
-  const [form, setForm] = useState({ name: "", email: "", role: "operator" as "admin_master"|"nutricionista"|"admin_cliente"|"operator", clientId: "", password: "" });
+  const [form, setForm] = useState({ name: "", email: "", role: "operator" as "admin_master"|"nutricionista"|"admin_cliente"|"gerente"|"operator", clientId: "", password: "" });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const needsClient = form.role === "operator" || form.role === "admin_cliente";
+  const needsClient = form.role === "operator" || form.role === "admin_cliente" || form.role === "gerente";
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,7 +250,8 @@ function UsuariosTab({ clients, users, onChanged }: { clients: ClientRow[]; user
             <option value="admin_master">Admin Master TiNutri</option>
             <option value="nutricionista">Nutricionista</option>
             <option value="admin_cliente">Admin Cliente</option>
-            <option value="operator">Operador</option>
+            <option value="gerente">Gerente</option>
+            <option value="operator">Colaborador</option>
           </select>
         </Field>
         {needsClient && (

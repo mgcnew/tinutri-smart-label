@@ -61,36 +61,54 @@ export type Database = {
       clients: {
         Row: {
           active: boolean
+          address: string | null
           city: string
           cnpj: string | null
           created_at: string
+          email: string | null
           id: string
           legal_name: string | null
           name: string
+          phone: string | null
+          plan: string
+          public_code: string
+          responsible_name: string | null
           state: string
           status: Database["public"]["Enums"]["client_status"]
           updated_at: string
         }
         Insert: {
           active?: boolean
+          address?: string | null
           city?: string
           cnpj?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           legal_name?: string | null
           name: string
+          phone?: string | null
+          plan?: string
+          public_code?: string
+          responsible_name?: string | null
           state?: string
           status?: Database["public"]["Enums"]["client_status"]
           updated_at?: string
         }
         Update: {
           active?: boolean
+          address?: string | null
           city?: string
           cnpj?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           legal_name?: string | null
           name?: string
+          phone?: string | null
+          plan?: string
+          public_code?: string
+          responsible_name?: string | null
           state?: string
           status?: Database["public"]["Enums"]["client_status"]
           updated_at?: string
@@ -426,6 +444,7 @@ export type Database = {
         | "admin_master"
         | "nutricionista"
         | "admin_cliente"
+        | "gerente"
       client_status: "ativa" | "inativa" | "suspensa"
       inspection_type: "SIF" | "SISP" | "SIM"
     }
@@ -561,6 +580,7 @@ export const Constants = {
         "admin_master",
         "nutricionista",
         "admin_cliente",
+        "gerente",
       ],
       client_status: ["ativa", "inativa", "suspensa"],
       inspection_type: ["SIF", "SISP", "SIM"],
