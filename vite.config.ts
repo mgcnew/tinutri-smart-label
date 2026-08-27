@@ -11,7 +11,7 @@ export default defineConfig({
     optimizeDeps: {
       ignoreOutdatedRequests: true,
       noDiscovery: true,
-      include: [],
+      include: ["qrcode"],
     },
   },
   tanstackStart: {
