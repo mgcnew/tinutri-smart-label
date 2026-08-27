@@ -1,6 +1,6 @@
 import { Download, Printer, QrCode } from "lucide-react";
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
+import { toDataURL } from "qrcode";
 
 import { Button } from "@/components/ui/button";
 
@@ -16,7 +16,7 @@ export function ClientQrCard({ clientName, publicCode }: { clientName: string; p
 
   useEffect(() => {
     if (!open || !url) return;
-    void QRCode.toDataURL(url, { width: 640, margin: 1, errorCorrectionLevel: "M" }).then(setDataUrl);
+    void toDataURL(url, { width: 640, margin: 1, errorCorrectionLevel: "M" }).then(setDataUrl);
   }, [open, url]);
 
   const download = () => {
