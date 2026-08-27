@@ -13,6 +13,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LabelTokenRouteImport } from './routes/label.$token'
 import { Route as ECodeRouteImport } from './routes/e.$code'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -35,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LabelTokenRoute = LabelTokenRouteImport.update({
+  id: '/label/$token',
+  path: '/label/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ECodeRoute = ECodeRouteImport.update({
   id: '/e/$code',
   path: '/e/$code',
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/e/$code': typeof ECodeRoute
+  '/label/$token': typeof LabelTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/e/$code': typeof ECodeRoute
+  '/label/$token': typeof LabelTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,12 +70,25 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/e/$code': typeof ECodeRoute
+  '/label/$token': typeof LabelTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/reset-password' | '/sitemap.xml' | '/e/$code'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/reset-password'
+    | '/sitemap.xml'
+    | '/e/$code'
+    | '/label/$token'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/reset-password' | '/sitemap.xml' | '/e/$code'
+  to:
+    | '/'
+    | '/admin'
+    | '/reset-password'
+    | '/sitemap.xml'
+    | '/e/$code'
+    | '/label/$token'
   id:
     | '__root__'
     | '/'
@@ -75,6 +96,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sitemap.xml'
     | '/e/$code'
+    | '/label/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -83,6 +105,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ECodeRoute: typeof ECodeRoute
+  LabelTokenRoute: typeof LabelTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -115,6 +138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/label/$token': {
+      id: '/label/$token'
+      path: '/label/$token'
+      fullPath: '/label/$token'
+      preLoaderRoute: typeof LabelTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/e/$code': {
       id: '/e/$code'
       path: '/e/$code'
@@ -131,6 +161,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ECodeRoute: ECodeRoute,
+  LabelTokenRoute: LabelTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
