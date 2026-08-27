@@ -24,7 +24,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminMaster,
 });
 
-type ClientRow = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; status: "ativa" | "inativa" | "suspensa" };
+type ClientRow = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; status: "ativa" | "inativa" | "suspensa"; responsible_name?: string | null; email?: string | null; phone?: string | null; address?: string | null; plan?: string | null; public_code?: string | null };
 type UserRow = { user_id: string; name: string; email: string; client_id: string | null; role: string | null };
 type Stats = Awaited<ReturnType<typeof masterStats>>;
 type ActivityRow = Awaited<ReturnType<typeof listActivity>>[number];
@@ -222,7 +222,7 @@ function UsuariosTab({ clients, users, onChanged }: { clients: ClientRow[]; user
   const [form, setForm] = useState({ name: "", email: "", role: "operator" as "admin_master"|"nutricionista"|"admin_cliente"|"gerente"|"operator", clientId: "", password: "" });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const needsClient = form.role === "operator" || form.role === "admin_cliente";
+  const needsClient = form.role === "operator" || form.role === "admin_cliente" || form.role === "gerente";
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -250,7 +250,8 @@ function UsuariosTab({ clients, users, onChanged }: { clients: ClientRow[]; user
             <option value="admin_master">Admin Master TiNutri</option>
             <option value="nutricionista">Nutricionista</option>
             <option value="admin_cliente">Admin Cliente</option>
-            <option value="operator">Operador</option>
+            <option value="gerente">Gerente</option>
+            <option value="operator">Colaborador</option>
           </select>
         </Field>
         {needsClient && (

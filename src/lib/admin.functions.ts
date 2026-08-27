@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const ROLES = ["admin_master", "nutricionista", "admin_cliente", "operator"] as const;
+const ROLES = ["admin_master", "nutricionista", "admin_cliente", "gerente", "operator"] as const;
 const STATUSES = ["ativa", "inativa", "suspensa"] as const;
 
 const createUserSchema = z.object({
@@ -22,6 +22,11 @@ const upsertClientSchema = z.object({
   city: z.string().trim().max(80).default(""),
   state: z.string().trim().max(2).default(""),
   status: z.enum(STATUSES).default("ativa"),
+  responsible_name: z.string().trim().max(120).nullable().optional(),
+  email: z.string().trim().max(160).nullable().optional(),
+  phone: z.string().trim().max(30).nullable().optional(),
+  address: z.string().trim().max(200).nullable().optional(),
+  plan: z.string().trim().max(40).default("essencial"),
 });
 
 const setStatusSchema = z.object({
@@ -108,7 +113,7 @@ export const createUser = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId, context.supabase);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const needsClient = data.role === "admin_cliente" || data.role === "operator";
+    const needsClient = data.role === "admin_cliente" || data.role === "gerente" || data.role === "operator";
     if (needsClient && !data.clientId) throw new Error("Selecione a empresa do usuário.");
     let userId: string;
     if (data.password) {
@@ -184,6 +189,11 @@ export const upsertClient = createServerFn({ method: "POST" })
       city: data.city,
       state: data.state,
       status: data.status,
+      responsible_name: data.responsible_name || null,
+      email: data.email || null,
+      phone: data.phone || null,
+      address: data.address || null,
+      plan: data.plan,
       active: data.status === "ativa",
     };
     if (data.id) {
