@@ -92,7 +92,7 @@ body{font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:none;text-ren
 .tl__brand{display:flex;align-items:center;gap:.8mm;font-size:${f(5.2)}pt;font-weight:800;letter-spacing:.02em;line-height:1}
 .tl__brand img{height:${f(3)}mm;width:${f(3)}mm;object-fit:contain}
 .tl__kind{margin-top:.5mm;align-self:flex-start;background:#000;color:#fff;padding:.35mm 1.1mm;border-radius:.6mm;font-size:${f(4.8)}pt;font-weight:800;letter-spacing:.06em;line-height:1.2;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.tl__product{margin-top:.7mm;font-size:${f(9.5)}pt;font-weight:900;line-height:1.02;text-transform:uppercase;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.tl__product{margin-top:.7mm;font-size:${f(11)}pt;font-weight:900;line-height:1.02;text-transform:uppercase;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
 .tl__body{margin-top:.7mm;display:flex;gap:1.2mm;flex:1;min-height:0}
 .tl__info{flex:1;min-width:0;display:flex;flex-direction:column}
 .tl__k{font-size:${f(4.6)}pt;font-weight:700;letter-spacing:.06em;line-height:1.1}
