@@ -9,9 +9,12 @@ import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger 
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import { ClientQrCard } from "@/components/ClientQrCard";
+import { LabelPreview } from "@/components/LabelPreview";
 import { CLIENT_CODE_KEY } from "./e.$code";
 import { claimFirstAdmin } from "@/lib/admin.functions";
+import { buildPrintDocument, kindLabel, LABEL_KINDS, newLabelToken, qrFor, STORAGE_PRESETS, type LabelKind, type PrintableLabel } from "@/lib/label";
 import tinutriLogo from "@/assets/tinutri-logo.png";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,7 +32,6 @@ type ClientStatus = "ativa" | "inativa" | "suspensa";
 type Client = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; active: boolean; status: ClientStatus; responsible_name: string | null; email: string | null; phone: string | null; address: string | null; plan: string; public_code: string; created_at?: string };
 type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null; active: boolean };
 type Collaborator = { id: string; client_id: string; name: string; role_title: string | null; active: boolean };
-type PrintableLabel = { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date };
 type QueueItem = {
   id: string;
   label: PrintableLabel;
@@ -39,8 +41,11 @@ type QueueItem = {
   responsible_id: string;
   opened_iso: string;
   expires_iso: string;
+  opened_at: string;
+  expires_at: string;
 };
-type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number };
+
+type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number; public_token?: string | null; label_kind?: string | null; label_status?: string | null; storage_condition?: string | null; sector?: string | null; opened_at?: string | null; expires_at?: string | null };
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
 type AppRole = "admin_master" | "nutricionista" | "admin_cliente" | "gerente" | "operator";
 
@@ -92,11 +97,11 @@ function sizeMm(size: LabelSize) {
   return size === "50x30" ? { w: 50, h: 30 } : { w: 60, h: 40 };
 }
 
-async function generateNiimbotPng(label: PrintableLabel, size: LabelSize, showTime: boolean): Promise<Blob | null> {
-  // tamanho real @ ~203 DPI (8 px/mm)
+async function generateNiimbotPng(label: PrintableLabel, size: LabelSize): Promise<Blob | null> {
+  // Bitmap monocromático no tamanho real @ ~203 DPI (8 px/mm)
   const PX_PER_MM = 8;
   const { w, h } = sizeMm(size);
-  const scale = size === "50x30" ? 0.75 : 1;
+  const scale = size === "50x30" ? 0.78 : 1;
   const W = w * PX_PER_MM;
   const H = h * PX_PER_MM;
   const canvas = document.createElement("canvas");
@@ -108,63 +113,100 @@ async function generateNiimbotPng(label: PrintableLabel, size: LabelSize, showTi
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = "#000000";
   ctx.textBaseline = "top";
+  ctx.textAlign = "left";
 
-  // Carrega o logo
-  const logo = new Image();
-  logo.crossOrigin = "anonymous";
-  logo.src = new URL(tinutriLogo, window.location.origin).toString();
-  await new Promise<void>((resolve) => { logo.onload = () => resolve(); logo.onerror = () => resolve(); });
+  const load = (src: string) => new Promise<HTMLImageElement | null>((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+  const [logo, qr] = await Promise.all([
+    load(new URL(tinutriLogo, window.location.origin).toString()),
+    label.qrDataUrl ? load(label.qrDataUrl) : Promise.resolve(null),
+  ]);
 
+  const pad = Math.round(10 * scale);
   const fs = (n: number) => Math.max(8, Math.round(n * scale));
-  // Cabeçalho: logo + marca
-  const headerY = 8;
-  const logoSize = Math.round(28 * scale);
-  try { if (logo.width) ctx.drawImage(logo, 10, headerY, logoSize, logoSize); } catch {}
-  ctx.font = `700 ${fs(14)}px Arial, Helvetica, sans-serif`;
-  ctx.textAlign = "left";
-  ctx.fillText("TiNutri Smart Label®", 10 + logoSize + 8, headerY + 8);
+  const qrSize = qr ? Math.round(100 * scale) : 0;
+  const colW = W - pad * 2 - (qr ? qrSize + Math.round(8 * scale) : 0);
 
-  // Nome do produto
-  ctx.font = `800 ${fs(22)}px Arial, Helvetica, sans-serif`;
-  ctx.textAlign = "center";
-  const productName = label.product.toUpperCase();
-  // Quebra simples se exceder
-  let name = productName;
-  while (ctx.measureText(name).width > W - 20 && name.length > 4) name = name.slice(0, -2);
-  ctx.fillText(name === productName ? productName : name + "…", W / 2, Math.round(44 * scale));
+  // Marca
+  let y = pad;
+  const logoSize = Math.round(22 * scale);
+  if (logo) ctx.drawImage(logo, pad, y, logoSize, logoSize);
+  ctx.font = `800 ${fs(12)}px Arial, Helvetica, sans-serif`;
+  ctx.fillText("TiNutri Smart Label®", pad + logoSize + Math.round(6 * scale), y + Math.round(6 * scale));
+  y += logoSize + Math.round(4 * scale);
 
-  let cursorY = Math.round(74 * scale);
-  ctx.textAlign = "left";
-  ctx.font = `700 ${fs(13)}px Arial, Helvetica, sans-serif`;
-  if (label.lot) { ctx.fillText(`LOTE: ${label.lot.toUpperCase()}`, 10, cursorY); cursorY += fs(16); }
-  if (label.inspection) { ctx.fillText(label.inspection.toUpperCase(), 10, cursorY); cursorY += fs(16); }
+  // Tipo da etiqueta (tarja preta)
+  const kindText = kindLabel(label.kind);
+  ctx.font = `800 ${fs(11)}px Arial, Helvetica, sans-serif`;
+  const kindW = ctx.measureText(kindText).width + Math.round(12 * scale);
+  const kindH = Math.round(20 * scale);
+  ctx.fillRect(pad, y, kindW, kindH);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(kindText, pad + Math.round(6 * scale), y + Math.round(4 * scale));
+  ctx.fillStyle = "#000000";
+  y += kindH + Math.round(6 * scale);
 
-  // FABRICAÇÃO (esquerda) - menor
+  // Produto (até 2 linhas)
+  ctx.font = `900 ${fs(26)}px Arial, Helvetica, sans-serif`;
+  const words = label.product.toUpperCase().split(" ");
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (ctx.measureText(next).width > W - pad * 2 && current) { lines.push(current); current = word; } else current = next;
+  }
+  if (current) lines.push(current);
+  for (const text of lines.slice(0, 2)) {
+    ctx.fillText(text, pad, y);
+    y += Math.round(27 * scale);
+  }
+
+  // Manipulação / abertura
   ctx.font = `700 ${fs(11)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText("FABRICAÇÃO:", 10, cursorY + 4);
+  ctx.fillText("MANIP./ABERTURA:", pad, y);
   ctx.font = `700 ${fs(16)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText(label.opened, 10, cursorY + fs(18));
+  ctx.fillText(label.opened, pad, y + Math.round(13 * scale));
+  y += Math.round(34 * scale);
 
-  // VALIDADE (destaque máximo)
-  ctx.textAlign = "right";
-  ctx.font = `700 ${fs(12)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText("VALIDADE:", W - 10, cursorY);
-  ctx.font = `900 ${fs(36)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText(label.expires, W - 10, cursorY + fs(14));
+  // Validade — maior destaque
+  ctx.fillRect(pad, y, colW, Math.max(1, Math.round(2 * scale)));
+  y += Math.round(5 * scale);
+  ctx.font = `700 ${fs(11)}px Arial, Helvetica, sans-serif`;
+  ctx.fillText("VALIDADE:", pad, y);
+  ctx.font = `900 ${fs(28)}px Arial, Helvetica, sans-serif`;
+  ctx.fillText(label.expires, pad, y + Math.round(13 * scale));
+  y += Math.round(48 * scale);
 
-  // Rodapé: responsável + hora
-  ctx.textAlign = "left";
-  ctx.font = `700 ${fs(10)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText("RESPONSÁVEL:", 10, H - 28);
-  ctx.font = `800 ${fs(14)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText(label.responsible.toUpperCase().slice(0, 22), 10, H - 16);
+  // Metadados
+  ctx.font = `700 ${fs(11)}px Arial, Helvetica, sans-serif`;
+  const meta = [
+    label.storage ? `CONSERVAÇÃO: ${label.storage.toUpperCase()}` : "",
+    label.lot ? `LOTE: ${label.lot.toUpperCase()}` : "",
+    label.sector ? `SETOR: ${label.sector.toUpperCase()}` : "",
+    label.inspection ? label.inspection.toUpperCase() : "",
+    `RESP.: ${label.responsible.toUpperCase()}`,
+  ].filter(Boolean);
+  const lineH = Math.round(13 * scale);
+  let metaY = Math.min(y, H - pad - lineH * meta.length);
+  for (const text of meta) {
+    let t = text;
+    while (ctx.measureText(t).width > colW && t.length > 4) t = t.slice(0, -2);
+    ctx.fillText(t === text ? text : `${t}…`, pad, metaY);
+    metaY += lineH;
+  }
 
-  if (showTime) {
-    ctx.textAlign = "right";
-    ctx.font = `700 ${fs(10)}px Arial, Helvetica, sans-serif`;
-    ctx.fillText("HORA:", W - 10, H - 28);
-    ctx.font = `800 ${fs(16)}px Arial, Helvetica, sans-serif`;
-    ctx.fillText(format(label.issued, "HH:mm"), W - 10, H - 16);
+  // QR Code de rastreio
+  if (qr) {
+    ctx.drawImage(qr, W - pad - qrSize, H - pad - qrSize - Math.round(11 * scale), qrSize, qrSize);
+    ctx.font = `700 ${fs(9)}px Arial, Helvetica, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText("RASTREIO", W - pad - qrSize / 2, H - pad - Math.round(9 * scale));
+    ctx.textAlign = "left";
   }
 
   return await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
@@ -173,35 +215,20 @@ async function generateNiimbotPng(label: PrintableLabel, size: LabelSize, showTi
 type NiimbotPreview = { url: string; filename: string };
 
 async function buildNiimbotPreview(label: PrintableLabel, settings: PrinterSettings): Promise<NiimbotPreview | null> {
-  const blob = await generateNiimbotPng(label, settings.size, settings.showTime);
+  const blob = await generateNiimbotPng(label, settings.size);
   if (!blob) return null;
   const safe = label.product.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "etiqueta";
   return { url: URL.createObjectURL(blob), filename: `niimbot-${safe}-${settings.size}mm.png` };
 }
 
-function buildLabelHtml(label: PrintableLabel, showTime: boolean) {
-  const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
-  const lotLine = label.lot ? `<div class="lot">LOTE: ${escapeHtml(label.lot.toUpperCase())}</div>` : "";
-  const inspection = label.inspection ? `<div class="insp">${escapeHtml(label.inspection.toUpperCase())}</div>` : "";
-  const timeBlock = showTime ? `<time>${format(label.issued, "HH:mm")}</time>` : "";
-  const logoUrl = new URL(tinutriLogo, window.location.origin).toString();
-  return `<main class="label"><header class="brand"><img src="${logoUrl}" alt="" class="logo"/><span>TiNutri Smart Label®</span></header><strong class="product">${escapeHtml(label.product.toUpperCase())}</strong>${lotLine}${inspection}<div class="dates"><div class="fab"><span>FAB:</span><strong>${escapeHtml(label.opened)}</strong></div><div class="expiry"><span>VALIDADE</span><strong>${escapeHtml(label.expires)}</strong></div></div><footer class="footer"><div class="resp"><span>RESPONSÁVEL:</span><strong>${escapeHtml(label.responsible.toUpperCase())}</strong></div>${timeBlock}</footer></main>`;
-}
-
-function printThermalBatch(items: { label: PrintableLabel; copies: number }[], settings: PrinterSettings): boolean {
-  if (typeof window === "undefined") return false;
+/** Imprime uma etiqueta física por item da lista, cada uma em sua própria página. */
+function printThermalBatch(labels: PrintableLabel[], settings: PrinterSettings): boolean {
+  if (typeof window === "undefined" || labels.length === 0) return false;
   const { w, h } = sizeMm(settings.size);
   const scale = settings.size === "50x30" ? 0.78 : 1;
-  const f = (pt: number) => +(pt * scale).toFixed(2);
-  const pages = items.flatMap(({ label, copies }) => {
-    const html = buildLabelHtml(label, settings.showTime);
-    return Array.from({ length: Math.max(1, Math.min(200, Math.floor(copies))) }, () => html);
-  }).join("");
-  const doc = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etiqueta TiNutri ${w} × ${h} mm</title><style>
-    @page{size:${w}mm ${h}mm;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000}body{font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:none;text-rendering:geometricPrecision}.label{width:${w}mm;height:${h}mm;padding:1.2mm 1.5mm;line-height:1;display:flex;flex-direction:column;align-items:stretch;gap:.2mm;page-break-after:always;break-after:page;overflow:hidden}.label:last-child{page-break-after:auto;break-after:auto}.brand{display:flex;align-items:center;justify-content:center;gap:1mm;font-size:${f(5.5)}pt;font-weight:800;letter-spacing:.02em}.brand .logo{height:${f(3.5)}mm;width:${f(3.5)}mm;object-fit:contain}.product{display:block;overflow:hidden;font-size:${f(9)}pt;font-weight:800;line-height:1.1;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase;text-align:center;margin-top:.4mm}.lot{margin-top:.4mm;font-size:${f(6.5)}pt;font-weight:700;text-transform:uppercase;text-align:center}.insp{font-size:${f(5.5)}pt;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;margin-top:.2mm}.dates{margin-top:.6mm;display:grid;grid-template-columns:1fr 1.2fr;gap:1.5mm;align-items:end}.dates span{display:block;font-size:${f(5)}pt;font-weight:700;letter-spacing:.04em}.fab strong{display:block;font-size:${f(8.5)}pt;font-weight:700}.expiry{text-align:right}.expiry strong{display:block;font-size:${f(18)}pt;font-weight:900;letter-spacing:-.03em;line-height:1;margin-top:.2mm}.footer{display:flex;align-items:baseline;justify-content:space-between;gap:1mm;margin-top:auto}.footer .resp{flex:1;min-width:0;text-align:left;line-height:1}.footer .resp span{display:block;font-size:${f(4.5)}pt;font-weight:700;letter-spacing:.04em}.footer .resp strong{display:block;overflow:hidden;margin-top:.2mm;font-size:${f(7.5)}pt;font-weight:800;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase}.footer time{flex-shrink:0;font-size:${f(8.5)}pt;font-weight:700;font-variant-numeric:tabular-nums}@media print{.label{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
-  </style></head><body>${pages}</body></html>`;
+  const doc = buildPrintDocument(labels, w, h, scale);
   try {
-    // Clean up any previous hidden print frame so we don't accumulate them.
+    // Remove qualquer frame de impressão anterior para não acumular.
     document.querySelectorAll<HTMLIFrameElement>("iframe[data-tinutri-print]").forEach((node) => node.remove());
     const iframe = document.createElement("iframe");
     iframe.setAttribute("data-tinutri-print", "1");
@@ -216,9 +243,8 @@ function printThermalBatch(items: { label: PrintableLabel; copies: number }[], s
         win.focus();
         win.print();
       } catch {
-        /* ignore — preserve session */
+        /* ignore — preserva a sessão */
       }
-      // Leave the iframe in place briefly so the print dialog can finish, then remove.
       window.setTimeout(() => iframe.remove(), 4000);
     };
     return true;
@@ -226,6 +252,7 @@ function printThermalBatch(items: { label: PrintableLabel; copies: number }[], s
     return false;
   }
 }
+
 
 function Index() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -244,7 +271,13 @@ function Index() {
   const [selectedProduct, setSelectedProduct] = useState("");
   const [selectedResponsible, setSelectedResponsible] = useState("");
   const [openedOn, setOpenedOn] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [openedTime, setOpenedTime] = useState(format(new Date(), "HH:mm"));
+  const [kind, setKind] = useState<LabelKind>("aberto");
+  const [storage, setStorage] = useState<string>("");
+  const [sector, setSector] = useState("");
+  const [previewQr, setPreviewQr] = useState<string | undefined>(undefined);
   const [lot, setLot] = useState("");
+
   const [shelfDays, setShelfDays] = useState<string>("");
   const [quantity, setQuantity] = useState<string>("1");
   const [label, setLabel] = useState<PrintableLabel | null>(null);
@@ -258,6 +291,9 @@ function Index() {
   useEffect(() => () => { if (niimbotPreview) URL.revokeObjectURL(niimbotPreview.url); }, [niimbotPreview]);
 
   useEffect(() => { setPrinterSettings(loadSettings()); }, []);
+  // QR Code apenas ilustrativo na pré-visualização; o token real é gerado ao emitir.
+  useEffect(() => { void qrFor(newLabelToken()).then(setPreviewQr); }, []);
+
   const updateSettings = (patch: Partial<PrinterSettings>) => {
     setPrinterSettings((prev) => {
       const next = { ...prev, ...patch };
@@ -342,7 +378,7 @@ function Index() {
       return;
     }
     // Histórico — RLS faz o filtro no banco; operador/admin_cliente verão somente seu cliente
-    const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity").order("issued_at", { ascending: false }).limit(200);
+    const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity,public_token,label_kind,label_status,storage_condition,sector,opened_at,expires_at").order("issued_at", { ascending: false }).limit(200);
     setHistory((labels ?? []) as LabelRecord[]);
     setLoading(false);
   };
@@ -357,15 +393,22 @@ function Index() {
   const client = clients.find((item) => item.id === selectedClient);
   const effectiveShelfDays = Number(shelfDays) > 0 ? Number(shelfDays) : product?.shelf_life_days ?? 0;
   const expiresOn = useMemo(() => product && openedOn ? format(addDays(new Date(`${openedOn}T12:00:00`), effectiveShelfDays), "dd/MM/yyyy") : "—", [product, openedOn, effectiveShelfDays]);
+  const openedAtPreview = useMemo(() => new Date(`${labelDraft?.opened || openedOn}T${openedTime || "00:00"}:00`), [labelDraft?.opened, openedOn, openedTime]);
+  const expiresAtPreview = useMemo(() => addDays(openedAtPreview, effectiveShelfDays), [openedAtPreview, effectiveShelfDays]);
   const previewLabel: PrintableLabel = {
+    kind,
     product: labelDraft?.product || product?.name || "NOME DO PRODUTO",
-    opened: labelDraft?.opened ? format(new Date(`${labelDraft.opened}T12:00:00`), "dd/MM/yyyy") : openedOn ? format(new Date(`${openedOn}T12:00:00`), "dd/MM/yyyy") : "—",
-    expires: labelDraft?.expires ? format(new Date(`${labelDraft.expires}T12:00:00`), "dd/MM/yyyy") : expiresOn,
+    opened: format(openedAtPreview, "dd/MM/yyyy HH:mm"),
+    expires: labelDraft?.expires ? format(new Date(`${labelDraft.expires}T${openedTime || "00:00"}:00`), "dd/MM/yyyy HH:mm") : format(expiresAtPreview, "dd/MM/yyyy HH:mm"),
+    storage: storage || undefined,
+    sector: sector.trim() || undefined,
     lot: (labelDraft?.lot ?? lot) || undefined,
     inspection: product?.requires_inspection && product.inspection_type && product.inspection_number ? `${product.inspection_type}: ${product.inspection_number}` : undefined,
     responsible: labelDraft?.responsible || responsible?.name || "RESPONSÁVEL",
     issued: new Date(),
+    qrDataUrl: previewQr,
   };
+
 
   if (loading) return <main className="grid min-h-screen place-items-center bg-background"><p className="font-semibold text-muted-foreground">Preparando sua estação…</p></main>;
 
@@ -402,17 +445,17 @@ function Index() {
     </main>
   );
 
-  const buildCurrentItem = (): QueueItem | null => {
+  const buildCurrentItem = async (): Promise<QueueItem | null> => {
     if (!client || !product || !responsible) { setMessage("Selecione cliente, produto e responsável."); return null; }
     if (product.requires_lot && !(labelDraft?.lot ?? lot).trim()) { setMessage("Este produto exige número de lote."); return null; }
     const copies = Math.max(1, Math.min(200, Math.floor(Number(quantity) || 1)));
     const issued = new Date();
     const effectiveOpened = labelDraft?.opened || openedOn;
     const expiry = labelDraft?.expires || format(addDays(new Date(`${effectiveOpened}T12:00:00`), effectiveShelfDays), "yyyy-MM-dd");
+    const openedAt = new Date(`${effectiveOpened}T${openedTime || "00:00"}:00`);
+    const expiresAt = new Date(`${expiry}T${openedTime || "00:00"}:00`);
     const inspection = product.requires_inspection && product.inspection_type && product.inspection_number ? `${product.inspection_type}: ${product.inspection_number}` : undefined;
-    const effectiveProduct = labelDraft?.product.trim() || product.name;
-    const effectiveResponsible = labelDraft?.responsible.trim() || responsible.name;
-    const effectiveLot = (labelDraft?.lot ?? lot).trim();
+    const token = newLabelToken();
     return {
       id: crypto.randomUUID(),
       copies,
@@ -421,21 +464,28 @@ function Index() {
       responsible_id: responsible.id,
       opened_iso: effectiveOpened,
       expires_iso: expiry,
+      opened_at: openedAt.toISOString(),
+      expires_at: expiresAt.toISOString(),
       label: {
-        product: effectiveProduct,
-        opened: format(new Date(`${effectiveOpened}T12:00:00`), "dd/MM/yyyy"),
-        expires: format(new Date(`${expiry}T12:00:00`), "dd/MM/yyyy"),
-        lot: effectiveLot || undefined,
+        kind,
+        product: labelDraft?.product.trim() || product.name,
+        opened: format(openedAt, "dd/MM/yyyy HH:mm"),
+        expires: format(expiresAt, "dd/MM/yyyy HH:mm"),
+        storage: storage || undefined,
+        sector: sector.trim() || undefined,
+        lot: (labelDraft?.lot ?? lot).trim() || undefined,
         inspection,
-        responsible: effectiveResponsible,
+        responsible: labelDraft?.responsible.trim() || responsible.name,
         issued,
+        token,
+        qrDataUrl: await qrFor(token),
       },
     };
   };
 
-  const addToQueue = () => {
+  const addToQueue = async () => {
     setMessage("");
-    const item = buildCurrentItem();
+    const item = await buildCurrentItem();
     if (!item) return;
     setQueue((q) => [...q, item]);
     setLot(""); setLabelDraft(null); setQuantity("1");
@@ -446,31 +496,47 @@ function Index() {
   const updateQueueCopies = (id: string, copies: number) =>
     setQueue((q) => q.map((it) => it.id === id ? { ...it, copies: Math.max(1, Math.min(200, Math.floor(copies) || 1)) } : it));
 
+  /** Cada cópia impressa é uma etiqueta física distinta: recebe token e QR Code próprios. */
+  const expandUnits = async (items: QueueItem[]) => {
+    const units: { item: QueueItem; label: PrintableLabel }[] = [];
+    for (const it of items) {
+      for (let i = 0; i < Math.max(1, it.copies); i += 1) {
+        const token = i === 0 && it.label.token ? it.label.token : newLabelToken();
+        units.push({ item: it, label: { ...it.label, token, qrDataUrl: await qrFor(token) } });
+      }
+    }
+    return units;
+  };
+
   const dispatchPrint = async (items: QueueItem[]) => {
     if (items.length === 0) return false;
     const isNiimbot = printerSettings.type === "niimbot";
-    // Persist em histórico
-    const rows = items.map((it) => ({
-      client_id: it.client_id, product_id: it.product_id, responsible_id: it.responsible_id, issued_by: userId,
-      client_name: clients.find(c => c.id === it.client_id)?.name ?? "", product_name: it.label.product, responsible_name: it.label.responsible,
-      lot_number: it.label.lot ?? null, inspection_label: it.label.inspection ?? null,
-      opened_on: it.opened_iso, expires_on: it.expires_iso, quantity: it.copies,
+    const units = await expandUnits(items);
+    const rows = units.map(({ item, label }) => ({
+      client_id: item.client_id, product_id: item.product_id, responsible_id: item.responsible_id, issued_by: userId,
+      client_name: clients.find(c => c.id === item.client_id)?.name ?? "", product_name: label.product, responsible_name: label.responsible,
+      lot_number: label.lot ?? null, inspection_label: label.inspection ?? null,
+      opened_on: item.opened_iso, expires_on: item.expires_iso, quantity: 1,
+      public_token: label.token, label_kind: label.kind,
+      storage_condition: label.storage ?? null, sector: label.sector ?? null,
+      opened_at: item.opened_at, expires_at: item.expires_at,
     }));
-    const { error } = await supabase.from("issued_labels").insert(rows);
+    const { error } = await supabase.from("issued_labels").insert(rows as never);
     if (error) { setLastFailedPrint(items); setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return false; }
+    const lastLabel = units[units.length - 1].label;
     if (isNiimbot) {
-      const preview = await buildNiimbotPreview(items[items.length - 1].label, printerSettings);
+      const preview = await buildNiimbotPreview(lastLabel, printerSettings);
       if (!preview) { setLastFailedPrint(items); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
       setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
       setMessage(`Etiqueta pronta para o app NiiMbot. Toque em "Baixar PNG" para enviar à impressora.`);
     } else {
-      const ok = printThermalBatch(items.map((it) => ({ label: it.label, copies: it.copies })), printerSettings);
+      const ok = printThermalBatch(units.map((u) => u.label), printerSettings);
       if (!ok) { setLastFailedPrint(items); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
       setMessage(printerSettings.connection !== "browser"
         ? `Enviando para a impressora ${printerSettings.type.toUpperCase()} via ${printerSettings.connection.toUpperCase()}…`
-        : "Etiqueta enviada para a impressora.");
+        : `${units.length} etiqueta(s) enviada(s) para a impressora, cada uma com QR Code de rastreio.`);
     }
-    setLabel(items[items.length - 1].label);
+    setLabel(lastLabel);
     setLastFailedPrint(null);
     await refresh();
     return true;
@@ -478,7 +544,7 @@ function Index() {
 
   const printNow = async () => {
     setMessage(""); setLastFailedPrint(null);
-    const item = buildCurrentItem();
+    const item = await buildCurrentItem();
     if (!item) return;
     const ok = await dispatchPrint([item]);
     if (ok) setLabelDraft(null);
@@ -500,14 +566,19 @@ function Index() {
 
   const testPrint = async () => {
     const now = new Date();
+    const token = newLabelToken();
     const sample: PrintableLabel = {
+      kind: "manipulado",
       product: "TESTE DE IMPRESSÃO",
-      opened: format(now, "dd/MM/yyyy"),
-      expires: format(addDays(now, 7), "dd/MM/yyyy"),
+      opened: format(now, "dd/MM/yyyy HH:mm"),
+      expires: format(addDays(now, 7), "dd/MM/yyyy HH:mm"),
+      storage: STORAGE_PRESETS[0],
+      sector: "COZINHA",
       lot: "0001",
-      inspection: undefined,
       responsible: "TINUTRI",
       issued: now,
+      token,
+      qrDataUrl: await qrFor(token),
     };
     if (printerSettings.type === "niimbot") {
       const preview = await buildNiimbotPreview(sample, printerSettings);
@@ -516,24 +587,40 @@ function Index() {
       setMessage('Etiqueta de teste pronta. Toque em "Baixar PNG" para enviar ao app NiiMbot.');
       return;
     }
-    const ok = printThermalBatch([{ label: sample, copies: 1 }], printerSettings);
+    const ok = printThermalBatch([sample], printerSettings);
     setMessage(ok ? "Etiqueta de teste enviada para impressão." : PRINTER_NOT_FOUND_MESSAGE);
   };
 
-  const reprintLabel = (record: LabelRecord) => {
-    const historicalLabel = { product: record.product_name, opened: format(new Date(`${record.opened_on}T12:00:00`), "dd/MM/yyyy"), expires: format(new Date(`${record.expires_on}T12:00:00`), "dd/MM/yyyy"), lot: record.lot_number ?? undefined, inspection: record.inspection_label ?? undefined, responsible: record.responsible_name, issued: new Date(record.issued_at) };
+  /** Reimpressão preserva o token original: a etiqueta física continua sendo a mesma. */
+  const reprintLabel = async (record: LabelRecord) => {
+    const openedAt = record.opened_at ? new Date(record.opened_at) : new Date(`${record.opened_on}T12:00:00`);
+    const expiresAt = record.expires_at ? new Date(record.expires_at) : new Date(`${record.expires_on}T12:00:00`);
+    const historicalLabel: PrintableLabel = {
+      kind: (record.label_kind ?? "aberto") as LabelKind,
+      product: record.product_name,
+      opened: format(openedAt, "dd/MM/yyyy HH:mm"),
+      expires: format(expiresAt, "dd/MM/yyyy HH:mm"),
+      storage: record.storage_condition ?? undefined,
+      sector: record.sector ?? undefined,
+      lot: record.lot_number ?? undefined,
+      inspection: record.inspection_label ?? undefined,
+      responsible: record.responsible_name,
+      issued: new Date(record.issued_at),
+      token: record.public_token ?? undefined,
+      qrDataUrl: record.public_token ? await qrFor(record.public_token) : undefined,
+    };
     setLabel(historicalLabel);
     setTab("emit");
     if (printerSettings.type === "niimbot") {
-      void buildNiimbotPreview(historicalLabel, printerSettings).then((preview) => {
-        if (!preview) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return; }
-        setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
-        setMessage('Etiqueta pronta. Toque em "Baixar PNG" para enviar ao app NiiMbot.');
-      });
-    } else if (!printThermalBatch([{ label: historicalLabel, copies: record.quantity || 1 }], printerSettings)) {
+      const preview = await buildNiimbotPreview(historicalLabel, printerSettings);
+      if (!preview) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return; }
+      setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
+      setMessage('Etiqueta pronta. Toque em "Baixar PNG" para enviar ao app NiiMbot.');
+    } else if (!printThermalBatch(Array.from({ length: record.quantity || 1 }, () => historicalLabel), printerSettings)) {
       setMessage(PRINTER_NOT_FOUND_MESSAGE);
     }
   };
+
 
   const duplicateLabel = (record: LabelRecord) => {
     setSelectedClient(record.client_id);
@@ -622,10 +709,10 @@ function Index() {
                       <option value="50x30">50 mm × 30 mm (opcional)</option>
                     </select>
                   </Field>
-                  <label className="flex items-center gap-3 rounded-xl border p-3 text-sm font-semibold sm:col-span-2">
-                    <input type="checkbox" className="size-4 w-auto" checked={printerSettings.showTime} onChange={(e) => updateSettings({ showTime: e.target.checked })} />
-                    Exibir a HORA na etiqueta
-                  </label>
+                  <p className="rounded-xl border bg-secondary/40 p-3 text-xs text-muted-foreground sm:col-span-2">
+                    A etiqueta imprime data e hora de manipulação/abertura e de validade, além do QR Code individual de rastreio.
+                  </p>
+
                   <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
                     <Button variant="outline" onClick={testPrint}><Printer /> Testar impressão</Button>
                     {printerSettings.connection !== "browser" && printerSettings.type !== "niimbot" && (
@@ -644,15 +731,29 @@ function Index() {
               <div className="space-y-5 rounded-3xl border bg-card p-5 shadow-sm sm:p-7">
                 <Field label="Cliente"><select value={selectedClient} disabled={role === "operator" || role === "admin_cliente"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
                 <Field label="Produto"><select value={selectedProduct} onChange={(e) => { setSelectedProduct(e.target.value); setLot(""); setLabelDraft(null); const sel = products.find(p => p.id === e.target.value); setShelfDays(sel ? String(sel.shelf_life_days) : ""); }}><option value="">Selecione o produto</option>{visibleProducts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
-                <div className="grid gap-5 sm:grid-cols-3">
-                  <Field label="Data de abertura"><input type="date" value={openedOn} onChange={(e) => setOpenedOn(e.target.value)} /></Field>
+                <Field label="Tipo da etiqueta"><select value={kind} onChange={(e) => setKind(e.target.value as LabelKind)}>{LABEL_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</select></Field>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label="Data de manipulação/abertura"><input type="date" value={openedOn} onChange={(e) => setOpenedOn(e.target.value)} /></Field>
+                  <Field label="Hora"><input type="time" value={openedTime} onChange={(e) => setOpenedTime(e.target.value)} /></Field>
+                </div>
+                <div className="grid gap-5 sm:grid-cols-2">
                   <Field label="Validade após abertura (dias)" hint="Editável"><input type="number" min={0} max={3650} value={shelfDays} onChange={(e) => setShelfDays(e.target.value)} placeholder={product ? String(product.shelf_life_days) : "0"} /></Field>
                   <div className="rounded-2xl bg-secondary p-4"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Validade calculada</span><strong className="mt-1 block text-xl text-primary">{expiresOn}</strong></div>
+                </div>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label="Conservação">
+                    <select value={storage} onChange={(e) => setStorage(e.target.value)}>
+                      <option value="">Não informar</option>
+                      {STORAGE_PRESETS.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Setor / local" hint="Opcional"><input maxLength={40} value={sector} onChange={(e) => setSector(e.target.value)} placeholder="Ex.: Cozinha quente" /></Field>
                 </div>
                 {product?.requires_lot && <Field label="Número do lote" hint="Obrigatório para este produto"><input value={lot} maxLength={80} onChange={(e) => setLot(e.target.value)} placeholder="Ex.: 4587" /></Field>}
                 {product?.requires_inspection && <div className="rounded-2xl border border-primary/20 bg-secondary p-4 text-sm"><ShieldCheck className="mr-2 inline size-5 text-primary" /><strong>{product.inspection_type}/registro:</strong> {product.inspection_number}</div>}
                 <Field label="Responsável"><select value={selectedResponsible} onChange={(e) => setSelectedResponsible(e.target.value)}><option value="">Selecione o responsável</option>{visibleCollaborators.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
-                <Field label="Quantidade de etiquetas" hint="Imprime várias cópias em sequência"><input type="number" min={1} max={200} value={quantity} onChange={(e) => setQuantity(e.target.value)} /></Field>
+                <Field label="Quantidade de etiquetas" hint="Cada etiqueta recebe um QR Code exclusivo"><input type="number" min={1} max={200} value={quantity} onChange={(e) => setQuantity(e.target.value)} /></Field>
+
                 {product && responsible && !labelDraft && <Button variant="outline" className="w-full" onClick={() => setLabelDraft({ product: product.name, responsible: responsible.name, opened: openedOn, expires: format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd"), lot })}><Pencil /> Editar etiqueta antes de imprimir</Button>}
                 {labelDraft && <div className="grid gap-4 rounded-2xl border bg-secondary/50 p-4 sm:grid-cols-2"><div className="sm:col-span-2"><Field label="Nome na etiqueta"><input maxLength={120} value={labelDraft.product} onChange={(e) => setLabelDraft({ ...labelDraft, product: e.target.value })} /></Field></div><Field label="Aberto em"><input type="date" value={labelDraft.opened} onChange={(e) => setLabelDraft({ ...labelDraft, opened: e.target.value })} /></Field><Field label="Validade"><input type="date" value={labelDraft.expires} onChange={(e) => setLabelDraft({ ...labelDraft, expires: e.target.value })} /></Field><Field label="Lote"><input maxLength={80} value={labelDraft.lot} onChange={(e) => setLabelDraft({ ...labelDraft, lot: e.target.value })} /></Field><Field label="Responsável"><input maxLength={120} value={labelDraft.responsible} onChange={(e) => setLabelDraft({ ...labelDraft, responsible: e.target.value })} /></Field><div className="sm:col-span-2"><Button variant="ghost" size="sm" onClick={() => setLabelDraft(null)}>Cancelar edição</Button></div></div>}
                 {message && (
@@ -682,7 +783,8 @@ function Index() {
               <div className="space-y-4">
                 <div>
                   <p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · {printerSettings.size.replace("x", " × ")} MM</p>
-                  <ThermalLabel label={label ?? previewLabel} />
+                  <LabelPreview label={label ?? previewLabel} widthMm={sizeMm(printerSettings.size).w} heightMm={sizeMm(printerSettings.size).h} scale={printerSettings.size === "50x30" ? 0.78 : 1} />
+
                 </div>
                 <div className="rounded-2xl border bg-card p-4 shadow-sm">
                   <div className="flex items-center justify-between">
@@ -737,26 +839,6 @@ function Login() {
 
 function Brand({ inverse = false }: { inverse?: boolean }) { return <div className="flex min-w-0 items-center gap-3"><img src={tinutriLogo} alt="TiNutri" width={40} height={40} className="size-10 shrink-0 rounded-xl object-contain" loading="lazy" /><div className="min-w-0"><strong className={`block truncate font-display text-lg leading-tight ${inverse ? "text-primary-foreground" : "text-foreground"}`}>TiNutri Smart Label®</strong><span className={`text-xs ${inverse ? "text-primary-foreground/65" : "text-muted-foreground"}`}>Validade simples. Segurança sempre.</span></div></div> }
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) { return <label className="block"><span className="mb-2 flex justify-between text-sm font-bold">{label}{hint && <small className="font-medium text-muted-foreground">{hint}</small>}</span>{children}</label> }
-function ThermalLabel({ label }: { label: { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date } }) {
-  return <div className="thermal-label !h-[40mm] !w-[60mm] min-h-[40mm] min-w-[60mm] max-h-[40mm] max-w-[60mm] shrink-0" aria-label="Pré-visualização da etiqueta térmica de 60 por 40 milímetros">
-    <header className="thermal-label__brand">TiNutri Smart Label®</header>
-    <strong className="thermal-label__product">{label.product.toUpperCase()}</strong>
-    <div className="thermal-label__expiry-block">
-      <span>VALIDADE</span>
-      <strong>{label.expires}</strong>
-    </div>
-    <div className="thermal-label__fab">
-      <span>FAB:</span>
-      <strong>{label.opened}</strong>
-    </div>
-    <div className="thermal-label__lot">LOTE: {(label.lot ?? "—").toUpperCase()}</div>
-    {label.inspection && <div className="thermal-label__insp">{label.inspection}</div>}
-    <footer className="thermal-label__footer">
-      <div><span>RESPONSÁVEL:</span><strong>{label.responsible.toUpperCase()}</strong></div>
-      <time>{format(label.issued, "HH:mm")}</time>
-    </footer>
-  </div>;
-}
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
