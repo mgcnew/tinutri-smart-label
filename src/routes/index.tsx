@@ -291,6 +291,9 @@ function Index() {
   useEffect(() => () => { if (niimbotPreview) URL.revokeObjectURL(niimbotPreview.url); }, [niimbotPreview]);
 
   useEffect(() => { setPrinterSettings(loadSettings()); }, []);
+  // QR Code apenas ilustrativo na pré-visualização; o token real é gerado ao emitir.
+  useEffect(() => { void qrFor(newLabelToken()).then(setPreviewQr); }, []);
+
   const updateSettings = (patch: Partial<PrinterSettings>) => {
     setPrinterSettings((prev) => {
       const next = { ...prev, ...patch };
