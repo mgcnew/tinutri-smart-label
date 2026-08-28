@@ -742,26 +742,6 @@ function Login() {
 
 function Brand({ inverse = false }: { inverse?: boolean }) { return <div className="flex min-w-0 items-center gap-3"><img src={tinutriLogo} alt="TiNutri" width={40} height={40} className="size-10 shrink-0 rounded-xl object-contain" loading="lazy" /><div className="min-w-0"><strong className={`block truncate font-display text-lg leading-tight ${inverse ? "text-primary-foreground" : "text-foreground"}`}>TiNutri Smart Label®</strong><span className={`text-xs ${inverse ? "text-primary-foreground/65" : "text-muted-foreground"}`}>Validade simples. Segurança sempre.</span></div></div> }
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) { return <label className="block"><span className="mb-2 flex justify-between text-sm font-bold">{label}{hint && <small className="font-medium text-muted-foreground">{hint}</small>}</span>{children}</label> }
-function ThermalLabel({ label }: { label: { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date } }) {
-  return <div className="thermal-label !h-[40mm] !w-[60mm] min-h-[40mm] min-w-[60mm] max-h-[40mm] max-w-[60mm] shrink-0" aria-label="Pré-visualização da etiqueta térmica de 60 por 40 milímetros">
-    <header className="thermal-label__brand">TiNutri Smart Label®</header>
-    <strong className="thermal-label__product">{label.product.toUpperCase()}</strong>
-    <div className="thermal-label__expiry-block">
-      <span>VALIDADE</span>
-      <strong>{label.expires}</strong>
-    </div>
-    <div className="thermal-label__fab">
-      <span>FAB:</span>
-      <strong>{label.opened}</strong>
-    </div>
-    <div className="thermal-label__lot">LOTE: {(label.lot ?? "—").toUpperCase()}</div>
-    {label.inspection && <div className="thermal-label__insp">{label.inspection}</div>}
-    <footer className="thermal-label__footer">
-      <div><span>RESPONSÁVEL:</span><strong>{label.responsible.toUpperCase()}</strong></div>
-      <time>{format(label.issued, "HH:mm")}</time>
-    </footer>
-  </div>;
-}
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
