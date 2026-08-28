@@ -97,11 +97,11 @@ function sizeMm(size: LabelSize) {
   return size === "50x30" ? { w: 50, h: 30 } : { w: 60, h: 40 };
 }
 
-async function generateNiimbotPng(label: PrintableLabel, size: LabelSize, showTime: boolean): Promise<Blob | null> {
-  // tamanho real @ ~203 DPI (8 px/mm)
+async function generateNiimbotPng(label: PrintableLabel, size: LabelSize): Promise<Blob | null> {
+  // Bitmap monocromático no tamanho real @ ~203 DPI (8 px/mm)
   const PX_PER_MM = 8;
   const { w, h } = sizeMm(size);
-  const scale = size === "50x30" ? 0.75 : 1;
+  const scale = size === "50x30" ? 0.78 : 1;
   const W = w * PX_PER_MM;
   const H = h * PX_PER_MM;
   const canvas = document.createElement("canvas");
@@ -113,63 +113,100 @@ async function generateNiimbotPng(label: PrintableLabel, size: LabelSize, showTi
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = "#000000";
   ctx.textBaseline = "top";
+  ctx.textAlign = "left";
 
-  // Carrega o logo
-  const logo = new Image();
-  logo.crossOrigin = "anonymous";
-  logo.src = new URL(tinutriLogo, window.location.origin).toString();
-  await new Promise<void>((resolve) => { logo.onload = () => resolve(); logo.onerror = () => resolve(); });
+  const load = (src: string) => new Promise<HTMLImageElement | null>((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+  const [logo, qr] = await Promise.all([
+    load(new URL(tinutriLogo, window.location.origin).toString()),
+    label.qrDataUrl ? load(label.qrDataUrl) : Promise.resolve(null),
+  ]);
 
+  const pad = Math.round(10 * scale);
   const fs = (n: number) => Math.max(8, Math.round(n * scale));
-  // Cabeçalho: logo + marca
-  const headerY = 8;
-  const logoSize = Math.round(28 * scale);
-  try { if (logo.width) ctx.drawImage(logo, 10, headerY, logoSize, logoSize); } catch {}
-  ctx.font = `700 ${fs(14)}px Arial, Helvetica, sans-serif`;
-  ctx.textAlign = "left";
-  ctx.fillText("TiNutri Smart Label®", 10 + logoSize + 8, headerY + 8);
+  const qrSize = qr ? Math.round(100 * scale) : 0;
+  const colW = W - pad * 2 - (qr ? qrSize + Math.round(8 * scale) : 0);
 
-  // Nome do produto
-  ctx.font = `800 ${fs(22)}px Arial, Helvetica, sans-serif`;
-  ctx.textAlign = "center";
-  const productName = label.product.toUpperCase();
-  // Quebra simples se exceder
-  let name = productName;
-  while (ctx.measureText(name).width > W - 20 && name.length > 4) name = name.slice(0, -2);
-  ctx.fillText(name === productName ? productName : name + "…", W / 2, Math.round(44 * scale));
+  // Marca
+  let y = pad;
+  const logoSize = Math.round(22 * scale);
+  if (logo) ctx.drawImage(logo, pad, y, logoSize, logoSize);
+  ctx.font = `800 ${fs(12)}px Arial, Helvetica, sans-serif`;
+  ctx.fillText("TiNutri Smart Label®", pad + logoSize + Math.round(6 * scale), y + Math.round(6 * scale));
+  y += logoSize + Math.round(4 * scale);
 
-  let cursorY = Math.round(74 * scale);
-  ctx.textAlign = "left";
-  ctx.font = `700 ${fs(13)}px Arial, Helvetica, sans-serif`;
-  if (label.lot) { ctx.fillText(`LOTE: ${label.lot.toUpperCase()}`, 10, cursorY); cursorY += fs(16); }
-  if (label.inspection) { ctx.fillText(label.inspection.toUpperCase(), 10, cursorY); cursorY += fs(16); }
+  // Tipo da etiqueta (tarja preta)
+  const kindText = kindLabel(label.kind);
+  ctx.font = `800 ${fs(11)}px Arial, Helvetica, sans-serif`;
+  const kindW = ctx.measureText(kindText).width + Math.round(12 * scale);
+  const kindH = Math.round(20 * scale);
+  ctx.fillRect(pad, y, kindW, kindH);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(kindText, pad + Math.round(6 * scale), y + Math.round(4 * scale));
+  ctx.fillStyle = "#000000";
+  y += kindH + Math.round(6 * scale);
 
-  // FABRICAÇÃO (esquerda) - menor
+  // Produto (até 2 linhas)
+  ctx.font = `900 ${fs(26)}px Arial, Helvetica, sans-serif`;
+  const words = label.product.toUpperCase().split(" ");
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (ctx.measureText(next).width > W - pad * 2 && current) { lines.push(current); current = word; } else current = next;
+  }
+  if (current) lines.push(current);
+  for (const text of lines.slice(0, 2)) {
+    ctx.fillText(text, pad, y);
+    y += Math.round(27 * scale);
+  }
+
+  // Manipulação / abertura
   ctx.font = `700 ${fs(11)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText("FABRICAÇÃO:", 10, cursorY + 4);
+  ctx.fillText("MANIP./ABERTURA:", pad, y);
   ctx.font = `700 ${fs(16)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText(label.opened, 10, cursorY + fs(18));
+  ctx.fillText(label.opened, pad, y + Math.round(13 * scale));
+  y += Math.round(34 * scale);
 
-  // VALIDADE (destaque máximo)
-  ctx.textAlign = "right";
-  ctx.font = `700 ${fs(12)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText("VALIDADE:", W - 10, cursorY);
-  ctx.font = `900 ${fs(36)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText(label.expires, W - 10, cursorY + fs(14));
+  // Validade — maior destaque
+  ctx.fillRect(pad, y, colW, Math.max(1, Math.round(2 * scale)));
+  y += Math.round(5 * scale);
+  ctx.font = `700 ${fs(11)}px Arial, Helvetica, sans-serif`;
+  ctx.fillText("VALIDADE:", pad, y);
+  ctx.font = `900 ${fs(28)}px Arial, Helvetica, sans-serif`;
+  ctx.fillText(label.expires, pad, y + Math.round(13 * scale));
+  y += Math.round(48 * scale);
 
-  // Rodapé: responsável + hora
-  ctx.textAlign = "left";
-  ctx.font = `700 ${fs(10)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText("RESPONSÁVEL:", 10, H - 28);
-  ctx.font = `800 ${fs(14)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText(label.responsible.toUpperCase().slice(0, 22), 10, H - 16);
+  // Metadados
+  ctx.font = `700 ${fs(11)}px Arial, Helvetica, sans-serif`;
+  const meta = [
+    label.storage ? `CONSERVAÇÃO: ${label.storage.toUpperCase()}` : "",
+    label.lot ? `LOTE: ${label.lot.toUpperCase()}` : "",
+    label.sector ? `SETOR: ${label.sector.toUpperCase()}` : "",
+    label.inspection ? label.inspection.toUpperCase() : "",
+    `RESP.: ${label.responsible.toUpperCase()}`,
+  ].filter(Boolean);
+  const lineH = Math.round(13 * scale);
+  let metaY = Math.min(y, H - pad - lineH * meta.length);
+  for (const text of meta) {
+    let t = text;
+    while (ctx.measureText(t).width > colW && t.length > 4) t = t.slice(0, -2);
+    ctx.fillText(t === text ? text : `${t}…`, pad, metaY);
+    metaY += lineH;
+  }
 
-  if (showTime) {
-    ctx.textAlign = "right";
-    ctx.font = `700 ${fs(10)}px Arial, Helvetica, sans-serif`;
-    ctx.fillText("HORA:", W - 10, H - 28);
-    ctx.font = `800 ${fs(16)}px Arial, Helvetica, sans-serif`;
-    ctx.fillText(format(label.issued, "HH:mm"), W - 10, H - 16);
+  // QR Code de rastreio
+  if (qr) {
+    ctx.drawImage(qr, W - pad - qrSize, H - pad - qrSize - Math.round(11 * scale), qrSize, qrSize);
+    ctx.font = `700 ${fs(9)}px Arial, Helvetica, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText("RASTREIO", W - pad - qrSize / 2, H - pad - Math.round(9 * scale));
+    ctx.textAlign = "left";
   }
 
   return await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
@@ -178,35 +215,20 @@ async function generateNiimbotPng(label: PrintableLabel, size: LabelSize, showTi
 type NiimbotPreview = { url: string; filename: string };
 
 async function buildNiimbotPreview(label: PrintableLabel, settings: PrinterSettings): Promise<NiimbotPreview | null> {
-  const blob = await generateNiimbotPng(label, settings.size, settings.showTime);
+  const blob = await generateNiimbotPng(label, settings.size);
   if (!blob) return null;
   const safe = label.product.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "etiqueta";
   return { url: URL.createObjectURL(blob), filename: `niimbot-${safe}-${settings.size}mm.png` };
 }
 
-function buildLabelHtml(label: PrintableLabel, showTime: boolean) {
-  const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
-  const lotLine = label.lot ? `<div class="lot">LOTE: ${escapeHtml(label.lot.toUpperCase())}</div>` : "";
-  const inspection = label.inspection ? `<div class="insp">${escapeHtml(label.inspection.toUpperCase())}</div>` : "";
-  const timeBlock = showTime ? `<time>${format(label.issued, "HH:mm")}</time>` : "";
-  const logoUrl = new URL(tinutriLogo, window.location.origin).toString();
-  return `<main class="label"><header class="brand"><img src="${logoUrl}" alt="" class="logo"/><span>TiNutri Smart Label®</span></header><strong class="product">${escapeHtml(label.product.toUpperCase())}</strong>${lotLine}${inspection}<div class="dates"><div class="fab"><span>FAB:</span><strong>${escapeHtml(label.opened)}</strong></div><div class="expiry"><span>VALIDADE</span><strong>${escapeHtml(label.expires)}</strong></div></div><footer class="footer"><div class="resp"><span>RESPONSÁVEL:</span><strong>${escapeHtml(label.responsible.toUpperCase())}</strong></div>${timeBlock}</footer></main>`;
-}
-
-function printThermalBatch(items: { label: PrintableLabel; copies: number }[], settings: PrinterSettings): boolean {
-  if (typeof window === "undefined") return false;
+/** Imprime uma etiqueta física por item da lista, cada uma em sua própria página. */
+function printThermalBatch(labels: PrintableLabel[], settings: PrinterSettings): boolean {
+  if (typeof window === "undefined" || labels.length === 0) return false;
   const { w, h } = sizeMm(settings.size);
   const scale = settings.size === "50x30" ? 0.78 : 1;
-  const f = (pt: number) => +(pt * scale).toFixed(2);
-  const pages = items.flatMap(({ label, copies }) => {
-    const html = buildLabelHtml(label, settings.showTime);
-    return Array.from({ length: Math.max(1, Math.min(200, Math.floor(copies))) }, () => html);
-  }).join("");
-  const doc = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etiqueta TiNutri ${w} × ${h} mm</title><style>
-    @page{size:${w}mm ${h}mm;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000}body{font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:none;text-rendering:geometricPrecision}.label{width:${w}mm;height:${h}mm;padding:1.2mm 1.5mm;line-height:1;display:flex;flex-direction:column;align-items:stretch;gap:.2mm;page-break-after:always;break-after:page;overflow:hidden}.label:last-child{page-break-after:auto;break-after:auto}.brand{display:flex;align-items:center;justify-content:center;gap:1mm;font-size:${f(5.5)}pt;font-weight:800;letter-spacing:.02em}.brand .logo{height:${f(3.5)}mm;width:${f(3.5)}mm;object-fit:contain}.product{display:block;overflow:hidden;font-size:${f(9)}pt;font-weight:800;line-height:1.1;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase;text-align:center;margin-top:.4mm}.lot{margin-top:.4mm;font-size:${f(6.5)}pt;font-weight:700;text-transform:uppercase;text-align:center}.insp{font-size:${f(5.5)}pt;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;margin-top:.2mm}.dates{margin-top:.6mm;display:grid;grid-template-columns:1fr 1.2fr;gap:1.5mm;align-items:end}.dates span{display:block;font-size:${f(5)}pt;font-weight:700;letter-spacing:.04em}.fab strong{display:block;font-size:${f(8.5)}pt;font-weight:700}.expiry{text-align:right}.expiry strong{display:block;font-size:${f(18)}pt;font-weight:900;letter-spacing:-.03em;line-height:1;margin-top:.2mm}.footer{display:flex;align-items:baseline;justify-content:space-between;gap:1mm;margin-top:auto}.footer .resp{flex:1;min-width:0;text-align:left;line-height:1}.footer .resp span{display:block;font-size:${f(4.5)}pt;font-weight:700;letter-spacing:.04em}.footer .resp strong{display:block;overflow:hidden;margin-top:.2mm;font-size:${f(7.5)}pt;font-weight:800;white-space:nowrap;text-overflow:ellipsis;text-transform:uppercase}.footer time{flex-shrink:0;font-size:${f(8.5)}pt;font-weight:700;font-variant-numeric:tabular-nums}@media print{.label{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
-  </style></head><body>${pages}</body></html>`;
+  const doc = buildPrintDocument(labels, w, h, scale);
   try {
-    // Clean up any previous hidden print frame so we don't accumulate them.
+    // Remove qualquer frame de impressão anterior para não acumular.
     document.querySelectorAll<HTMLIFrameElement>("iframe[data-tinutri-print]").forEach((node) => node.remove());
     const iframe = document.createElement("iframe");
     iframe.setAttribute("data-tinutri-print", "1");
@@ -221,9 +243,8 @@ function printThermalBatch(items: { label: PrintableLabel; copies: number }[], s
         win.focus();
         win.print();
       } catch {
-        /* ignore — preserve session */
+        /* ignore — preserva a sessão */
       }
-      // Leave the iframe in place briefly so the print dialog can finish, then remove.
       window.setTimeout(() => iframe.remove(), 4000);
     };
     return true;
@@ -231,6 +252,7 @@ function printThermalBatch(items: { label: PrintableLabel; copies: number }[], s
     return false;
   }
 }
+
 
 function Index() {
   const [userId, setUserId] = useState<string | null>(null);
