@@ -9,9 +9,12 @@ import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger 
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import { ClientQrCard } from "@/components/ClientQrCard";
+import { LabelPreview } from "@/components/LabelPreview";
 import { CLIENT_CODE_KEY } from "./e.$code";
 import { claimFirstAdmin } from "@/lib/admin.functions";
+import { buildPrintDocument, kindLabel, LABEL_KINDS, newLabelToken, qrFor, STORAGE_PRESETS, type LabelKind, type PrintableLabel } from "@/lib/label";
 import tinutriLogo from "@/assets/tinutri-logo.png";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
