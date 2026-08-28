@@ -706,10 +706,10 @@ function Index() {
                       <option value="50x30">50 mm × 30 mm (opcional)</option>
                     </select>
                   </Field>
-                  <label className="flex items-center gap-3 rounded-xl border p-3 text-sm font-semibold sm:col-span-2">
-                    <input type="checkbox" className="size-4 w-auto" checked={printerSettings.showTime} onChange={(e) => updateSettings({ showTime: e.target.checked })} />
-                    Exibir a HORA na etiqueta
-                  </label>
+                  <p className="rounded-xl border bg-secondary/40 p-3 text-xs text-muted-foreground sm:col-span-2">
+                    A etiqueta imprime data e hora de manipulação/abertura e de validade, além do QR Code individual de rastreio.
+                  </p>
+
                   <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
                     <Button variant="outline" onClick={testPrint}><Printer /> Testar impressão</Button>
                     {printerSettings.connection !== "browser" && printerSettings.type !== "niimbot" && (
