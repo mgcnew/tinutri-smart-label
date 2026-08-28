@@ -45,7 +45,7 @@ type QueueItem = {
   expires_at: string;
 };
 
-type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number };
+type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number; public_token?: string | null; label_kind?: string | null; label_status?: string | null; storage_condition?: string | null; sector?: string | null; opened_at?: string | null; expires_at?: string | null };
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
 type AppRole = "admin_master" | "nutricionista" | "admin_cliente" | "gerente" | "operator";
 
