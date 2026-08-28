@@ -687,7 +687,8 @@ function Index() {
               <div className="space-y-4">
                 <div>
                   <p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · {printerSettings.size.replace("x", " × ")} MM</p>
-                  <ThermalLabel label={label ?? previewLabel} />
+                  <LabelPreview label={label ?? previewLabel} widthMm={sizeMm(printerSettings.size).w} heightMm={sizeMm(printerSettings.size).h} scale={printerSettings.size === "50x30" ? 0.78 : 1} />
+
                 </div>
                 <div className="rounded-2xl border bg-card p-4 shadow-sm">
                   <div className="flex items-center justify-between">
