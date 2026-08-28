@@ -362,15 +362,22 @@ function Index() {
   const client = clients.find((item) => item.id === selectedClient);
   const effectiveShelfDays = Number(shelfDays) > 0 ? Number(shelfDays) : product?.shelf_life_days ?? 0;
   const expiresOn = useMemo(() => product && openedOn ? format(addDays(new Date(`${openedOn}T12:00:00`), effectiveShelfDays), "dd/MM/yyyy") : "—", [product, openedOn, effectiveShelfDays]);
+  const openedAtPreview = useMemo(() => new Date(`${labelDraft?.opened || openedOn}T${openedTime || "00:00"}:00`), [labelDraft?.opened, openedOn, openedTime]);
+  const expiresAtPreview = useMemo(() => addDays(openedAtPreview, effectiveShelfDays), [openedAtPreview, effectiveShelfDays]);
   const previewLabel: PrintableLabel = {
+    kind,
     product: labelDraft?.product || product?.name || "NOME DO PRODUTO",
-    opened: labelDraft?.opened ? format(new Date(`${labelDraft.opened}T12:00:00`), "dd/MM/yyyy") : openedOn ? format(new Date(`${openedOn}T12:00:00`), "dd/MM/yyyy") : "—",
-    expires: labelDraft?.expires ? format(new Date(`${labelDraft.expires}T12:00:00`), "dd/MM/yyyy") : expiresOn,
+    opened: format(openedAtPreview, "dd/MM/yyyy HH:mm"),
+    expires: labelDraft?.expires ? format(new Date(`${labelDraft.expires}T${openedTime || "00:00"}:00`), "dd/MM/yyyy HH:mm") : format(expiresAtPreview, "dd/MM/yyyy HH:mm"),
+    storage: storage || undefined,
+    sector: sector.trim() || undefined,
     lot: (labelDraft?.lot ?? lot) || undefined,
     inspection: product?.requires_inspection && product.inspection_type && product.inspection_number ? `${product.inspection_type}: ${product.inspection_number}` : undefined,
     responsible: labelDraft?.responsible || responsible?.name || "RESPONSÁVEL",
     issued: new Date(),
+    qrDataUrl: previewQr,
   };
+
 
   if (loading) return <main className="grid min-h-screen place-items-center bg-background"><p className="font-semibold text-muted-foreground">Preparando sua estação…</p></main>;
 
