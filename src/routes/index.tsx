@@ -29,7 +29,6 @@ type ClientStatus = "ativa" | "inativa" | "suspensa";
 type Client = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; active: boolean; status: ClientStatus; responsible_name: string | null; email: string | null; phone: string | null; address: string | null; plan: string; public_code: string; created_at?: string };
 type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null; active: boolean };
 type Collaborator = { id: string; client_id: string; name: string; role_title: string | null; active: boolean };
-type PrintableLabel = { product: string; opened: string; expires: string; lot?: string; inspection?: string; responsible: string; issued: Date };
 type QueueItem = {
   id: string;
   label: PrintableLabel;
@@ -39,7 +38,10 @@ type QueueItem = {
   responsible_id: string;
   opened_iso: string;
   expires_iso: string;
+  opened_at: string;
+  expires_at: string;
 };
+
 type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number };
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
 type AppRole = "admin_master" | "nutricionista" | "admin_cliente" | "gerente" | "operator";
