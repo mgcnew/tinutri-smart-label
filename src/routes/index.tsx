@@ -249,7 +249,13 @@ function Index() {
   const [selectedProduct, setSelectedProduct] = useState("");
   const [selectedResponsible, setSelectedResponsible] = useState("");
   const [openedOn, setOpenedOn] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [openedTime, setOpenedTime] = useState(format(new Date(), "HH:mm"));
+  const [kind, setKind] = useState<LabelKind>("aberto");
+  const [storage, setStorage] = useState<string>("");
+  const [sector, setSector] = useState("");
+  const [previewQr, setPreviewQr] = useState<string | undefined>(undefined);
   const [lot, setLot] = useState("");
+
   const [shelfDays, setShelfDays] = useState<string>("");
   const [quantity, setQuantity] = useState<string>("1");
   const [label, setLabel] = useState<PrintableLabel | null>(null);
