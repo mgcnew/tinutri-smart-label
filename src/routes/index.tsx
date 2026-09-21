@@ -515,6 +515,14 @@ function Index() {
     return units;
   };
 
+  /** Registra um evento na linha do tempo da etiqueta (emissão, confirmação, falha, reimpressão, baixa). */
+  const logLabelEvent = async (labelId: string, clientId: string, eventType: string, quantity = 1, metadata: Record<string, unknown> = {}) => {
+    await supabase.from("label_events").insert({
+      label_id: labelId, client_id: clientId, event_type: eventType,
+      user_id: userId, user_name: userName || null, quantity, metadata: metadata as never,
+    } as never);
+  };
+
   const dispatchPrint = async (items: QueueItem[]) => {
     if (items.length === 0) return false;
     const isNiimbot = printerSettings.type === "niimbot";
@@ -527,26 +535,69 @@ function Index() {
       public_token: label.token, label_kind: label.kind,
       storage_condition: label.storage ?? null, sector: label.sector ?? null,
       opened_at: item.opened_at, expires_at: item.expires_at,
+      print_status: "preparada",
     }));
-    const { error } = await supabase.from("issued_labels").insert(rows as never);
+    // Etiquetas nascem "preparadas": só entram no controle PVPS após a confirmação da impressão física.
+    const { data: inserted, error } = await supabase.from("issued_labels").insert(rows as never).select("id,client_id,product_name");
     if (error) { setLastFailedPrint(items); setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return false; }
+    const created = (inserted ?? []) as { id: string; client_id: string; product_name: string }[];
+    await Promise.all(created.map((row) => logLabelEvent(row.id, row.client_id, "emissao")));
     const lastLabel = units[units.length - 1].label;
     if (isNiimbot) {
       const preview = await buildNiimbotPreview(lastLabel, printerSettings);
-      if (!preview) { setLastFailedPrint(items); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
+      if (!preview) { setLastFailedPrint(items); await markPrintFailed(created, "preview_indisponivel"); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
       setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
       setMessage(`Etiqueta pronta para o app NiiMbot. Toque em "Baixar PNG" para enviar à impressora.`);
     } else {
       const ok = printThermalBatch(units.map((u) => u.label), printerSettings);
-      if (!ok) { setLastFailedPrint(items); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
-      setMessage(printerSettings.connection !== "browser"
-        ? `Enviando para a impressora ${printerSettings.type.toUpperCase()} via ${printerSettings.connection.toUpperCase()}…`
-        : `${units.length} etiqueta(s) enviada(s) para a impressora, cada uma com QR Code de rastreio.`);
+      if (!ok) { setLastFailedPrint(items); await markPrintFailed(created, "impressora_indisponivel"); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
+      setMessage(`${units.length} etiqueta(s) enviada(s) para a impressora. Confirme abaixo se a impressão saiu correta.`);
     }
+    setPendingPrint({ rows: created, total: created.length, product: lastLabel.product });
     setLabel(lastLabel);
     setLastFailedPrint(null);
     await refresh();
     return true;
+  };
+
+  /** Impressão não confirmada / com erro: nunca dá baixa no PVPS. */
+  const markPrintFailed = async (rows: { id: string; client_id: string }[], reason: string) => {
+    if (rows.length === 0) return;
+    await supabase.from("issued_labels").update({ print_status: "falha" } as never).in("id", rows.map((r) => r.id));
+    await Promise.all(rows.map((r) => logLabelEvent(r.id, r.client_id, "falha_impressao", 1, { reason })));
+  };
+
+  const confirmPendingPrint = async () => {
+    const pending = pendingPrint;
+    if (!pending) return;
+    setPendingPrint(null);
+    const ids = pending.rows.map((r) => r.id);
+    const { error } = await supabase
+      .from("issued_labels")
+      .update({ print_status: "confirmada", confirmed_at: new Date().toISOString(), confirmed_by: userId } as never)
+      .in("id", ids)
+      .eq("print_status", "preparada"); // evita baixa duplicada
+    if (error) { setMessage("Não foi possível confirmar a saída. Tente novamente."); return; }
+    await Promise.all(pending.rows.map((r) => logLabelEvent(r.id, r.client_id, "impressao_confirmada")));
+    setMessage(`Saída confirmada: ${pending.total} etiqueta(s) de ${pending.product} entraram no controle de validades.`);
+    await refresh();
+  };
+
+  const rejectPendingPrint = async () => {
+    const pending = pendingPrint;
+    if (!pending) return;
+    setPendingPrint(null);
+    await markPrintFailed(pending.rows, "nao_confirmada_pelo_usuario");
+    setMessage("Impressão marcada como falha. Nenhuma saída foi registrada — você pode imprimir novamente.");
+    await refresh();
+  };
+
+  /** Baixa manual no painel PVPS (utilizada, consumida ou descartada). */
+  const settleLabel = async (record: LabelRecord, status: "utilizada" | "consumida" | "descartada") => {
+    const { error } = await supabase.from("issued_labels").update({ label_status: status } as never).eq("id", record.id).eq("label_status", "ativa");
+    if (error) { setMessage("Não foi possível registrar a baixa."); return; }
+    await logLabelEvent(record.id, record.client_id, `baixa_${status}`);
+    await refresh();
   };
 
   const printNow = async () => {
