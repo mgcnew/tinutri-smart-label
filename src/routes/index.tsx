@@ -294,6 +294,14 @@ function Index() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [niimbotPreview, setNiimbotPreview] = useState<NiimbotPreview | null>(null);
   const [lastFailedPrint, setLastFailedPrint] = useState<QueueItem[] | null>(null);
+  const [pendingPrint, setPendingPrint] = useState<{ rows: { id: string; client_id: string; product_name: string }[]; total: number; product: string } | null>(null);
+  const [alertDays, setAlertDays] = useState(3);
+  useEffect(() => { setAlertDays(loadAlertDays()); }, []);
+  const updateAlertDays = (value: number) => {
+    const safe = Math.max(1, Math.min(90, Math.floor(value) || 1));
+    setAlertDays(safe);
+    try { window.localStorage.setItem(ALERT_DAYS_KEY, String(safe)); } catch {}
+  };
 
   useEffect(() => () => { if (niimbotPreview) URL.revokeObjectURL(niimbotPreview.url); }, [niimbotPreview]);
 
