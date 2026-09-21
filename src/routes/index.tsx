@@ -781,20 +781,32 @@ function Index() {
                       <option value="50x30">50 mm × 30 mm (opcional)</option>
                     </select>
                   </Field>
+                  <Field label="Avisar “próximo de vencer” com quantos dias de antecedência" hint="1 a 90 dias">
+                    <input type="number" min={1} max={90} value={alertDays} onChange={(e) => updateAlertDays(Number(e.target.value))} />
+                  </Field>
                   <p className="rounded-xl border bg-secondary/40 p-3 text-xs text-muted-foreground sm:col-span-2">
                     A etiqueta imprime data e hora de manipulação/abertura e de validade, além do QR Code individual de rastreio.
                   </p>
 
                   <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
-                    <Button variant="outline" onClick={testPrint}><Printer /> Testar impressão</Button>
-                    {printerSettings.connection !== "browser" && printerSettings.type !== "niimbot" && (
-                      <p className="text-xs text-muted-foreground">
-                        Conexão direta {printerSettings.connection.toUpperCase()} usará a impressão do sistema como fallback no navegador.
-                      </p>
-                    )}
+                    <Button variant="outline" onClick={testPrint}><Printer /> Imprimir 1 etiqueta de teste</Button>
                     {printerSettings.type === "niimbot" && (
                       <p className="text-xs text-muted-foreground">NiiMbot: a etiqueta será baixada como PNG para envio pelo app oficial.</p>
                     )}
+                  </div>
+                  <div className="sm:col-span-2 rounded-xl border border-primary/25 bg-secondary/50 p-4 text-xs leading-6">
+                    <strong className="block text-sm">Elgin L42 Pro Full (USB no computador)</strong>
+                    <p className="mt-1 text-muted-foreground">
+                      Na janela de impressão que abrir, escolha a <strong>Elgin L42</strong>, deixe as margens em zero e a escala em 100% (sem “ajustar à página”).
+                      A etiqueta já sai no tamanho exato de {printerSettings.size.replace("x", " × ")} mm.
+                    </p>
+                    <p className="mt-2 text-muted-foreground">
+                      No driver ou no utilitário da Elgin, no computador, selecione <strong>Térmica direta (sem ribbon)</strong> e o papel {printerSettings.size.replace("x", " × ")} mm.
+                      Essa configuração é da impressora: o site não consegue alterá-la sozinho.
+                    </p>
+                    <p className="mt-2 flex gap-2 text-muted-foreground"><Smartphone className="mt-0.5 size-4 shrink-0" />
+                      No iPhone você cria e consulta etiquetas normalmente. Imprimir direto na Elgin pelo celular exige uma integração compatível, que ainda não está disponível aqui — prepare no celular e imprima pelo computador ligado à impressora.
+                    </p>
                   </div>
                 </div>
               )}
