@@ -1,103 +1,57 @@
-## TiNutri Smart Label® — Estrutura SaaS Multiempresa
+# Controle de validades por PVPS — TiNutri Smart Label®
 
-Transformar o app atual (hoje single-tenant na prática, com tudo em `src/routes/index.tsx`) em um SaaS multiempresa com 4 níveis de acesso, isolamento total de dados, logs de auditoria e área master.
+## 1. Como o sistema funciona hoje
 
----
+- **Master**: painel próprio com empresas, usuários, papéis (Master, Nutricionista, Admin cliente, Gerente, Operador) e estatísticas.
+- **Clientes / Produtos / Colaboradores**: cadastros já existentes, sempre vinculados a uma empresa; cada produto tem prazo de validade em dias, exigência de lote e de inspeção.
+- **Emitir etiqueta**: escolhe cliente, produto, responsável, tipo, conservação, setor, lote, quantidade; dá para revisar antes e montar uma fila com várias etiquetas.
+- **Impressão**: cada cópia vira uma etiqueta física com QR Code próprio; sai pela janela de impressão do computador (60 × 40 mm, sem margens) ou como imagem no modo NiiMbot.
+- **Histórico**: lista as emissões com busca, reimprimir e duplicar.
+- **Consulta pública**: o QR Code abre uma página com produto, validade e situação da etiqueta.
 
-### 1. Banco de dados (migration única)
+## 2. O que precisa mudar
 
-**Novos papéis (enum `app_role`):**
-- `admin_master` (TiNutri)
-- `nutricionista` (equipe TiNutri, carteira de clientes)
-- `admin_cliente` (gestor da empresa)
-- `operator` (já existe — produção)
+1. **A baixa acontece cedo demais.** Hoje a etiqueta é gravada assim que a impressão é disparada — mesmo se o papel travar ou a pessoa cancelar. Falta o passo "a impressão saiu certa?".
+2. **Não existe painel de validades.** O histórico é por data de emissão, não por vencimento; não há separação vencidos / vencem hoje / próximos.
+3. **Reimpressão não é distinguida.** Reimprimir hoje não gera nenhum registro; também não pode gerar uma segunda baixa.
+4. **Antecedência de aviso não é configurável.**
+5. **Elgin L42 Pro Full**: falta um teste claro de uma etiqueta só e as orientações de térmica direta / sem ribbon.
+6. **iPhone**: falta explicar que preparar no celular funciona, imprimir direto na Elgin não.
 
-Manter `admin` antigo migrando para `admin_master`.
+## 3. O que será implementado
 
-**Novas colunas / tabelas:**
+### Painel "Validades" (PVPS)
+Nova aba, ordenada do vencimento mais próximo para o mais distante, em três blocos: **Vencidos**, **Vencem hoje**, **Próximos de vencer**. Filtros por cliente e por produto, busca por lote. Só entram etiquetas com impressão confirmada e ainda ativas. Cada linha permite dar baixa (utilizada, consumida, descartada) com registro de quem fez.
 
-- `clients`: adicionar `status` enum (`ativa`, `inativa`, `suspensa`) — manter `active` por compatibilidade, derivar de `status`.
-- `nutritionist_clients` (carteira): `nutritionist_user_id`, `client_id` (unique pair). Grants + RLS.
-- `products`: adicionar `created_by`, `updated_by` (uuid → auth.users).
-- `issued_labels`: adicionar `issued_by_user_id` (uuid auth.users) — já existe `issued_by` texto.
-- `activity_logs`: `id`, `client_id`, `user_id`, `user_name`, `action` (texto: `product.created`, `label.printed`, `login`, etc.), `entity_type`, `entity_id`, `metadata` jsonb, `created_at`.
+A antecedência de "próximos de vencer" vira uma configuração por empresa (padrão 3 dias), editável em Configurações.
 
-**Funções security definer:**
-- `has_role(user_id, role)` — já existe, estender para novos papéis.
-- `is_admin_master(user_id)` — wrapper.
-- `current_user_client_id()` — lê de profiles.
-- `nutritionist_has_client(user_id, client_id)` — consulta `nutritionist_clients`.
-- `user_can_access_client(user_id, client_id)` — combina: admin_master OR profile.client_id = client_id OR nutricionista com carteira.
+### Confirmação de impressão
+Ao mandar imprimir, as etiquetas ficam **preparadas** e aparece uma confirmação: "A impressão saiu correta?" → **Sim** confirma a saída e ela entra no painel de validades; **Não / cancelar** marca como falha e nada é dado baixa. Fechar a tela sem responder mantém como preparada (não conta). Nenhuma etiqueta preparada ou com falha aparece no painel.
 
-**RLS revisada em todas as tabelas** usando `user_can_access_client` para SELECT/UPDATE/INSERT/DELETE conforme matriz de permissões. GRANTs para `authenticated` e `service_role`.
+### Reimpressão sem baixa duplicada
+Reimprimir usa a etiqueta já existente, mantém o mesmo QR Code e **não cria nova saída** — apenas grava o evento de reimpressão no histórico, com data, usuário e quantidade.
 
-**Trigger** em `products` para preencher `updated_by` automaticamente; trigger em `issued_labels` para registrar log + `issued_by_user_id`.
+### Histórico de eventos
+Cada etiqueta passa a ter uma linha do tempo: emissão → confirmação ou falha → reimpressões → baixa. Visível no histórico e filtrada pela empresa do usuário.
 
-**Bloqueio de empresa suspensa:** função `user_client_status()` que retorna o status — front bloqueia a tela.
+### Impressão Elgin L42 Pro Full
+- Botão **"Imprimir 1 etiqueta de teste"** que envia exatamente uma etiqueta no tamanho escolhido.
+- Impressão sem margens e sem redimensionamento, no tamanho exato (prioridade 60 × 40 mm); a janela de impressão do Windows permite escolher a Elgin.
+- Bloco de orientações: no driver/utilitário da Elgin definir **Térmica direta / sem ribbon**, tamanho 60 × 40 mm, escala 100% e margens zero — deixando claro que essa configuração é feita no computador, não pelo site.
 
-### 2. Server functions (`src/lib/`)
+### Celular
+Criação e consulta continuam no iPhone. Aviso explícito de que imprimir direto na Elgin pelo iPhone exige integração compatível (não disponível hoje): prepare no celular, imprima pelo computador ligado à impressora.
 
-- `auth.functions.ts`: `getCurrentUserContext` → retorna `{ role, clientId, clientStatus, clientName, displayName }` (usa `requireSupabaseAuth`).
-- `admin.functions.ts` (estender): `listAllClients`, `upsertClient`, `setClientStatus`, `createUser` (admin/nutri/admin_cliente/operator), `resetUserPassword`, `assignNutritionistClient`, `removeNutritionistClient`, `masterStats` (contagens).
-- `activity.functions.ts`: `logActivity`, `listActivity({ clientId? })`.
-- Reaproveitar `inviteOperator` adaptando para receber `role`.
+### Segurança
+Tudo separado por empresa nas regras do banco; Master vê todas, demais só a própria. Nenhuma senha em tela ou no código.
 
-### 3. Rotas
+## 4. Detalhes técnicos
 
-- `/auth` — login + "Esqueci minha senha" (`supabase.auth.resetPasswordForEmail`) + página `/reset-password`.
-- `/_authenticated/` — gate (já gerenciado pela integração). Dentro:
-  - `/` — fluxo de emissão (atual `index.tsx` movido para `_authenticated/index.tsx`), filtrando tudo por `clientId` do usuário. Se empresa suspensa, exibir tela de bloqueio.
-  - `/admin` — área master (somente admin_master): lista de empresas, criar/editar/suspender, criar usuários, ver estatísticas, vincular nutricionista↔cliente.
-  - `/admin/empresas/:id` — detalhe da empresa (produtos, colaboradores, etiquetas, log).
-  - `/atividades` — log de atividades (filtrado pelo escopo do usuário).
+- Migração: `issued_labels` ganha `print_status` (preparada | confirmada | falha | cancelada), `confirmed_at`, `confirmed_by`, `reprint_count`, `source_label_id`; nova tabela `label_events` (etiqueta, tipo do evento, usuário, quantidade, metadados) com GRANTs e RLS por `user_can_access_client`; `label_settings` ganha `expiry_alert_days` (padrão 3).
+- Registros existentes recebem `print_status = 'confirmada'` no backfill, para não sumirem do painel.
+- Painel lê `issued_labels` com `print_status='confirmada'` e `label_status='ativa'`, ordenado por `expires_at`.
+- Reimpressão grava em `label_events` e incrementa `reprint_count`; nunca insere linha nova.
 
-Nutricionista vê seletor de cliente (carteira); ao escolher, fluxo de emissão opera no contexto daquele cliente.
+## 5. Testes que farei aqui
 
-Admin cliente e operador: `clientId` fixo do profile, sem seletor.
-
-### 4. UI
-
-- Header: nome do usuário, papel, empresa atual.
-- Footer global: `TiNutri Smart Label® — Validade simples. Segurança sempre. Desenvolvido por TiNutri Soluções em Consultoria de Alimentos. © 2026 …`.
-- Tela "Empresa suspensa": mensagem solicitada, sem permitir uso.
-- Menus condicionais por papel (Emitir / Histórico / Produtos / Colaboradores / Atividades / Admin).
-
-### 5. Log de atividades
-
-Disparado em:
-- login (root `onAuthStateChange` → server fn).
-- create/update/delete product e collaborator.
-- print/reprint/duplicate label (já no fluxo de emissão).
-
-Ordenado desc, paginado simples.
-
-### 6. Backup
-
-Comentário no projeto + nota: backup diário roda no Lovable Cloud (Postgres gerenciado). Não expor UI.
-
-### 7. Fora de escopo (não implementar)
-
-Estoque, financeiro, CMV, compras, ERP, dashboards complexos, relatórios avançados, IA.
-
----
-
-### Ordem de execução
-
-1. Migration (schema + RLS + funções + grants + trigger).
-2. Aguardar aprovação e regeneração de tipos.
-3. Server functions de auth/admin/activity.
-4. Rotas `/auth`, `/reset-password`, `/_authenticated/admin*`, `/_authenticated/atividades`.
-5. Refatorar `index.tsx` → `_authenticated/index.tsx` com filtro por `clientId` do contexto e tela de empresa suspensa.
-6. Footer global + cabeçalho com papel/empresa.
-7. Hook de logging em criação/edição/impressão.
-8. Configurar Google auth + reset de senha email template (Lovable Emails).
-
-### Notas técnicas
-
-- Sem alteração no layout/template das etiquetas impressas — apenas filtragem por `client_id`.
-- Manter compat: papel `admin` antigo vira `admin_master` via UPDATE no migration.
-- `claimFirstAdmin` continua funcionando para o primeiro admin_master.
-- Todas as queries do front passam a usar `clientId` do contexto retornado pelo server (sem trust no client).
-- Empresas inativas/suspensas: dados permanecem, apenas bloqueio de uso operacional. Admin master continua vendo tudo.
-
-Posso prosseguir?
+Avanço de uma etiqueta, teste de impressão de uma etiqueta, confirmação de saída, falha sem baixa, reimpressão sem baixa duplicada e atualização do painel. O comportamento físico da Elgin (qualidade, alinhamento, térmica direta) só pode ser conferido com a impressora ligada.
