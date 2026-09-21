@@ -840,6 +840,18 @@ function Index() {
 
                 {product && responsible && !labelDraft && <Button variant="outline" className="w-full" onClick={() => setLabelDraft({ product: product.name, responsible: responsible.name, opened: openedOn, expires: format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd"), lot })}><Pencil /> Editar etiqueta antes de imprimir</Button>}
                 {labelDraft && <div className="grid gap-4 rounded-2xl border bg-secondary/50 p-4 sm:grid-cols-2"><div className="sm:col-span-2"><Field label="Nome na etiqueta"><input maxLength={120} value={labelDraft.product} onChange={(e) => setLabelDraft({ ...labelDraft, product: e.target.value })} /></Field></div><Field label="Aberto em"><input type="date" value={labelDraft.opened} onChange={(e) => setLabelDraft({ ...labelDraft, opened: e.target.value })} /></Field><Field label="Validade"><input type="date" value={labelDraft.expires} onChange={(e) => setLabelDraft({ ...labelDraft, expires: e.target.value })} /></Field><Field label="Lote"><input maxLength={80} value={labelDraft.lot} onChange={(e) => setLabelDraft({ ...labelDraft, lot: e.target.value })} /></Field><Field label="Responsável"><input maxLength={120} value={labelDraft.responsible} onChange={(e) => setLabelDraft({ ...labelDraft, responsible: e.target.value })} /></Field><div className="sm:col-span-2"><Button variant="ghost" size="sm" onClick={() => setLabelDraft(null)}>Cancelar edição</Button></div></div>}
+                {pendingPrint && (
+                  <div role="alert" className="rounded-2xl border-2 border-primary/40 bg-secondary p-4">
+                    <strong className="block text-sm">A impressão saiu correta?</strong>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {pendingPrint.total} etiqueta(s) de {pendingPrint.product} aguardando confirmação. A saída só entra no controle de validades depois do seu “Sim”.
+                    </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <Button variant="kitchen" onClick={confirmPendingPrint}><CheckCircle2 /> Sim, imprimiu certo</Button>
+                      <Button variant="outline" onClick={rejectPendingPrint}><AlertTriangle /> Não / deu erro</Button>
+                    </div>
+                  </div>
+                )}
                 {message && (
                   <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary p-3 text-sm font-semibold">
                     <span className="min-w-0 flex-1">{message}</span>
