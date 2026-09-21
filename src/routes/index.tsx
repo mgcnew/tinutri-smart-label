@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Building2, Clock3, Copy, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import { AlertTriangle, Building2, CalendarClock, CheckCircle2, Clock3, Copy, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Smartphone, Trash2, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
