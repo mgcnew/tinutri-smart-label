@@ -921,6 +921,7 @@ function Index() {
           {tab === "clients" && <ClientsPanel clients={clients} refresh={refresh} />}
           {tab === "products" && <ProductsPanel clients={clients} products={products} refresh={refresh} />}
           {tab === "team" && <TeamPanel clients={clients} collaborators={collaborators} refresh={refresh} />}
+          {tab === "validades" && <ValidadesPanel history={history} alertDays={alertDays} onAlertDaysChange={updateAlertDays} onSettle={settleLabel} />}
           {tab === "history" && <HistoryPanel history={history} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
         </main>
       </div>
