@@ -45,9 +45,16 @@ type QueueItem = {
   expires_at: string;
 };
 
-type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number; public_token?: string | null; label_kind?: string | null; label_status?: string | null; storage_condition?: string | null; sector?: string | null; opened_at?: string | null; expires_at?: string | null };
-type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
+type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number; public_token?: string | null; label_kind?: string | null; label_status?: string | null; storage_condition?: string | null; sector?: string | null; opened_at?: string | null; expires_at?: string | null; print_status?: string | null; confirmed_at?: string | null; reprint_count?: number | null };
+type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "validades" | "history";
 type AppRole = "admin_master" | "nutricionista" | "admin_cliente" | "gerente" | "operator";
+
+const ALERT_DAYS_KEY = "tinutri.expiry-alert-days";
+function loadAlertDays(): number {
+  if (typeof window === "undefined") return 3;
+  const raw = Number(window.localStorage.getItem(ALERT_DAYS_KEY));
+  return Number.isFinite(raw) && raw > 0 && raw <= 90 ? Math.floor(raw) : 3;
+}
 
 const PRINTER_NOT_FOUND_MESSAGE = "Impressora não encontrada. Verifique a conexão Bluetooth, Wi-Fi ou a configuração da impressora.";
 
