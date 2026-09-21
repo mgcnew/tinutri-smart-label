@@ -684,7 +684,13 @@ function Index() {
       setMessage('Etiqueta pronta. Toque em "Baixar PNG" para enviar ao app NiiMbot.');
     } else if (!printThermalBatch(Array.from({ length: record.quantity || 1 }, () => historicalLabel), printerSettings)) {
       setMessage(PRINTER_NOT_FOUND_MESSAGE);
+      return;
     }
+    // Reimpressão: mesma etiqueta física, sem nova saída no PVPS — apenas registro no histórico.
+    await supabase.from("issued_labels").update({ reprint_count: (record.reprint_count ?? 0) + 1 } as never).eq("id", record.id);
+    await logLabelEvent(record.id, record.client_id, "reimpressao", record.quantity || 1);
+    setMessage("Reimpressão registrada no histórico. Nenhuma nova saída foi lançada no controle de validades.");
+    await refresh();
   };
 
 
