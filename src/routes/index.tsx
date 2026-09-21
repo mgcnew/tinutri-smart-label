@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Building2, Clock3, Copy, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import { AlertTriangle, Building2, CalendarClock, CheckCircle2, Clock3, Copy, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Smartphone, Trash2, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -45,9 +45,16 @@ type QueueItem = {
   expires_at: string;
 };
 
-type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number; public_token?: string | null; label_kind?: string | null; label_status?: string | null; storage_condition?: string | null; sector?: string | null; opened_at?: string | null; expires_at?: string | null };
-type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "history";
+type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number; public_token?: string | null; label_kind?: string | null; label_status?: string | null; storage_condition?: string | null; sector?: string | null; opened_at?: string | null; expires_at?: string | null; print_status?: string | null; confirmed_at?: string | null; reprint_count?: number | null };
+type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "validades" | "history";
 type AppRole = "admin_master" | "nutricionista" | "admin_cliente" | "gerente" | "operator";
+
+const ALERT_DAYS_KEY = "tinutri.expiry-alert-days";
+function loadAlertDays(): number {
+  if (typeof window === "undefined") return 3;
+  const raw = Number(window.localStorage.getItem(ALERT_DAYS_KEY));
+  return Number.isFinite(raw) && raw > 0 && raw <= 90 ? Math.floor(raw) : 3;
+}
 
 const PRINTER_NOT_FOUND_MESSAGE = "Impressora não encontrada. Verifique a conexão Bluetooth, Wi-Fi ou a configuração da impressora.";
 
@@ -287,6 +294,14 @@ function Index() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [niimbotPreview, setNiimbotPreview] = useState<NiimbotPreview | null>(null);
   const [lastFailedPrint, setLastFailedPrint] = useState<QueueItem[] | null>(null);
+  const [pendingPrint, setPendingPrint] = useState<{ rows: { id: string; client_id: string; product_name: string }[]; total: number; product: string } | null>(null);
+  const [alertDays, setAlertDays] = useState(3);
+  useEffect(() => { setAlertDays(loadAlertDays()); }, []);
+  const updateAlertDays = (value: number) => {
+    const safe = Math.max(1, Math.min(90, Math.floor(value) || 1));
+    setAlertDays(safe);
+    try { window.localStorage.setItem(ALERT_DAYS_KEY, String(safe)); } catch {}
+  };
 
   useEffect(() => () => { if (niimbotPreview) URL.revokeObjectURL(niimbotPreview.url); }, [niimbotPreview]);
 
@@ -378,7 +393,7 @@ function Index() {
       return;
     }
     // Histórico — RLS faz o filtro no banco; operador/admin_cliente verão somente seu cliente
-    const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity,public_token,label_kind,label_status,storage_condition,sector,opened_at,expires_at").order("issued_at", { ascending: false }).limit(200);
+    const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity,public_token,label_kind,label_status,storage_condition,sector,opened_at,expires_at,print_status,confirmed_at,reprint_count").order("issued_at", { ascending: false }).limit(500);
     setHistory((labels ?? []) as LabelRecord[]);
     setLoading(false);
   };
@@ -508,6 +523,14 @@ function Index() {
     return units;
   };
 
+  /** Registra um evento na linha do tempo da etiqueta (emissão, confirmação, falha, reimpressão, baixa). */
+  const logLabelEvent = async (labelId: string, clientId: string, eventType: string, quantity = 1, metadata: Record<string, unknown> = {}) => {
+    await supabase.from("label_events").insert({
+      label_id: labelId, client_id: clientId, event_type: eventType,
+      user_id: userId, user_name: userName || null, quantity, metadata: metadata as never,
+    } as never);
+  };
+
   const dispatchPrint = async (items: QueueItem[]) => {
     if (items.length === 0) return false;
     const isNiimbot = printerSettings.type === "niimbot";
@@ -520,26 +543,69 @@ function Index() {
       public_token: label.token, label_kind: label.kind,
       storage_condition: label.storage ?? null, sector: label.sector ?? null,
       opened_at: item.opened_at, expires_at: item.expires_at,
+      print_status: "preparada",
     }));
-    const { error } = await supabase.from("issued_labels").insert(rows as never);
+    // Etiquetas nascem "preparadas": só entram no controle PVPS após a confirmação da impressão física.
+    const { data: inserted, error } = await supabase.from("issued_labels").insert(rows as never).select("id,client_id,product_name");
     if (error) { setLastFailedPrint(items); setMessage("Não foi possível registrar a etiqueta. Verifique seu acesso."); return false; }
+    const created = (inserted ?? []) as { id: string; client_id: string; product_name: string }[];
+    await Promise.all(created.map((row) => logLabelEvent(row.id, row.client_id, "emissao")));
     const lastLabel = units[units.length - 1].label;
     if (isNiimbot) {
       const preview = await buildNiimbotPreview(lastLabel, printerSettings);
-      if (!preview) { setLastFailedPrint(items); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
+      if (!preview) { setLastFailedPrint(items); await markPrintFailed(created, "preview_indisponivel"); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
       setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
       setMessage(`Etiqueta pronta para o app NiiMbot. Toque em "Baixar PNG" para enviar à impressora.`);
     } else {
       const ok = printThermalBatch(units.map((u) => u.label), printerSettings);
-      if (!ok) { setLastFailedPrint(items); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
-      setMessage(printerSettings.connection !== "browser"
-        ? `Enviando para a impressora ${printerSettings.type.toUpperCase()} via ${printerSettings.connection.toUpperCase()}…`
-        : `${units.length} etiqueta(s) enviada(s) para a impressora, cada uma com QR Code de rastreio.`);
+      if (!ok) { setLastFailedPrint(items); await markPrintFailed(created, "impressora_indisponivel"); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
+      setMessage(`${units.length} etiqueta(s) enviada(s) para a impressora. Confirme abaixo se a impressão saiu correta.`);
     }
+    setPendingPrint({ rows: created, total: created.length, product: lastLabel.product });
     setLabel(lastLabel);
     setLastFailedPrint(null);
     await refresh();
     return true;
+  };
+
+  /** Impressão não confirmada / com erro: nunca dá baixa no PVPS. */
+  const markPrintFailed = async (rows: { id: string; client_id: string }[], reason: string) => {
+    if (rows.length === 0) return;
+    await supabase.from("issued_labels").update({ print_status: "falha" } as never).in("id", rows.map((r) => r.id));
+    await Promise.all(rows.map((r) => logLabelEvent(r.id, r.client_id, "falha_impressao", 1, { reason })));
+  };
+
+  const confirmPendingPrint = async () => {
+    const pending = pendingPrint;
+    if (!pending) return;
+    setPendingPrint(null);
+    const ids = pending.rows.map((r) => r.id);
+    const { error } = await supabase
+      .from("issued_labels")
+      .update({ print_status: "confirmada", confirmed_at: new Date().toISOString(), confirmed_by: userId } as never)
+      .in("id", ids)
+      .eq("print_status", "preparada"); // evita baixa duplicada
+    if (error) { setMessage("Não foi possível confirmar a saída. Tente novamente."); return; }
+    await Promise.all(pending.rows.map((r) => logLabelEvent(r.id, r.client_id, "impressao_confirmada")));
+    setMessage(`Saída confirmada: ${pending.total} etiqueta(s) de ${pending.product} entraram no controle de validades.`);
+    await refresh();
+  };
+
+  const rejectPendingPrint = async () => {
+    const pending = pendingPrint;
+    if (!pending) return;
+    setPendingPrint(null);
+    await markPrintFailed(pending.rows, "nao_confirmada_pelo_usuario");
+    setMessage("Impressão marcada como falha. Nenhuma saída foi registrada — você pode imprimir novamente.");
+    await refresh();
+  };
+
+  /** Baixa manual no painel PVPS (utilizada, consumida ou descartada). */
+  const settleLabel = async (record: LabelRecord, status: "utilizada" | "consumida" | "descartada") => {
+    const { error } = await supabase.from("issued_labels").update({ label_status: status } as never).eq("id", record.id).eq("label_status", "ativa");
+    if (error) { setMessage("Não foi possível registrar a baixa."); return; }
+    await logLabelEvent(record.id, record.client_id, `baixa_${status}`);
+    await refresh();
   };
 
   const printNow = async () => {
@@ -618,7 +684,13 @@ function Index() {
       setMessage('Etiqueta pronta. Toque em "Baixar PNG" para enviar ao app NiiMbot.');
     } else if (!printThermalBatch(Array.from({ length: record.quantity || 1 }, () => historicalLabel), printerSettings)) {
       setMessage(PRINTER_NOT_FOUND_MESSAGE);
+      return;
     }
+    // Reimpressão: mesma etiqueta física, sem nova saída no PVPS — apenas registro no histórico.
+    await supabase.from("issued_labels").update({ reprint_count: (record.reprint_count ?? 0) + 1 } as never).eq("id", record.id);
+    await logLabelEvent(record.id, record.client_id, "reimpressao", record.quantity || 1);
+    setMessage("Reimpressão registrada no histórico. Nenhuma nova saída foi lançada no controle de validades.");
+    await refresh();
   };
 
 
@@ -709,20 +781,32 @@ function Index() {
                       <option value="50x30">50 mm × 30 mm (opcional)</option>
                     </select>
                   </Field>
+                  <Field label="Avisar “próximo de vencer” com quantos dias de antecedência" hint="1 a 90 dias">
+                    <input type="number" min={1} max={90} value={alertDays} onChange={(e) => updateAlertDays(Number(e.target.value))} />
+                  </Field>
                   <p className="rounded-xl border bg-secondary/40 p-3 text-xs text-muted-foreground sm:col-span-2">
                     A etiqueta imprime data e hora de manipulação/abertura e de validade, além do QR Code individual de rastreio.
                   </p>
 
                   <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
-                    <Button variant="outline" onClick={testPrint}><Printer /> Testar impressão</Button>
-                    {printerSettings.connection !== "browser" && printerSettings.type !== "niimbot" && (
-                      <p className="text-xs text-muted-foreground">
-                        Conexão direta {printerSettings.connection.toUpperCase()} usará a impressão do sistema como fallback no navegador.
-                      </p>
-                    )}
+                    <Button variant="outline" onClick={testPrint}><Printer /> Imprimir 1 etiqueta de teste</Button>
                     {printerSettings.type === "niimbot" && (
                       <p className="text-xs text-muted-foreground">NiiMbot: a etiqueta será baixada como PNG para envio pelo app oficial.</p>
                     )}
+                  </div>
+                  <div className="sm:col-span-2 rounded-xl border border-primary/25 bg-secondary/50 p-4 text-xs leading-6">
+                    <strong className="block text-sm">Elgin L42 Pro Full (USB no computador)</strong>
+                    <p className="mt-1 text-muted-foreground">
+                      Na janela de impressão que abrir, escolha a <strong>Elgin L42</strong>, deixe as margens em zero e a escala em 100% (sem “ajustar à página”).
+                      A etiqueta já sai no tamanho exato de {printerSettings.size.replace("x", " × ")} mm.
+                    </p>
+                    <p className="mt-2 text-muted-foreground">
+                      No driver ou no utilitário da Elgin, no computador, selecione <strong>Térmica direta (sem ribbon)</strong> e o papel {printerSettings.size.replace("x", " × ")} mm.
+                      Essa configuração é da impressora: o site não consegue alterá-la sozinho.
+                    </p>
+                    <p className="mt-2 flex gap-2 text-muted-foreground"><Smartphone className="mt-0.5 size-4 shrink-0" />
+                      No iPhone você cria e consulta etiquetas normalmente. Imprimir direto na Elgin pelo celular exige uma integração compatível, que ainda não está disponível aqui — prepare no celular e imprima pelo computador ligado à impressora.
+                    </p>
                   </div>
                 </div>
               )}
@@ -756,6 +840,18 @@ function Index() {
 
                 {product && responsible && !labelDraft && <Button variant="outline" className="w-full" onClick={() => setLabelDraft({ product: product.name, responsible: responsible.name, opened: openedOn, expires: format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd"), lot })}><Pencil /> Editar etiqueta antes de imprimir</Button>}
                 {labelDraft && <div className="grid gap-4 rounded-2xl border bg-secondary/50 p-4 sm:grid-cols-2"><div className="sm:col-span-2"><Field label="Nome na etiqueta"><input maxLength={120} value={labelDraft.product} onChange={(e) => setLabelDraft({ ...labelDraft, product: e.target.value })} /></Field></div><Field label="Aberto em"><input type="date" value={labelDraft.opened} onChange={(e) => setLabelDraft({ ...labelDraft, opened: e.target.value })} /></Field><Field label="Validade"><input type="date" value={labelDraft.expires} onChange={(e) => setLabelDraft({ ...labelDraft, expires: e.target.value })} /></Field><Field label="Lote"><input maxLength={80} value={labelDraft.lot} onChange={(e) => setLabelDraft({ ...labelDraft, lot: e.target.value })} /></Field><Field label="Responsável"><input maxLength={120} value={labelDraft.responsible} onChange={(e) => setLabelDraft({ ...labelDraft, responsible: e.target.value })} /></Field><div className="sm:col-span-2"><Button variant="ghost" size="sm" onClick={() => setLabelDraft(null)}>Cancelar edição</Button></div></div>}
+                {pendingPrint && (
+                  <div role="alert" className="rounded-2xl border-2 border-primary/40 bg-secondary p-4">
+                    <strong className="block text-sm">A impressão saiu correta?</strong>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {pendingPrint.total} etiqueta(s) de {pendingPrint.product} aguardando confirmação. A saída só entra no controle de validades depois do seu “Sim”.
+                    </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <Button variant="kitchen" onClick={confirmPendingPrint}><CheckCircle2 /> Sim, imprimiu certo</Button>
+                      <Button variant="outline" onClick={rejectPendingPrint}><AlertTriangle /> Não / deu erro</Button>
+                    </div>
+                  </div>
+                )}
                 {message && (
                   <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary p-3 text-sm font-semibold">
                     <span className="min-w-0 flex-1">{message}</span>
@@ -825,6 +921,7 @@ function Index() {
           {tab === "clients" && <ClientsPanel clients={clients} refresh={refresh} />}
           {tab === "products" && <ProductsPanel clients={clients} products={products} refresh={refresh} />}
           {tab === "team" && <TeamPanel clients={clients} collaborators={collaborators} refresh={refresh} />}
+          {tab === "validades" && <ValidadesPanel history={history} alertDays={alertDays} onAlertDaysChange={updateAlertDays} onSettle={settleLabel} />}
           {tab === "history" && <HistoryPanel history={history} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
         </main>
       </div>
@@ -846,15 +943,16 @@ const navItems = [
   { id: "products", label: "Produtos", icon: PackagePlus },
   { id: "team", label: "Colaboradores", icon: Users },
   { id: "emit", label: "Emitir Etiquetas", icon: Printer },
+  { id: "validades", label: "Validades (PVPS)", icon: CalendarClock },
   { id: "history", label: "Histórico", icon: History },
 ] as const;
 
 const ROLE_TABS: Record<AppRole, AppTab[]> = {
-  admin_master: ["dashboard", "clients", "products", "team", "emit", "history"],
-  nutricionista: ["dashboard", "clients", "products", "team", "emit", "history"],
-  admin_cliente: ["dashboard", "products", "team", "emit", "history"],
-  gerente: ["dashboard", "products", "team", "emit", "history"],
-  operator: ["emit", "history"],
+  admin_master: ["dashboard", "clients", "products", "team", "emit", "validades", "history"],
+  nutricionista: ["dashboard", "clients", "products", "team", "emit", "validades", "history"],
+  admin_cliente: ["dashboard", "products", "team", "emit", "validades", "history"],
+  gerente: ["dashboard", "products", "team", "emit", "validades", "history"],
+  operator: ["emit", "validades", "history"],
 };
 
 function Nav({ role, tab, setTab, closeOnSelect = false }: { role: AppRole; tab: AppTab; setTab: (id: AppTab) => void; closeOnSelect?: boolean }) {
@@ -1137,5 +1235,76 @@ function HistoryPanel({ history, onReprint, onDuplicate }: { history: LabelRecor
     (!dateQuery || item.issued_at.slice(0, 10) === dateQuery),
   );
 
-  return <section><PanelHeader eyebrow="Registros" title="Etiquetas emitidas" description="Últimas 100 emissões registradas."/><div className="mt-7 grid gap-3 rounded-2xl border bg-card p-4 sm:grid-cols-2 xl:grid-cols-4"><Field label="Produto"><div className="relative"><Search className="absolute left-3 top-3.5 size-4 text-muted-foreground"/><input className="pl-9" value={productQuery} onChange={(event) => setProductQuery(event.target.value)} placeholder="Pesquisar produto"/></div></Field><Field label="Responsável"><input value={responsibleQuery} onChange={(event) => setResponsibleQuery(event.target.value)} placeholder="Pesquisar responsável"/></Field><Field label="Cliente"><input value={clientQuery} onChange={(event) => setClientQuery(event.target.value)} placeholder="Pesquisar cliente"/></Field><Field label="Data"><input type="date" value={dateQuery} onChange={(event) => setDateQuery(event.target.value)}/></Field></div><div className="mt-4 overflow-hidden rounded-2xl border bg-card">{filtered.length === 0 ? <p className="p-8 text-center text-muted-foreground">Nenhuma etiqueta encontrada.</p> : filtered.map((h) => <article key={h.id} className="grid gap-4 border-b p-4 md:grid-cols-[1.2fr_1fr_auto] md:items-center"><div><strong>{h.product_name}</strong><p className="text-sm text-muted-foreground">{h.client_name}</p></div><div className="text-sm"><p>{h.responsible_name}</p><p className="text-xs text-muted-foreground">Lote: {h.lot_number || "—"} · Aberto: {format(new Date(`${h.opened_on}T12:00:00`), "dd/MM/yyyy")}</p><p className="text-xs font-semibold text-foreground">Validade: {format(new Date(`${h.expires_on}T12:00:00`), "dd/MM/yyyy")} · {h.quantity || 1} etiqueta(s)</p><time className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="size-3"/>{format(new Date(h.issued_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</time></div><div className="grid grid-cols-2 gap-2 md:grid-cols-1"><Button variant="outline" size="sm" onClick={() => onReprint(h)}><Printer/>Reimprimir</Button><Button variant="secondary" size="sm" onClick={() => onDuplicate(h)}><Copy/>Duplicar</Button></div></article>)}</div></section>;
+  return <section><PanelHeader eyebrow="Registros" title="Etiquetas emitidas" description="Últimas 100 emissões registradas."/><div className="mt-7 grid gap-3 rounded-2xl border bg-card p-4 sm:grid-cols-2 xl:grid-cols-4"><Field label="Produto"><div className="relative"><Search className="absolute left-3 top-3.5 size-4 text-muted-foreground"/><input className="pl-9" value={productQuery} onChange={(event) => setProductQuery(event.target.value)} placeholder="Pesquisar produto"/></div></Field><Field label="Responsável"><input value={responsibleQuery} onChange={(event) => setResponsibleQuery(event.target.value)} placeholder="Pesquisar responsável"/></Field><Field label="Cliente"><input value={clientQuery} onChange={(event) => setClientQuery(event.target.value)} placeholder="Pesquisar cliente"/></Field><Field label="Data"><input type="date" value={dateQuery} onChange={(event) => setDateQuery(event.target.value)}/></Field></div><div className="mt-4 overflow-hidden rounded-2xl border bg-card">{filtered.length === 0 ? <p className="p-8 text-center text-muted-foreground">Nenhuma etiqueta encontrada.</p> : filtered.map((h) => <article key={h.id} className="grid gap-4 border-b p-4 md:grid-cols-[1.2fr_1fr_auto] md:items-center"><div><strong>{h.product_name}</strong><p className="text-sm text-muted-foreground">{h.client_name}</p></div><div className="text-sm"><p>{h.responsible_name}</p><p className="text-xs text-muted-foreground">Lote: {h.lot_number || "—"} · Aberto: {format(new Date(`${h.opened_on}T12:00:00`), "dd/MM/yyyy")}</p><p className="text-xs font-semibold text-foreground">Validade: {format(new Date(`${h.expires_on}T12:00:00`), "dd/MM/yyyy")} · {h.quantity || 1} etiqueta(s)</p><p className="text-xs text-muted-foreground">{h.print_status === "falha" ? "Impressão com falha — sem baixa" : h.print_status === "preparada" ? "Aguardando confirmação — sem baixa" : "Saída confirmada"}{(h.reprint_count ?? 0) > 0 ? ` · ${h.reprint_count} reimpressão(ões)` : ""}</p><time className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="size-3"/>{format(new Date(h.issued_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</time></div><div className="grid grid-cols-2 gap-2 md:grid-cols-1"><Button variant="outline" size="sm" onClick={() => onReprint(h)}><Printer/>Reimprimir</Button><Button variant="secondary" size="sm" onClick={() => onDuplicate(h)}><Copy/>Duplicar</Button></div></article>)}</div></section>;
+}
+
+/** Painel PVPS: etiquetas com impressão confirmada e ainda ativas, da validade mais próxima para a mais distante. */
+function ValidadesPanel({ history, alertDays, onAlertDaysChange, onSettle }: {
+  history: LabelRecord[];
+  alertDays: number;
+  onAlertDaysChange: (value: number) => void;
+  onSettle: (record: LabelRecord, status: "utilizada" | "consumida" | "descartada") => Promise<void>;
+}) {
+  const [clientQuery, setClientQuery] = useState("");
+  const [productQuery, setProductQuery] = useState("");
+  const [lotQuery, setLotQuery] = useState("");
+  const norm = (value: string) => value.toLocaleLowerCase("pt-BR").trim();
+  const expiryOf = (item: LabelRecord) => new Date(item.expires_at ?? `${item.expires_on}T23:59:00`);
+
+  const rows = useMemo(() => history
+    .filter((item) => (item.print_status ?? "confirmada") === "confirmada" && (item.label_status ?? "ativa") === "ativa")
+    .filter((item) =>
+      norm(item.client_name).includes(norm(clientQuery)) &&
+      norm(item.product_name).includes(norm(productQuery)) &&
+      norm(item.lot_number ?? "").includes(norm(lotQuery)))
+    .sort((a, b) => expiryOf(a).getTime() - expiryOf(b).getTime()), [history, clientQuery, productQuery, lotQuery]);
+
+  const today = format(new Date(), "yyyy-MM-dd");
+  const limit = addDays(new Date(), alertDays);
+  const dayOf = (item: LabelRecord) => format(expiryOf(item), "yyyy-MM-dd");
+  const vencidos = rows.filter((item) => dayOf(item) < today);
+  const hoje = rows.filter((item) => dayOf(item) === today);
+  const proximos = rows.filter((item) => dayOf(item) > today && expiryOf(item) <= limit);
+  const depois = rows.filter((item) => expiryOf(item) > limit);
+
+  const Group = ({ title, tone, items }: { title: string; tone: string; items: LabelRecord[] }) => (
+    <div className="mt-6">
+      <h2 className={`flex items-center gap-2 text-sm font-extrabold uppercase tracking-[0.14em] ${tone}`}>{title} <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{items.length}</span></h2>
+      <div className="mt-3 overflow-hidden rounded-2xl border bg-card">
+        {items.length === 0 ? <p className="p-6 text-center text-sm text-muted-foreground">Nada aqui.</p> : items.map((item) => (
+          <article key={item.id} className="grid gap-3 border-b p-4 last:border-0 md:grid-cols-[1.2fr_1fr_auto] md:items-center">
+            <div className="min-w-0">
+              <strong className="block truncate">{item.product_name}</strong>
+              <p className="truncate text-sm text-muted-foreground">{item.client_name}{item.lot_number ? ` · Lote ${item.lot_number}` : ""}</p>
+            </div>
+            <div className="text-sm">
+              <p className="font-semibold">Validade: {format(expiryOf(item), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
+              <p className="text-xs text-muted-foreground">Resp.: {item.responsible_name} · Emitida em {format(new Date(item.issued_at), "dd/MM/yyyy HH:mm")}{(item.reprint_count ?? 0) > 0 ? ` · ${item.reprint_count} reimpressão(ões)` : ""}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 md:grid-cols-1">
+              <Button variant="outline" size="sm" onClick={() => void onSettle(item, "utilizada")}>Utilizada</Button>
+              <Button variant="outline" size="sm" onClick={() => void onSettle(item, "consumida")}>Consumida</Button>
+              <Button variant="secondary" size="sm" onClick={() => void onSettle(item, "descartada")}>Descartada</Button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <section>
+      <PanelHeader eyebrow="PVPS" title="Painel de validades" description="Primeiro que vence, primeiro que sai. Somente etiquetas com impressão confirmada." />
+      <div className="mt-7 grid gap-3 rounded-2xl border bg-card p-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Field label="Cliente"><input value={clientQuery} onChange={(e) => setClientQuery(e.target.value)} placeholder="Filtrar por cliente" /></Field>
+        <Field label="Produto"><div className="relative"><Search className="absolute left-3 top-3.5 size-4 text-muted-foreground" /><input className="pl-9" value={productQuery} onChange={(e) => setProductQuery(e.target.value)} placeholder="Filtrar por produto" /></div></Field>
+        <Field label="Lote"><input value={lotQuery} onChange={(e) => setLotQuery(e.target.value)} placeholder="Filtrar por lote" /></Field>
+        <Field label="Antecedência do aviso (dias)"><input type="number" min={1} max={90} value={alertDays} onChange={(e) => onAlertDaysChange(Number(e.target.value))} /></Field>
+      </div>
+      <Group title="Vencidos" tone="text-destructive" items={vencidos} />
+      <Group title="Vencem hoje" tone="text-primary" items={hoje} />
+      <Group title={`Próximos de vencer (${alertDays} dia(s))`} tone="text-foreground" items={proximos} />
+      <Group title="Dentro do prazo" tone="text-muted-foreground" items={depois} />
+    </section>
+  );
 }

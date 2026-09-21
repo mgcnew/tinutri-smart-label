@@ -166,6 +166,8 @@ export type Database = {
           closed_at: string | null
           closed_by: string | null
           closed_reason: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
           expires_at: string | null
           expires_on: string
           id: string
@@ -179,13 +181,16 @@ export type Database = {
           lot_number: string | null
           opened_at: string | null
           opened_on: string
+          print_status: Database["public"]["Enums"]["print_status"]
           product_id: string | null
           product_name: string
           public_token: string
           quantity: number
+          reprint_count: number
           responsible_id: string | null
           responsible_name: string
           sector: string | null
+          source_label_id: string | null
           storage_condition: string | null
         }
         Insert: {
@@ -194,6 +199,8 @@ export type Database = {
           closed_at?: string | null
           closed_by?: string | null
           closed_reason?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           expires_at?: string | null
           expires_on: string
           id?: string
@@ -207,13 +214,16 @@ export type Database = {
           lot_number?: string | null
           opened_at?: string | null
           opened_on: string
+          print_status?: Database["public"]["Enums"]["print_status"]
           product_id?: string | null
           product_name: string
           public_token?: string
           quantity?: number
+          reprint_count?: number
           responsible_id?: string | null
           responsible_name: string
           sector?: string | null
+          source_label_id?: string | null
           storage_condition?: string | null
         }
         Update: {
@@ -222,6 +232,8 @@ export type Database = {
           closed_at?: string | null
           closed_by?: string | null
           closed_reason?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           expires_at?: string | null
           expires_on?: string
           id?: string
@@ -235,13 +247,16 @@ export type Database = {
           lot_number?: string | null
           opened_at?: string | null
           opened_on?: string
+          print_status?: Database["public"]["Enums"]["print_status"]
           product_id?: string | null
           product_name?: string
           public_token?: string
           quantity?: number
+          reprint_count?: number
           responsible_id?: string | null
           responsible_name?: string
           sector?: string | null
+          source_label_id?: string | null
           storage_condition?: string | null
         }
         Relationships: [
@@ -268,10 +283,62 @@ export type Database = {
           },
         ]
       }
+      label_events: {
+        Row: {
+          client_id: string
+          created_at: string
+          event_type: string
+          id: string
+          label_id: string
+          metadata: Json
+          quantity: number
+          user_id: string | null
+          user_name: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          label_id: string
+          metadata?: Json
+          quantity?: number
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          label_id?: string
+          metadata?: Json
+          quantity?: number
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "label_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "label_events_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "issued_labels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       label_settings: {
         Row: {
           client_id: string
           created_at: string
+          expiry_alert_days: number
           header_text: string
           height_mm: number
           id: string
@@ -282,6 +349,7 @@ export type Database = {
         Insert: {
           client_id: string
           created_at?: string
+          expiry_alert_days?: number
           header_text?: string
           height_mm?: number
           id?: string
@@ -292,6 +360,7 @@ export type Database = {
         Update: {
           client_id?: string
           created_at?: string
+          expiry_alert_days?: number
           header_text?: string
           height_mm?: number
           id?: string
@@ -512,6 +581,7 @@ export type Database = {
         | "consumida"
         | "descartada"
         | "cancelada"
+      print_status: "preparada" | "confirmada" | "falha" | "cancelada"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -657,6 +727,7 @@ export const Constants = {
         "descartada",
         "cancelada",
       ],
+      print_status: ["preparada", "confirmada", "falha", "cancelada"],
     },
   },
 } as const
