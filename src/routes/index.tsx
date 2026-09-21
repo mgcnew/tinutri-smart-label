@@ -1237,3 +1237,74 @@ function HistoryPanel({ history, onReprint, onDuplicate }: { history: LabelRecor
 
   return <section><PanelHeader eyebrow="Registros" title="Etiquetas emitidas" description="Últimas 100 emissões registradas."/><div className="mt-7 grid gap-3 rounded-2xl border bg-card p-4 sm:grid-cols-2 xl:grid-cols-4"><Field label="Produto"><div className="relative"><Search className="absolute left-3 top-3.5 size-4 text-muted-foreground"/><input className="pl-9" value={productQuery} onChange={(event) => setProductQuery(event.target.value)} placeholder="Pesquisar produto"/></div></Field><Field label="Responsável"><input value={responsibleQuery} onChange={(event) => setResponsibleQuery(event.target.value)} placeholder="Pesquisar responsável"/></Field><Field label="Cliente"><input value={clientQuery} onChange={(event) => setClientQuery(event.target.value)} placeholder="Pesquisar cliente"/></Field><Field label="Data"><input type="date" value={dateQuery} onChange={(event) => setDateQuery(event.target.value)}/></Field></div><div className="mt-4 overflow-hidden rounded-2xl border bg-card">{filtered.length === 0 ? <p className="p-8 text-center text-muted-foreground">Nenhuma etiqueta encontrada.</p> : filtered.map((h) => <article key={h.id} className="grid gap-4 border-b p-4 md:grid-cols-[1.2fr_1fr_auto] md:items-center"><div><strong>{h.product_name}</strong><p className="text-sm text-muted-foreground">{h.client_name}</p></div><div className="text-sm"><p>{h.responsible_name}</p><p className="text-xs text-muted-foreground">Lote: {h.lot_number || "—"} · Aberto: {format(new Date(`${h.opened_on}T12:00:00`), "dd/MM/yyyy")}</p><p className="text-xs font-semibold text-foreground">Validade: {format(new Date(`${h.expires_on}T12:00:00`), "dd/MM/yyyy")} · {h.quantity || 1} etiqueta(s)</p><time className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="size-3"/>{format(new Date(h.issued_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</time></div><div className="grid grid-cols-2 gap-2 md:grid-cols-1"><Button variant="outline" size="sm" onClick={() => onReprint(h)}><Printer/>Reimprimir</Button><Button variant="secondary" size="sm" onClick={() => onDuplicate(h)}><Copy/>Duplicar</Button></div></article>)}</div></section>;
 }
+
+/** Painel PVPS: etiquetas com impressão confirmada e ainda ativas, da validade mais próxima para a mais distante. */
+function ValidadesPanel({ history, alertDays, onAlertDaysChange, onSettle }: {
+  history: LabelRecord[];
+  alertDays: number;
+  onAlertDaysChange: (value: number) => void;
+  onSettle: (record: LabelRecord, status: "utilizada" | "consumida" | "descartada") => Promise<void>;
+}) {
+  const [clientQuery, setClientQuery] = useState("");
+  const [productQuery, setProductQuery] = useState("");
+  const [lotQuery, setLotQuery] = useState("");
+  const norm = (value: string) => value.toLocaleLowerCase("pt-BR").trim();
+  const expiryOf = (item: LabelRecord) => new Date(item.expires_at ?? `${item.expires_on}T23:59:00`);
+
+  const rows = useMemo(() => history
+    .filter((item) => (item.print_status ?? "confirmada") === "confirmada" && (item.label_status ?? "ativa") === "ativa")
+    .filter((item) =>
+      norm(item.client_name).includes(norm(clientQuery)) &&
+      norm(item.product_name).includes(norm(productQuery)) &&
+      norm(item.lot_number ?? "").includes(norm(lotQuery)))
+    .sort((a, b) => expiryOf(a).getTime() - expiryOf(b).getTime()), [history, clientQuery, productQuery, lotQuery]);
+
+  const today = format(new Date(), "yyyy-MM-dd");
+  const limit = addDays(new Date(), alertDays);
+  const dayOf = (item: LabelRecord) => format(expiryOf(item), "yyyy-MM-dd");
+  const vencidos = rows.filter((item) => dayOf(item) < today);
+  const hoje = rows.filter((item) => dayOf(item) === today);
+  const proximos = rows.filter((item) => dayOf(item) > today && expiryOf(item) <= limit);
+  const depois = rows.filter((item) => expiryOf(item) > limit);
+
+  const Group = ({ title, tone, items }: { title: string; tone: string; items: LabelRecord[] }) => (
+    <div className="mt-6">
+      <h2 className={`flex items-center gap-2 text-sm font-extrabold uppercase tracking-[0.14em] ${tone}`}>{title} <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{items.length}</span></h2>
+      <div className="mt-3 overflow-hidden rounded-2xl border bg-card">
+        {items.length === 0 ? <p className="p-6 text-center text-sm text-muted-foreground">Nada aqui.</p> : items.map((item) => (
+          <article key={item.id} className="grid gap-3 border-b p-4 last:border-0 md:grid-cols-[1.2fr_1fr_auto] md:items-center">
+            <div className="min-w-0">
+              <strong className="block truncate">{item.product_name}</strong>
+              <p className="truncate text-sm text-muted-foreground">{item.client_name}{item.lot_number ? ` · Lote ${item.lot_number}` : ""}</p>
+            </div>
+            <div className="text-sm">
+              <p className="font-semibold">Validade: {format(expiryOf(item), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
+              <p className="text-xs text-muted-foreground">Resp.: {item.responsible_name} · Emitida em {format(new Date(item.issued_at), "dd/MM/yyyy HH:mm")}{(item.reprint_count ?? 0) > 0 ? ` · ${item.reprint_count} reimpressão(ões)` : ""}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 md:grid-cols-1">
+              <Button variant="outline" size="sm" onClick={() => void onSettle(item, "utilizada")}>Utilizada</Button>
+              <Button variant="outline" size="sm" onClick={() => void onSettle(item, "consumida")}>Consumida</Button>
+              <Button variant="secondary" size="sm" onClick={() => void onSettle(item, "descartada")}>Descartada</Button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <section>
+      <PanelHeader eyebrow="PVPS" title="Painel de validades" description="Primeiro que vence, primeiro que sai. Somente etiquetas com impressão confirmada." />
+      <div className="mt-7 grid gap-3 rounded-2xl border bg-card p-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Field label="Cliente"><input value={clientQuery} onChange={(e) => setClientQuery(e.target.value)} placeholder="Filtrar por cliente" /></Field>
+        <Field label="Produto"><div className="relative"><Search className="absolute left-3 top-3.5 size-4 text-muted-foreground" /><input className="pl-9" value={productQuery} onChange={(e) => setProductQuery(e.target.value)} placeholder="Filtrar por produto" /></div></Field>
+        <Field label="Lote"><input value={lotQuery} onChange={(e) => setLotQuery(e.target.value)} placeholder="Filtrar por lote" /></Field>
+        <Field label="Antecedência do aviso (dias)"><input type="number" min={1} max={90} value={alertDays} onChange={(e) => onAlertDaysChange(Number(e.target.value))} /></Field>
+      </div>
+      <Group title="Vencidos" tone="text-destructive" items={vencidos} />
+      <Group title="Vencem hoje" tone="text-primary" items={hoje} />
+      <Group title={`Próximos de vencer (${alertDays} dia(s))`} tone="text-foreground" items={proximos} />
+      <Group title="Dentro do prazo" tone="text-muted-foreground" items={depois} />
+    </section>
+  );
+}
