@@ -393,7 +393,7 @@ function Index() {
       return;
     }
     // Histórico — RLS faz o filtro no banco; operador/admin_cliente verão somente seu cliente
-    const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity,public_token,label_kind,label_status,storage_condition,sector,opened_at,expires_at").order("issued_at", { ascending: false }).limit(200);
+    const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity,public_token,label_kind,label_status,storage_condition,sector,opened_at,expires_at,print_status,confirmed_at,reprint_count").order("issued_at", { ascending: false }).limit(500);
     setHistory((labels ?? []) as LabelRecord[]);
     setLoading(false);
   };
