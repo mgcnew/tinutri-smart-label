@@ -853,15 +853,16 @@ const navItems = [
   { id: "products", label: "Produtos", icon: PackagePlus },
   { id: "team", label: "Colaboradores", icon: Users },
   { id: "emit", label: "Emitir Etiquetas", icon: Printer },
+  { id: "validades", label: "Validades (PVPS)", icon: CalendarClock },
   { id: "history", label: "Histórico", icon: History },
 ] as const;
 
 const ROLE_TABS: Record<AppRole, AppTab[]> = {
-  admin_master: ["dashboard", "clients", "products", "team", "emit", "history"],
-  nutricionista: ["dashboard", "clients", "products", "team", "emit", "history"],
-  admin_cliente: ["dashboard", "products", "team", "emit", "history"],
-  gerente: ["dashboard", "products", "team", "emit", "history"],
-  operator: ["emit", "history"],
+  admin_master: ["dashboard", "clients", "products", "team", "emit", "validades", "history"],
+  nutricionista: ["dashboard", "clients", "products", "team", "emit", "validades", "history"],
+  admin_cliente: ["dashboard", "products", "team", "emit", "validades", "history"],
+  gerente: ["dashboard", "products", "team", "emit", "validades", "history"],
+  operator: ["emit", "validades", "history"],
 };
 
 function Nav({ role, tab, setTab, closeOnSelect = false }: { role: AppRole; tab: AppTab; setTab: (id: AppTab) => void; closeOnSelect?: boolean }) {
