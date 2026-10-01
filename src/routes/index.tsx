@@ -1,14 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { addDays, format } from "date-fns";
+import { addDays, format, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AlertTriangle, Building2, CalendarClock, CheckCircle2, Clock3, Copy, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Smartphone, Trash2, Users, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { cloneElement, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EmissionProductPicker } from "@/components/EmissionProductPicker";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { lovable } from "@/integrations/lovable";
+import { OperationalDashboard } from "@/components/OperationalDashboard";
+import { AuditActionDetails } from "@/components/AuditActionDetails";
+import { LabelDetails } from "@/components/LabelDetails";
+import { useFocusedRecord } from "@/hooks/use-focused-record";
+import { useOperationalOverview } from "@/hooks/use-operational-overview";
+import { type ExpiryWindow, type RecentAction } from "@/lib/dashboard";
+import { AuthLogin } from "@/components/AuthLogin";
 import { supabase } from "@/integrations/supabase/client";
-import { ClientQrCard } from "@/components/ClientQrCard";
+import { ClientsPanel } from "@/components/ClientsPanel";
+import { ProductsPanel } from "@/components/ProductsPanel";
+import { ValidadesPanel } from "@/components/ValidadesPanel";
 import { LabelPreview } from "@/components/LabelPreview";
 import { CLIENT_CODE_KEY } from "./e.$code";
 import { claimFirstAdmin } from "@/lib/admin.functions";
@@ -46,6 +56,8 @@ type QueueItem = {
 };
 
 type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number; public_token?: string | null; label_kind?: string | null; label_status?: string | null; storage_condition?: string | null; sector?: string | null; opened_at?: string | null; expires_at?: string | null; print_status?: string | null; confirmed_at?: string | null; reprint_count?: number | null };
+type ActivityRecorder = (action: string, clientId: string, entityType: string, entityId: string, name: string, before: Record<string, unknown>, after: Record<string, unknown>) => Promise<void>;
+
 type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "validades" | "history";
 type AppRole = "admin_master" | "nutricionista" | "admin_cliente" | "gerente" | "operator";
 
@@ -265,6 +277,7 @@ function Index() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [profileClientId, setProfileClientId] = useState<string | null>(null);
   const [carteira, setCarteira] = useState<string[]>([]);
@@ -272,7 +285,17 @@ function Index() {
   const [products, setProducts] = useState<Product[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [history, setHistory] = useState<LabelRecord[]>([]);
+  const [overviewRevision, setOverviewRevision] = useState(0);
+  const [dashboardClient, setDashboardClient] = useState("");
+  const [validityWindow, setValidityWindow] = useState<ExpiryWindow>("all");
+  const [detailLabelId, setDetailLabelId] = useState<string | null>(null);
+  const [detailAction, setDetailAction] = useState<RecentAction | null>(null);
+  const [focusedEntityId, setFocusedEntityId] = useState<string | null>(null);
+  const [activityWarning, setActivityWarning] = useState<string | null>(null);
   const [tab, setTab] = useState<AppTab>("dashboard");
+  const overviewScope = dashboardClient && clients.some((client) => client.id === dashboardClient)
+    ? [dashboardClient] : role === "admin_master" ? null : clients.map((client) => client.id);
+  const overview = useOperationalOverview(Boolean(userId && role && !loading && (tab === "dashboard" || tab === "validades")), overviewScope, overviewRevision);
   const [message, setMessage] = useState("");
   const [selectedClient, setSelectedClient] = useState("");
   const [selectedProduct, setSelectedProduct] = useState("");
@@ -291,6 +314,9 @@ function Index() {
   const [labelDraft, setLabelDraft] = useState<{ product: string; responsible: string; opened: string; expires: string; lot: string } | null>(null);
   const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_SETTINGS);
   const [showPrinterSettings, setShowPrinterSettings] = useState(false);
+  const [emissionBusy, setEmissionBusy] = useState<string | null>(null);
+  const emissionLock = useRef(false);
+  const settingsButton = useRef<HTMLButtonElement | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [niimbotPreview, setNiimbotPreview] = useState<NiimbotPreview | null>(null);
   const [lastFailedPrint, setLastFailedPrint] = useState<QueueItem[] | null>(null);
@@ -318,84 +344,133 @@ function Index() {
   };
 
   const refresh = async () => {
-    const { data: auth } = await supabase.auth.getUser();
-    const id = auth.user?.id ?? null;
-    setUserId(id);
-    if (!id) { setLoading(false); return; }
-    const [{ data: roles }, { data: profile }] = await Promise.all([
-      supabase.from("user_roles").select("role").eq("user_id", id).maybeSingle(),
-      supabase.from("profiles").select("client_id,name,email").eq("user_id", id).maybeSingle(),
-    ]);
-    const rawRole = roles?.role as string | undefined;
-    const currentRole: AppRole | undefined =
-      rawRole === "operator" ? "operator"
-      : rawRole === "nutricionista" ? "nutricionista"
-      : rawRole === "admin_cliente" ? "admin_cliente"
-      : rawRole === "gerente" ? "gerente"
-      : (rawRole === "admin_master" || rawRole === "admin") ? "admin_master"
-      : undefined;
-    setUserName(profile?.name ?? profile?.email ?? "");
-    // Tab padrão por perfil — aplicar apenas na primeira carga (evita resetar a aba após imprimir/salvar)
-    setRole((prevRole) => {
-      if (prevRole === null && currentRole) {
-        if (currentRole === "operator") setTab("emit");
-        else if (currentRole === "admin_cliente" || currentRole === "gerente" || currentRole === "nutricionista") setTab("dashboard");
-      }
-      return currentRole ?? null;
-    });
-    const ownClient = profile?.client_id ?? null;
-    setProfileClientId(ownClient);
-    // Carteira da nutricionista
-    let carteiraIds: string[] = [];
-    if (currentRole === "nutricionista") {
-      const { data: cart } = await supabase.from("nutritionist_clients").select("client_id").eq("nutritionist_user_id", id);
-      carteiraIds = (cart ?? []).map((r) => r.client_id as string);
-      setCarteira(carteiraIds);
-    } else {
-      setCarteira([]);
-    }
-    const [{ data: clientRows }, { data: productRows }, { data: collaboratorRows }] = await Promise.all([
-      supabase.from("clients").select("id,name,legal_name,cnpj,city,state,active,status,responsible_name,email,phone,address,plan,public_code,created_at").order("name"),
-      supabase.from("products").select("*").eq("active", true).order("name"),
-      supabase.from("collaborators").select("id,client_id,name,role_title,active").eq("active", true).order("name"),
-    ]);
-    // Filtrar conforme perfil (segurança em profundidade — RLS já restringe no banco)
-    const allClients = (clientRows ?? []) as Client[];
-    const allProducts = (productRows ?? []) as Product[];
-    const allCollab = (collaboratorRows ?? []) as Collaborator[];
-    const allowedClientIds: string[] | null =
-      currentRole === "admin_master" ? null
-      : currentRole === "nutricionista" ? carteiraIds
-      : ownClient ? [ownClient] : [];
-    const filterByClient = <T extends { client_id?: string; id?: string }>(rows: T[], keyIsId = false): T[] => {
-      if (allowedClientIds === null) return rows;
-      const set = new Set(allowedClientIds);
-      return rows.filter((r) => set.has((keyIsId ? r.id : r.client_id) as string));
+    setLoadingError(null);
+    const controller = new AbortController();
+    let phase = "verificar sua sessão";
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const checkActive = () => {
+      if (controller.signal.aborted) throw new Error("Tempo de resposta excedido.");
     };
-    setClients(allowedClientIds === null ? allClients : allClients.filter((c) => allowedClientIds!.includes(c.id)));
-    setProducts(filterByClient(allProducts));
-    setCollaborators(filterByClient(allCollab));
-    if (ownClient) setSelectedClient(ownClient);
-    // QR Code do estabelecimento: valida se o usuário realmente pertence/tem acesso àquele cliente
-    try {
-      const pendingCode = window.localStorage.getItem(CLIENT_CODE_KEY);
-      if (pendingCode) {
-        window.localStorage.removeItem(CLIENT_CODE_KEY);
-        const visible = allowedClientIds === null ? allClients : allClients.filter((c) => allowedClientIds!.includes(c.id));
-        const target = visible.find((c) => c.public_code === pendingCode);
-        if (target) { setSelectedClient(target.id); setTab("emit"); setMessage(`Ambiente de ${target.name} aberto.`); }
-        else setMessage("Você não tem acesso ao estabelecimento deste QR Code.");
+    const load = async () => {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      checkActive();
+      if (authError && authError.name !== "AuthSessionMissingError") throw authError;
+      const id = auth.user?.id ?? null;
+      setUserId(id);
+      if (!id) return;
+      phase = "carregar seu perfil de acesso";
+      const [rolesResult, profileResult] = await Promise.all([
+        supabase.from("user_roles").select("role").eq("user_id", id).abortSignal(controller.signal).maybeSingle(),
+        supabase.from("profiles").select("client_id,name,email").eq("user_id", id).abortSignal(controller.signal).maybeSingle(),
+      ]);
+      checkActive();
+      if (rolesResult.error) throw rolesResult.error;
+      if (profileResult.error) throw profileResult.error;
+      const roles = rolesResult.data;
+      const profile = profileResult.data;
+      const rawRole = roles?.role as string | undefined;
+      const currentRole: AppRole | undefined =
+        rawRole === "operator" ? "operator"
+        : rawRole === "nutricionista" ? "nutricionista"
+        : rawRole === "admin_cliente" ? "admin_cliente"
+        : rawRole === "gerente" ? "gerente"
+        : (rawRole === "admin_master" || rawRole === "admin") ? "admin_master"
+        : undefined;
+      setUserName(profile?.name ?? profile?.email ?? "");
+      // Tab padrão por perfil — aplicar apenas na primeira carga (evita resetar a aba após imprimir/salvar)
+      setRole((prevRole) => {
+        if (prevRole === null && currentRole) {
+          if (currentRole === "operator") setTab("dashboard");
+          else if (currentRole === "admin_cliente" || currentRole === "gerente" || currentRole === "nutricionista") setTab("dashboard");
+        }
+        return currentRole ?? null;
+      });
+      const ownClient = profile?.client_id ?? null;
+      setProfileClientId(ownClient);
+      // Carteira da nutricionista
+      let carteiraIds: string[] = [];
+      if (currentRole === "nutricionista") {
+        phase = "carregar sua carteira de clientes";
+        const { data: cart, error: carteiraError } = await supabase.from("nutritionist_clients").select("client_id").eq("nutritionist_user_id", id).abortSignal(controller.signal);
+        checkActive();
+        if (carteiraError) throw carteiraError;
+        carteiraIds = (cart ?? []).map((r) => r.client_id as string);
+        setCarteira(carteiraIds);
+      } else {
+        setCarteira([]);
       }
-    } catch { /* ignore */ }
-    const suspendedOwn = allClients.find((c) => c.id === ownClient && c.status === "suspensa");
-    if (suspendedOwn) {
+      phase = "carregar os dados da sua estação";
+      const [clientsResult, productsResult, collaboratorsResult] = await Promise.all([
+        supabase.from("clients").select("id,name,legal_name,cnpj,city,state,active,status,responsible_name,email,phone,address,plan,public_code,created_at").order("name").abortSignal(controller.signal),
+        supabase.from("products").select("*").eq("active", true).order("name").abortSignal(controller.signal),
+        supabase.from("collaborators").select("id,client_id,name,role_title,active").eq("active", true).order("name").abortSignal(controller.signal),
+      ]);
+      checkActive();
+      for (const result of [clientsResult, productsResult, collaboratorsResult]) {
+        if (result.error) throw result.error;
+      }
+      const clientRows = clientsResult.data;
+      const productRows = productsResult.data;
+      const collaboratorRows = collaboratorsResult.data;
+      // Filtrar conforme perfil (segurança em profundidade — RLS já restringe no banco)
+      const allClients = (clientRows ?? []) as Client[];
+      const allProducts = (productRows ?? []) as Product[];
+      const allCollab = (collaboratorRows ?? []) as Collaborator[];
+      const allowedClientIds: string[] | null =
+        currentRole === "admin_master" ? null
+        : currentRole === "nutricionista" ? carteiraIds
+        : ownClient ? [ownClient] : [];
+      const filterByClient = <T extends { client_id?: string; id?: string }>(rows: T[], keyIsId = false): T[] => {
+        if (allowedClientIds === null) return rows;
+        const set = new Set(allowedClientIds);
+        return rows.filter((r) => set.has((keyIsId ? r.id : r.client_id) as string));
+      };
+      setClients(allowedClientIds === null ? allClients : allClients.filter((c) => allowedClientIds!.includes(c.id)));
+      setProducts(filterByClient(allProducts));
+      setCollaborators(filterByClient(allCollab));
+      if (ownClient) setSelectedClient(ownClient);
+      // QR Code do estabelecimento: valida se o usuário realmente pertence/tem acesso àquele cliente
+      try {
+        const pendingCode = window.localStorage.getItem(CLIENT_CODE_KEY);
+        if (pendingCode) {
+          window.localStorage.removeItem(CLIENT_CODE_KEY);
+          const visible = allowedClientIds === null ? allClients : allClients.filter((c) => allowedClientIds!.includes(c.id));
+          const target = visible.find((c) => c.public_code === pendingCode);
+          if (target) { setSelectedClient(target.id); setTab("emit"); setMessage(`Ambiente de ${target.name} aberto.`); }
+          else setMessage("Você não tem acesso ao estabelecimento deste QR Code.");
+        }
+      } catch { /* ignore */ }
+      const suspendedOwn = allClients.find((c) => c.id === ownClient && c.status === "suspensa");
+      if (suspendedOwn) return;
+      // Histórico — RLS faz o filtro no banco; operador/admin_cliente verão somente seu cliente
+      phase = "carregar o histórico de etiquetas";
+      const { data: labels, error: historyError } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity,public_token,label_kind,label_status,storage_condition,sector,opened_at,expires_at,print_status,confirmed_at,reprint_count").order("issued_at", { ascending: false }).limit(500).abortSignal(controller.signal);
+      checkActive();
+      if (historyError) throw historyError;
+      setHistory((labels ?? []) as LabelRecord[]);
+      setOverviewRevision((value) => value + 1);
+    };
+    try {
+      await Promise.race([
+        load(),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => {
+            reject(new Error("Tempo de resposta excedido."));
+            controller.abort();
+          }, 20000);
+        }),
+      ]);
+    } catch (error) {
+      const timedOut = controller.signal.aborted;
+      controller.abort();
+      console.error(`[Estação] Falha ao ${phase}`, error);
+      setLoadingError(timedOut
+        ? `O servidor demorou para ${phase}. Verifique sua conexão e tente novamente.`
+        : `Não foi possível ${phase}. Tente novamente. Se continuar, entre em contato com a TiNutri.`);
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
       setLoading(false);
-      return;
     }
-    // Histórico — RLS faz o filtro no banco; operador/admin_cliente verão somente seu cliente
-    const { data: labels } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity,public_token,label_kind,label_status,storage_condition,sector,opened_at,expires_at,print_status,confirmed_at,reprint_count").order("issued_at", { ascending: false }).limit(500);
-    setHistory((labels ?? []) as LabelRecord[]);
-    setLoading(false);
   };
 
   useEffect(() => { void refresh(); }, []);
@@ -406,15 +481,21 @@ function Index() {
   const product = products.find((item) => item.id === selectedProduct);
   const responsible = collaborators.find((item) => item.id === selectedResponsible);
   const client = clients.find((item) => item.id === selectedClient);
-  const effectiveShelfDays = Number(shelfDays) > 0 ? Number(shelfDays) : product?.shelf_life_days ?? 0;
-  const expiresOn = useMemo(() => product && openedOn ? format(addDays(new Date(`${openedOn}T12:00:00`), effectiveShelfDays), "dd/MM/yyyy") : "—", [product, openedOn, effectiveShelfDays]);
-  const openedAtPreview = useMemo(() => new Date(`${labelDraft?.opened || openedOn}T${openedTime || "00:00"}:00`), [labelDraft?.opened, openedOn, openedTime]);
-  const expiresAtPreview = useMemo(() => addDays(openedAtPreview, effectiveShelfDays), [openedAtPreview, effectiveShelfDays]);
+  const enteredShelfDays = Number(shelfDays);
+  const effectiveShelfDays = shelfDays.trim() && Number.isInteger(enteredShelfDays) && enteredShelfDays >= 0 && enteredShelfDays <= 3650 ? enteredShelfDays : product?.shelf_life_days ?? 0;
+  const rawOpenedAt = new Date(`${labelDraft?.opened || openedOn}T${openedTime || "00:00"}:00`);
+  const openedAtPreview = isValid(rawOpenedAt) ? rawOpenedAt : new Date();
+  const calculatedExpiry = addDays(openedAtPreview, effectiveShelfDays);
+  const rawExpiryOverride = labelDraft?.expires ? new Date(`${labelDraft.expires}T${openedTime || "00:00"}:00`) : calculatedExpiry;
+  const expiresAtPreview = isValid(rawExpiryOverride) ? rawExpiryOverride : calculatedExpiry;
+  const expiresOn = product ? format(expiresAtPreview, "dd/MM/yyyy 'às' HH:mm") : "—";
+  const emissionError = /não foi possível|não encontrada|confira|selecione|exige|falha/i.test(message);
+  const emissionReady = Boolean(client && product && responsible && (!labelDraft || (labelDraft.opened && labelDraft.expires)) && isValid(rawOpenedAt) && isValid(rawExpiryOverride) && shelfDays.trim() && Number.isInteger(enteredShelfDays) && enteredShelfDays >= 0 && enteredShelfDays <= 3650 && Number.isInteger(Number(quantity)) && Number(quantity) >= 1 && Number(quantity) <= 200 && (!product.requires_lot || (labelDraft?.lot ?? lot).trim()));
   const previewLabel: PrintableLabel = {
     kind,
     product: labelDraft?.product || product?.name || "NOME DO PRODUTO",
     opened: format(openedAtPreview, "dd/MM/yyyy HH:mm"),
-    expires: labelDraft?.expires ? format(new Date(`${labelDraft.expires}T${openedTime || "00:00"}:00`), "dd/MM/yyyy HH:mm") : format(expiresAtPreview, "dd/MM/yyyy HH:mm"),
+    expires: format(expiresAtPreview, "dd/MM/yyyy HH:mm"),
     storage: storage || undefined,
     sector: sector.trim() || undefined,
     lot: (labelDraft?.lot ?? lot) || undefined,
@@ -427,7 +508,29 @@ function Index() {
 
   if (loading) return <main className="grid min-h-screen place-items-center bg-background"><p className="font-semibold text-muted-foreground">Preparando sua estação…</p></main>;
 
-  if (!userId) return <Login />;
+  if (loadingError) return (
+    <main className="grid min-h-screen place-items-center bg-background p-5">
+      <section className="w-full max-w-md rounded-2xl border bg-card p-7 text-center shadow-sm">
+        <Brand />
+        <h1 className="mt-6 text-xl font-bold">Não conseguimos abrir sua estação</h1>
+        <p role="alert" className="mt-3 text-sm leading-6 text-muted-foreground">{loadingError}</p>
+        <div className="mt-6 grid gap-3">
+          <Button onClick={() => { setLoading(true); void refresh(); }}>Tentar novamente</Button>
+          <Button variant="outline" onClick={async () => {
+            try {
+              const { error } = await supabase.auth.signOut({ scope: "local" });
+              if (error) throw error;
+              window.location.reload();
+            } catch {
+              setLoadingError("Não foi possível sair da conta. Verifique sua conexão e tente novamente.");
+            }
+          }}>Voltar para o login</Button>
+        </div>
+      </section>
+    </main>
+  );
+
+  if (!userId) return <AuthLogin />;
 
   // Empresa suspensa bloqueia uso operacional (dados preservados)
   {
@@ -460,10 +563,30 @@ function Index() {
     </main>
   );
 
+  const navigateTab = (nextTab: AppTab) => {
+    setFocusedEntityId(null);
+    if (nextTab === "validades") setValidityWindow("all");
+    setTab(nextTab);
+  };
+  const canOpenAuditEntity = detailAction?.entity_id && role !== "operator" && (
+    (detailAction.entity_type === "product" && products.some((item) => item.id === detailAction.entity_id))
+    || (detailAction.entity_type === "collaborator" && collaborators.some((item) => item.id === detailAction.entity_id))
+    || (detailAction.entity_type === "client" && role === "admin_master" && clients.some((item) => item.id === detailAction.entity_id))
+  );
+  const recordActivity: ActivityRecorder = async (action, clientId, entityType, entityId, name, before, after) => {
+    try {
+      const { error } = await supabase.from("activity_logs").insert({ user_id: userId, user_name: userName || null, client_id: clientId, action, entity_type: entityType, entity_id: entityId, metadata: { name, before, after } as never });
+      if (error) throw error;
+    } catch {
+      setActivityWarning("O cadastro foi salvo, mas não foi possível registrar esta ação no histórico.");
+    }
+  };
+
   const buildCurrentItem = async (): Promise<QueueItem | null> => {
     if (!client || !product || !responsible) { setMessage("Selecione cliente, produto e responsável."); return null; }
     if (product.requires_lot && !(labelDraft?.lot ?? lot).trim()) { setMessage("Este produto exige número de lote."); return null; }
-    const copies = Math.max(1, Math.min(200, Math.floor(Number(quantity) || 1)));
+    if (!emissionReady) { setMessage("Confira datas, validade e quantidade (1 a 200 etiquetas)."); return null; }
+    const copies = Number(quantity);
     const issued = new Date();
     const effectiveOpened = labelDraft?.opened || openedOn;
     const expiry = labelDraft?.expires || format(addDays(new Date(`${effectiveOpened}T12:00:00`), effectiveShelfDays), "yyyy-MM-dd");
@@ -525,10 +648,17 @@ function Index() {
 
   /** Registra um evento na linha do tempo da etiqueta (emissão, confirmação, falha, reimpressão, baixa). */
   const logLabelEvent = async (labelId: string, clientId: string, eventType: string, quantity = 1, metadata: Record<string, unknown> = {}) => {
-    await supabase.from("label_events").insert({
-      label_id: labelId, client_id: clientId, event_type: eventType,
-      user_id: userId, user_name: userName || null, quantity, metadata: metadata as never,
-    } as never);
+    try {
+      const { error } = await supabase.from("label_events").insert({
+        label_id: labelId, client_id: clientId, event_type: eventType,
+        user_id: userId, user_name: userName || null, quantity, metadata: metadata as never,
+      });
+      if (error) throw error;
+      return true;
+    } catch {
+      setActivityWarning("A etiqueta foi atualizada, mas não foi possível registrar esta ação na linha do tempo.");
+      return false;
+    }
   };
 
   const dispatchPrint = async (items: QueueItem[]) => {
@@ -571,14 +701,14 @@ function Index() {
   /** Impressão não confirmada / com erro: nunca dá baixa no PVPS. */
   const markPrintFailed = async (rows: { id: string; client_id: string }[], reason: string) => {
     if (rows.length === 0) return;
-    await supabase.from("issued_labels").update({ print_status: "falha" } as never).in("id", rows.map((r) => r.id));
+    const { error } = await supabase.from("issued_labels").update({ print_status: "falha" } as never).in("id", rows.map((r) => r.id));
+    if (error) throw new Error("Não foi possível registrar a falha da impressão.");
     await Promise.all(rows.map((r) => logLabelEvent(r.id, r.client_id, "falha_impressao", 1, { reason })));
   };
 
   const confirmPendingPrint = async () => {
     const pending = pendingPrint;
     if (!pending) return;
-    setPendingPrint(null);
     const ids = pending.rows.map((r) => r.id);
     const { error } = await supabase
       .from("issued_labels")
@@ -586,6 +716,7 @@ function Index() {
       .in("id", ids)
       .eq("print_status", "preparada"); // evita baixa duplicada
     if (error) { setMessage("Não foi possível confirmar a saída. Tente novamente."); return; }
+    setPendingPrint(null);
     await Promise.all(pending.rows.map((r) => logLabelEvent(r.id, r.client_id, "impressao_confirmada")));
     setMessage(`Saída confirmada: ${pending.total} etiqueta(s) de ${pending.product} entraram no controle de validades.`);
     await refresh();
@@ -594,18 +725,29 @@ function Index() {
   const rejectPendingPrint = async () => {
     const pending = pendingPrint;
     if (!pending) return;
-    setPendingPrint(null);
     await markPrintFailed(pending.rows, "nao_confirmada_pelo_usuario");
+    setPendingPrint(null);
     setMessage("Impressão marcada como falha. Nenhuma saída foi registrada — você pode imprimir novamente.");
     await refresh();
   };
 
   /** Baixa manual no painel PVPS (utilizada, consumida ou descartada). */
   const settleLabel = async (record: LabelRecord, status: "utilizada" | "consumida" | "descartada") => {
-    const { error } = await supabase.from("issued_labels").update({ label_status: status } as never).eq("id", record.id).eq("label_status", "ativa");
-    if (error) { setMessage("Não foi possível registrar a baixa."); return; }
+    const { data: settled, error } = await supabase.from("issued_labels").update({ label_status: status, closed_at: new Date().toISOString(), closed_by: userId } as never).eq("id", record.id).eq("label_status", "ativa").eq("print_status", "confirmada").select("id").maybeSingle();
+    if (error) { setMessage("Não foi possível registrar a baixa."); return false; }
+    if (!settled) { setMessage("Esta etiqueta já recebeu baixa. Atualize o panorama."); await refresh(); return false; }
     await logLabelEvent(record.id, record.client_id, `baixa_${status}`);
     await refresh();
+    return true;
+  };
+
+  const performEmission = async (action: string, work: () => Promise<unknown>) => {
+    if (emissionLock.current) return;
+    if (pendingPrint && ["now", "queue", "retry"].includes(action)) { setMessage("Confirme a impressão anterior antes de enviar outras etiquetas."); return; }
+    emissionLock.current = true; setEmissionBusy(action);
+    try { await work(); }
+    catch { setMessage("Não foi possível concluir a operação. Confira sua conexão e tente novamente."); }
+    finally { emissionLock.current = false; setEmissionBusy(null); }
   };
 
   const printNow = async () => {
@@ -708,93 +850,86 @@ function Index() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b bg-card/95 px-4 py-3 backdrop-blur sm:px-7">
-        <div className="mx-auto grid max-w-7xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+    <div className="workspace-shell min-h-screen bg-background">
+      <AuditActionDetails action={detailAction?.source === "activity" ? detailAction : null} onClose={() => setDetailAction(null)} onOpenEntity={canOpenAuditEntity && detailAction ? () => {
+        setFocusedEntityId(detailAction.entity_id!);
+        setTab(detailAction.entity_type === "product" ? "products" : detailAction.entity_type === "collaborator" ? "team" : "clients");
+        setDetailAction(null);
+      } : undefined} />
+      <LabelDetails labelId={detailLabelId} action={detailAction?.source === "activity" ? null : detailAction} revision={overviewRevision} onClose={() => { setDetailLabelId(null); setDetailAction(null); }} onSettle={settleLabel} onReprint={reprintLabel} />
+      <header className="workspace-header sticky top-0 z-30 border-b bg-card/95 px-4 backdrop-blur sm:px-6">
+        <div className="workspace-topbar flex min-w-0 items-center gap-3">
           <div className="lg:hidden">
             <Sheet>
               <SheetTrigger asChild><Button variant="ghost" size="icon" aria-label="Abrir menu"><Menu /></Button></SheetTrigger>
-              <SheetContent side="left" className="w-[86%] max-w-xs p-5">
+              <SheetContent side="left" className="flex w-[86%] max-w-xs flex-col gap-0 p-5">
                 <SheetHeader className="border-b pb-5 text-left"><SheetTitle><Brand /></SheetTitle></SheetHeader>
-                <nav className="mt-6 space-y-2"><Nav role={role} tab={tab} setTab={setTab} closeOnSelect /></nav>
+                <nav aria-label="Menu principal" className="mt-6 min-h-0 flex-1 space-y-2 overflow-y-auto"><Nav role={role} tab={tab} setTab={navigateTab} closeOnSelect /></nav>
+                <WorkspaceActions role={role} closeOnSelect />
               </SheetContent>
             </Sheet>
           </div>
           <Brand />
-          <div className="flex items-center gap-2 justify-self-end">
-            {role === "admin_master" && (
-              <Button asChild variant="outline" size="sm"><Link to="/admin">Área Master</Link></Button>
-            )}
-            <Button variant="ghost" size="icon" aria-label="Sair" onClick={async () => { await supabase.auth.signOut(); location.reload(); }}><LogOut /></Button>
-          </div>
+          <UserStrip userName={userName} role={role} clientName={clients.find((c) => c.id === (profileClientId ?? selectedClient))?.name ?? null} />
         </div>
-        <UserStrip userName={userName} role={role} clientName={clients.find((c) => c.id === (profileClientId ?? selectedClient))?.name ?? null} />
       </header>
-      <div className="mx-auto flex max-w-7xl gap-8 px-4 py-6 sm:px-7 lg:py-8">
-        <aside className="hidden w-56 shrink-0 lg:block">
-          <p className="mb-3 px-3 text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">Menu principal</p>
-          <nav className="space-y-2">
-          <Nav role={role} tab={tab} setTab={setTab} />
-          </nav>
+      <div className="workspace-layout flex">
+        <aside className="workspace-sidebar hidden w-60 shrink-0 lg:block">
+          <div className="workspace-sidebar-content flex flex-col">
+            <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Navegação</p>
+            <nav aria-label="Menu principal" className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+              <Nav role={role} tab={tab} setTab={navigateTab} />
+            </nav>
+            <WorkspaceActions role={role} />
+          </div>
         </aside>
-        <main className="min-w-0 flex-1">
-          {tab === "dashboard" && <DashboardPanel clients={clients} products={products} collaborators={collaborators} history={history} setTab={setTab} />}
-          {tab === "emit" && <section>
-            <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">Estação de etiquetagem</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Emitir nova etiqueta</h1>
-            <p className="mt-2 text-muted-foreground">Selecione, confira e imprima. A validade é calculada automaticamente.</p>
-            <div className="mt-5 rounded-2xl border bg-card p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">Configuração da Impressora</p>
-                  <p className="mt-1 truncate text-sm font-semibold">
-                    {PRINTER_TYPES.find(t => t.id === printerSettings.type)?.label}
-                    {" · "}
-                    {CONNECTION_MODES.find(c => c.id === printerSettings.connection)?.label}
-                    {" · "}
-                    {printerSettings.size.replace("x", " × ")} mm
-                    {printerSettings.connection === "wifi" && printerSettings.ip ? ` · ${printerSettings.ip}` : ""}
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setShowPrinterSettings(v => !v)}>
-                  <Settings2 /> {showPrinterSettings ? "Fechar" : "Configurar"}
-                </Button>
-              </div>
-              {showPrinterSettings && (
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <Field label="Tipo da impressora">
+        <main className="workspace-main min-w-0 flex-1">
+          {activityWarning && <div role="alert" className="mb-5 flex items-center gap-3 rounded-xl border border-accent bg-card p-4 text-sm"><p className="flex-1">{activityWarning}</p><Button variant="ghost" size="icon" aria-label="Fechar aviso" onClick={() => setActivityWarning(null)}><X /></Button></div>}
+          {tab === "dashboard" && <OperationalDashboard overview={overview} clients={clients} userName={userName} role={role} clientId={dashboardClient} onClientChange={setDashboardClient} onNavigate={navigateTab} onWindow={(window) => { setValidityWindow(window); setTab("validades"); }} onLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} onAction={(action) => { setDetailAction(action); setDetailLabelId(action.source === "activity" ? null : action.label_id); }} />}
+          {tab === "emit" && <section className="emission-page space-y-6">
+            <header className="dashboard-heading"><div><p className="text-xs font-semibold uppercase tracking-[.14em] text-primary">Estação de etiquetagem</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Emitir etiquetas</h1><p className="mt-2 text-sm text-muted-foreground">Prepare uma etiqueta ou monte uma fila para imprimir em lote.</p></div></header>
+            <div className="emit-printer flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
+              <div className="flex min-w-0 items-center gap-3"><Printer className="size-5 shrink-0 text-primary" /><div className="min-w-0"><p className="text-xs text-muted-foreground">Impressora e etiqueta</p><p className="mt-1 break-words text-sm font-medium">{PRINTER_TYPES.find(t => t.id === printerSettings.type)?.label} · {printerSettings.size.replace("x", " × ")} mm <span className="text-xs text-muted-foreground">· {printerSettings.type === "niimbot" ? "PNG para o app NiiMbot" : CONNECTION_MODES.find(c => c.id === printerSettings.connection)?.label}</span></p></div></div>
+              <Button ref={settingsButton} variant="outline" className="min-h-11" onClick={() => { setMessage(""); setShowPrinterSettings(true); }}><Settings2 />Configurações</Button>
+            </div>
+            <Dialog open={showPrinterSettings} onOpenChange={setShowPrinterSettings}>
+              <DialogContent className="client-dialog printer-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl bg-white p-0" overlayClassName="bg-black/35 backdrop-blur-[2px]" onCloseAutoFocus={(event) => { event.preventDefault(); settingsButton.current?.focus(); }}>
+                <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 text-left sm:px-6"><DialogTitle>Configurações de impressão</DialogTitle><DialogDescription className="mt-2 text-xs leading-relaxed">As alterações são salvas automaticamente neste navegador.</DialogDescription></DialogHeader>
+                <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <EmitField label="Tipo da impressora">
                     <select value={printerSettings.type} onChange={(e) => updateSettings({ type: e.target.value as PrinterType })}>
                       {PRINTER_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
                     </select>
-                  </Field>
-                  <Field label="Modo de conexão">
+                  </EmitField>
+                  <EmitField label="Modo de conexão">
                     <select value={printerSettings.connection} onChange={(e) => updateSettings({ connection: e.target.value as ConnectionMode })}>
                       {CONNECTION_MODES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                     </select>
-                  </Field>
-                  <Field label="IP da impressora" hint="Ex.: 192.168.1.200">
+                  </EmitField>
+                  {printerSettings.connection === "wifi" && <EmitField label="IP da impressora" hint="Ex.: 192.168.1.200">
                     <input value={printerSettings.ip} placeholder="192.168.1.200" onChange={(e) => updateSettings({ ip: e.target.value })} />
-                  </Field>
-                  <Field label="Tamanho da etiqueta">
+                  </EmitField>}
+                  <EmitField label="Tamanho da etiqueta">
                     <select value={printerSettings.size} onChange={(e) => updateSettings({ size: e.target.value as LabelSize })}>
                       <option value="60x40">60 mm × 40 mm (padrão)</option>
                       <option value="50x30">50 mm × 30 mm (opcional)</option>
                     </select>
-                  </Field>
-                  <Field label="Avisar “próximo de vencer” com quantos dias de antecedência" hint="1 a 90 dias">
+                  </EmitField>
+                  <EmitField label="Avisar “próximo de vencer” com quantos dias de antecedência" hint="1 a 90 dias">
                     <input type="number" min={1} max={90} value={alertDays} onChange={(e) => updateAlertDays(Number(e.target.value))} />
-                  </Field>
+                  </EmitField>
                   <p className="rounded-xl border bg-secondary/40 p-3 text-xs text-muted-foreground sm:col-span-2">
                     A etiqueta imprime data e hora de manipulação/abertura e de validade, além do QR Code individual de rastreio.
                   </p>
 
                   <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
-                    <Button variant="outline" onClick={testPrint}><Printer /> Imprimir 1 etiqueta de teste</Button>
+                    <Button variant="outline" disabled={Boolean(emissionBusy) || Boolean(pendingPrint)} onClick={() => { setMessage(""); void performEmission("test", testPrint); }}><Printer /> Imprimir 1 etiqueta de teste</Button>
                     {printerSettings.type === "niimbot" && (
                       <p className="text-xs text-muted-foreground">NiiMbot: a etiqueta será baixada como PNG para envio pelo app oficial.</p>
                     )}
                   </div>
-                  <div className="sm:col-span-2 rounded-xl border border-primary/25 bg-secondary/50 p-4 text-xs leading-6">
+                  {printerSettings.type === "elgin" && <details className="sm:col-span-2 rounded-xl border bg-muted/30 p-4 text-xs leading-6"><summary className="cursor-pointer font-semibold">Orientações para Elgin e impressão pelo computador</summary>
                     <strong className="block text-sm">Elgin L42 Pro Full (USB no computador)</strong>
                     <p className="mt-1 text-muted-foreground">
                       Na janela de impressão que abrir, escolha a <strong>Elgin L42</strong>, deixe as margens em zero e a escala em 100% (sem “ajustar à página”).
@@ -807,56 +942,65 @@ function Index() {
                     <p className="mt-2 flex gap-2 text-muted-foreground"><Smartphone className="mt-0.5 size-4 shrink-0" />
                       No iPhone você cria e consulta etiquetas normalmente. Imprimir direto na Elgin pelo celular exige uma integração compatível, que ainda não está disponível aqui — prepare no celular e imprima pelo computador ligado à impressora.
                     </p>
-                  </div>
+                  </details>}
                 </div>
-              )}
-            </div>
-            <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <div className="space-y-5 rounded-3xl border bg-card p-5 shadow-sm sm:p-7">
-                <Field label="Cliente"><select value={selectedClient} disabled={role === "operator" || role === "admin_cliente"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
-                <Field label="Produto"><select value={selectedProduct} onChange={(e) => { setSelectedProduct(e.target.value); setLot(""); setLabelDraft(null); const sel = products.find(p => p.id === e.target.value); setShelfDays(sel ? String(sel.shelf_life_days) : ""); }}><option value="">Selecione o produto</option>{visibleProducts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
-                <Field label="Tipo da etiqueta"><select value={kind} onChange={(e) => setKind(e.target.value as LabelKind)}>{LABEL_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</select></Field>
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <Field label="Data de manipulação/abertura"><input type="date" value={openedOn} onChange={(e) => setOpenedOn(e.target.value)} /></Field>
-                  <Field label="Hora"><input type="time" value={openedTime} onChange={(e) => setOpenedTime(e.target.value)} /></Field>
+
+                  {message && <p role={emissionError ? "alert" : "status"} className={`${emissionError ? "clients-error" : "clients-notice"} mt-4`}>{message}</p>}
+                  {niimbotPreview && <a className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm text-white" href={niimbotPreview.url} download={niimbotPreview.filename}>Baixar PNG de teste</a>}
                 </div>
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <Field label="Validade após abertura (dias)" hint="Editável"><input type="number" min={0} max={3650} value={shelfDays} onChange={(e) => setShelfDays(e.target.value)} placeholder={product ? String(product.shelf_life_days) : "0"} /></Field>
-                  <div className="rounded-2xl bg-secondary p-4"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Validade calculada</span><strong className="mt-1 block text-xl text-primary">{expiresOn}</strong></div>
+                <div className="client-dialog-footer shrink-0 border-t px-5 py-4 text-right sm:px-6"><Button className="dashboard-primary" onClick={() => setShowPrinterSettings(false)}>Concluir</Button></div>
+              </DialogContent>
+            </Dialog>
+            <div className="emit-layout grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="emit-form min-w-0 rounded-2xl border bg-card p-5 sm:p-6">
+                <fieldset disabled={Boolean(emissionBusy)} className="min-w-0 space-y-4"><div className="emit-group-title"><span>1</span><h2>Dados da etiqueta</h2></div>
+                <div className="grid gap-4 sm:grid-cols-2"><EmitField label="Cliente"><select value={selectedClient} disabled={role === "operator" || role === "admin_cliente"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); setLabelDraft(null); setLot(""); setShelfDays(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></EmitField>
+                <EmissionProductPicker key={selectedClient} products={visibleProducts} value={selectedProduct} disabled={!selectedClient} onChange={(id) => { setSelectedProduct(id); setLot(""); setLabelDraft(null); const selected = products.find(p => p.id === id); setShelfDays(selected ? String(selected.shelf_life_days) : ""); }} />
+                <EmitField label="Responsável"><select value={selectedResponsible} disabled={!selectedClient} onChange={(e) => setSelectedResponsible(e.target.value)}><option value="">Selecione o responsável</option>{visibleCollaborators.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></EmitField>
+                <EmitField label="Tipo da etiqueta"><select value={kind} onChange={(e) => setKind(e.target.value as LabelKind)}>{LABEL_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</select></EmitField></div>
+                <div className="emit-group-title"><span>2</span><h2>Validade e conservação</h2></div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <EmitField label="Data de manipulação/abertura"><input type="date" value={openedOn} onChange={(e) => setOpenedOn(e.target.value)} /></EmitField>
+                  <EmitField label="Hora"><input type="time" value={openedTime} onChange={(e) => setOpenedTime(e.target.value)} /></EmitField>
                 </div>
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <Field label="Conservação">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <EmitField label="Validade após abertura (dias)" hint="Editável"><input type="number" min={0} max={3650} value={shelfDays} onChange={(e) => setShelfDays(e.target.value)} placeholder={product ? String(product.shelf_life_days) : "0"} /></EmitField>
+                  <div className="emit-expiry rounded-xl border bg-secondary/40 p-4"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Validade calculada</span><strong className="mt-1 block text-xl text-primary">{expiresOn}</strong></div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <EmitField label="Conservação">
                     <select value={storage} onChange={(e) => setStorage(e.target.value)}>
                       <option value="">Não informar</option>
                       {STORAGE_PRESETS.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
-                  </Field>
-                  <Field label="Setor / local" hint="Opcional"><input maxLength={40} value={sector} onChange={(e) => setSector(e.target.value)} placeholder="Ex.: Cozinha quente" /></Field>
+                  </EmitField>
+                  <EmitField label="Setor / local" hint="Opcional"><input maxLength={40} value={sector} onChange={(e) => setSector(e.target.value)} placeholder="Ex.: Cozinha quente" /></EmitField>
                 </div>
-                {product?.requires_lot && <Field label="Número do lote" hint="Obrigatório para este produto"><input value={lot} maxLength={80} onChange={(e) => setLot(e.target.value)} placeholder="Ex.: 4587" /></Field>}
+                {product?.requires_lot && <EmitField label="Número do lote" hint="Obrigatório para este produto"><input value={lot} maxLength={80} onChange={(e) => setLot(e.target.value)} placeholder="Ex.: 4587" /></EmitField>}
                 {product?.requires_inspection && <div className="rounded-2xl border border-primary/20 bg-secondary p-4 text-sm"><ShieldCheck className="mr-2 inline size-5 text-primary" /><strong>{product.inspection_type}/registro:</strong> {product.inspection_number}</div>}
-                <Field label="Responsável"><select value={selectedResponsible} onChange={(e) => setSelectedResponsible(e.target.value)}><option value="">Selecione o responsável</option>{visibleCollaborators.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
-                <Field label="Quantidade de etiquetas" hint="Cada etiqueta recebe um QR Code exclusivo"><input type="number" min={1} max={200} value={quantity} onChange={(e) => setQuantity(e.target.value)} /></Field>
+                <div className="emit-group-title"><span>3</span><h2>Quantidade e impressão</h2></div>
+                <div><EmitField label="Quantidade de etiquetas" hint="1 a 200"><input type="number" min={1} max={200} step={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} /></EmitField><div className="mt-2 flex gap-2" role="group" aria-label="Quantidades rápidas">{[1,5,10].map(count => <button key={count} type="button" className="emit-count" aria-pressed={quantity === String(count)} onClick={() => setQuantity(String(count))}>{count} etiqueta{count === 1 ? "" : "s"}</button>)}</div></div>
 
-                {product && responsible && !labelDraft && <Button variant="outline" className="w-full" onClick={() => setLabelDraft({ product: product.name, responsible: responsible.name, opened: openedOn, expires: format(addDays(new Date(`${openedOn}T12:00:00`), product.shelf_life_days), "yyyy-MM-dd"), lot })}><Pencil /> Editar etiqueta antes de imprimir</Button>}
-                {labelDraft && <div className="grid gap-4 rounded-2xl border bg-secondary/50 p-4 sm:grid-cols-2"><div className="sm:col-span-2"><Field label="Nome na etiqueta"><input maxLength={120} value={labelDraft.product} onChange={(e) => setLabelDraft({ ...labelDraft, product: e.target.value })} /></Field></div><Field label="Aberto em"><input type="date" value={labelDraft.opened} onChange={(e) => setLabelDraft({ ...labelDraft, opened: e.target.value })} /></Field><Field label="Validade"><input type="date" value={labelDraft.expires} onChange={(e) => setLabelDraft({ ...labelDraft, expires: e.target.value })} /></Field><Field label="Lote"><input maxLength={80} value={labelDraft.lot} onChange={(e) => setLabelDraft({ ...labelDraft, lot: e.target.value })} /></Field><Field label="Responsável"><input maxLength={120} value={labelDraft.responsible} onChange={(e) => setLabelDraft({ ...labelDraft, responsible: e.target.value })} /></Field><div className="sm:col-span-2"><Button variant="ghost" size="sm" onClick={() => setLabelDraft(null)}>Cancelar edição</Button></div></div>}
+                {product && responsible && !labelDraft && <Button variant="outline" className="w-full" onClick={() => setLabelDraft({ product: product.name, responsible: responsible.name, opened: openedOn, expires: format(expiresAtPreview, "yyyy-MM-dd"), lot })}><Pencil /> Editar etiqueta antes de imprimir</Button>}
+                {labelDraft && <div className="grid gap-4 rounded-2xl border bg-secondary/50 p-4 sm:grid-cols-2"><div className="sm:col-span-2"><EmitField label="Nome na etiqueta"><input maxLength={120} value={labelDraft.product} onChange={(e) => setLabelDraft({ ...labelDraft, product: e.target.value })} /></EmitField></div><EmitField label="Aberto em"><input type="date" value={labelDraft.opened} onChange={(e) => setLabelDraft({ ...labelDraft, opened: e.target.value })} /></EmitField><EmitField label="Validade"><input type="date" value={labelDraft.expires} onChange={(e) => setLabelDraft({ ...labelDraft, expires: e.target.value })} /></EmitField><EmitField label="Lote"><input maxLength={80} value={labelDraft.lot} onChange={(e) => setLabelDraft({ ...labelDraft, lot: e.target.value })} /></EmitField><EmitField label="Responsável"><input maxLength={120} value={labelDraft.responsible} onChange={(e) => setLabelDraft({ ...labelDraft, responsible: e.target.value })} /></EmitField><div className="sm:col-span-2"><Button variant="ghost" size="sm" onClick={() => setLabelDraft(null)}>Cancelar edição</Button></div></div>}
+                </fieldset>
                 {pendingPrint && (
-                  <div role="alert" className="rounded-2xl border-2 border-primary/40 bg-secondary p-4">
+                  <div role="alert" className="mt-5 rounded-2xl border border-primary/30 bg-secondary/50 p-4">
                     <strong className="block text-sm">A impressão saiu correta?</strong>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {pendingPrint.total} etiqueta(s) de {pendingPrint.product} aguardando confirmação. A saída só entra no controle de validades depois do seu “Sim”.
                     </p>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      <Button variant="kitchen" onClick={confirmPendingPrint}><CheckCircle2 /> Sim, imprimiu certo</Button>
-                      <Button variant="outline" onClick={rejectPendingPrint}><AlertTriangle /> Não / deu erro</Button>
+                      <Button className="dashboard-primary" disabled={Boolean(emissionBusy)} onClick={() => void performEmission("confirm", confirmPendingPrint)}><CheckCircle2 /> Sim, imprimiu certo</Button>
+                      <Button variant="outline" disabled={Boolean(emissionBusy)} onClick={() => void performEmission("reject", rejectPendingPrint)}><AlertTriangle /> Não / deu erro</Button>
                     </div>
                   </div>
                 )}
                 {message && (
-                  <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary p-3 text-sm font-semibold">
+                  <div role={emissionError ? "alert" : "status"} className={`emit-feedback mt-4 flex flex-wrap items-center justify-between gap-2 ${emissionError ? "clients-error" : "clients-notice"}`}>
                     <span className="min-w-0 flex-1">{message}</span>
                     {lastFailedPrint && lastFailedPrint.length > 0 && (
-                      <Button variant="kitchen" size="sm" onClick={retryLastPrint}><Printer /> Tentar novamente</Button>
+                      <Button variant="kitchen" size="sm" disabled={Boolean(emissionBusy) || Boolean(pendingPrint)} onClick={() => void performEmission("retry", retryLastPrint)}><Printer /> Tentar novamente</Button>
                     )}
                   </div>
                 )}
@@ -871,26 +1015,28 @@ function Index() {
                     <Button variant="ghost" size="icon" aria-label="Fechar" onClick={() => { URL.revokeObjectURL(niimbotPreview.url); setNiimbotPreview(null); }}><X /></Button>
                   </div>
                 )}
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Button variant="outline" size="xl" className="w-full" onClick={addToQueue}><ListPlus /> Adicionar à fila</Button>
-                  <Button variant="kitchen" size="xl" className="w-full" onClick={printNow}><Printer /> Imprimir agora</Button>
+                <div className="emit-actions mt-5 grid gap-2 border-t pt-5 sm:grid-cols-2">
+                  <Button variant="outline" className="min-h-12 w-full" disabled={!emissionReady || Boolean(emissionBusy)} onClick={() => void performEmission("add", addToQueue)}><ListPlus />{emissionBusy === "add" ? "Adicionando…" : "Adicionar à fila"}</Button>
+                  <Button className="dashboard-primary min-h-12 w-full" disabled={!emissionReady || Boolean(emissionBusy) || Boolean(pendingPrint)} onClick={() => void performEmission("now", printNow)}><Printer />{emissionBusy === "now" ? "Preparando impressão…" : "Imprimir agora"}</Button>
                 </div>
+                <p role="status" className="mt-3 text-xs leading-relaxed text-muted-foreground">{pendingPrint ? "Confirme o resultado da impressão antes de enviar outras etiquetas." : emissionReady ? "Tudo pronto. Cada etiqueta terá seu próprio QR Code." : "Selecione cliente, produto e responsável e confira os campos obrigatórios."}</p>
               </div>
-              <div className="space-y-4">
-                <div>
-                  <p className="mb-3 text-sm font-bold text-muted-foreground">PRÉ-VISUALIZAÇÃO · {printerSettings.size.replace("x", " × ")} MM</p>
-                  <LabelPreview label={label ?? previewLabel} widthMm={sizeMm(printerSettings.size).w} heightMm={sizeMm(printerSettings.size).h} scale={printerSettings.size === "50x30" ? 0.78 : 1} />
-
+              <aside className="emit-preview-column min-w-0 space-y-4">
+                <div className="emit-preview-card rounded-2xl border bg-card p-5">
+                  <h2 className="text-sm font-semibold">Pré-visualização</h2><p className="mt-1 mb-4 text-xs text-muted-foreground">{printerSettings.size.replace("x", " × ")} mm · Atualizada conforme o preenchimento</p><div className="emit-paper flex justify-center rounded-xl bg-muted/40 py-5">
+                  <LabelPreview label={previewLabel} widthMm={sizeMm(printerSettings.size).w} heightMm={sizeMm(printerSettings.size).h} scale={printerSettings.size === "50x30" ? 0.78 : 1} />
+                  </div>
+                  {label && <p className="mt-3 text-xs text-muted-foreground">Última enviada: <strong className="font-medium">{label.product}</strong></p>}
                 </div>
                 <div className="rounded-2xl border bg-card p-4 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">Fila de impressão</p>
+                    <h2 className="text-sm font-semibold">Fila de impressão</h2>
                     <span className="text-xs font-semibold text-muted-foreground">{queue.length} item(ns)</span>
                   </div>
                   {queue.length === 0 ? (
                     <p className="mt-3 text-sm text-muted-foreground">Adicione etiquetas à fila para imprimir várias de uma vez.</p>
                   ) : (
-                    <ul className="mt-3 space-y-2">
+                    <ul className="emit-queue-list mt-3 space-y-2">
                       {queue.map((it) => (
                         <li key={it.id} className="flex items-center gap-2 rounded-xl border bg-secondary/40 p-2">
                           <div className="min-w-0 flex-1">
@@ -904,24 +1050,24 @@ function Index() {
                             value={it.copies}
                             onChange={(e) => updateQueueCopies(it.id, Number(e.target.value))}
                             className="!w-16 !p-1 text-center text-sm"
-                            aria-label="Cópias"
+                            disabled={Boolean(emissionBusy)} aria-label={`Cópias de ${it.label.product}`}
                           />
-                          <Button variant="ghost" size="icon" aria-label="Remover" onClick={() => removeFromQueue(it.id)}><Trash2 /></Button>
+                          <Button variant="ghost" size="icon" aria-label={`Remover ${it.label.product} da fila`} disabled={Boolean(emissionBusy)} onClick={() => removeFromQueue(it.id)}><Trash2 /></Button>
                         </li>
                       ))}
                     </ul>
                   )}
-                  <Button variant="kitchen" size="lg" className="mt-3 w-full" disabled={queue.length === 0} onClick={printQueue}>
-                    <Printer /> Imprimir todas ({queue.reduce((sum, it) => sum + it.copies, 0)})
+                  <Button size="lg" className="dashboard-primary mt-3 w-full" disabled={queue.length === 0 || Boolean(emissionBusy) || Boolean(pendingPrint)} onClick={() => void performEmission("queue", printQueue)}>
+                    <Printer />{emissionBusy === "queue" ? "Preparando lote…" : `Imprimir fila (${queue.reduce((sum, it) => sum + it.copies, 0)})`}
                   </Button>
                 </div>
-              </div>
+              </aside>
             </div>
           </section>}
-          {tab === "clients" && <ClientsPanel clients={clients} refresh={refresh} />}
-          {tab === "products" && <ProductsPanel clients={clients} products={products} refresh={refresh} />}
-          {tab === "team" && <TeamPanel clients={clients} collaborators={collaborators} refresh={refresh} />}
-          {tab === "validades" && <ValidadesPanel history={history} alertDays={alertDays} onAlertDaysChange={updateAlertDays} onSettle={settleLabel} />}
+          {tab === "clients" && <ClientsPanel clients={clients} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
+          {tab === "products" && <ProductsPanel clients={clients} products={products} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
+          {tab === "team" && <TeamPanel clients={clients} collaborators={collaborators} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
+          {tab === "validades" && <ValidadesPanel history={overview.labels} alertDays={alertDays} onAlertDaysChange={updateAlertDays} onSettle={settleLabel} window={validityWindow} onWindowChange={setValidityWindow} now={overview.now} clientName={clients.find((item) => item.id === dashboardClient)?.name ?? "Todas as empresas acessíveis"} updatedAt={overview.updatedAt} loading={overview.loading} loadError={overview.labelsError} onRefresh={overview.reload} onOpenLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} />}
           {tab === "history" && <HistoryPanel history={history} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
         </main>
       </div>
@@ -929,12 +1075,22 @@ function Index() {
   );
 }
 
-function Login() {
-  const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [error, setError] = useState("");
-  return <main className="grid min-h-screen bg-primary lg:grid-cols-2"><section className="hidden flex-col justify-between p-12 text-primary-foreground lg:flex"><Brand inverse /><div><p className="text-sm font-bold uppercase tracking-[0.2em] text-primary-foreground/70">Segurança dos alimentos</p><h1 className="mt-4 max-w-xl text-5xl font-bold leading-tight">Identificação correta, em poucos segundos.</h1><p className="mt-5 max-w-md text-lg text-primary-foreground/75">Etiquetas padronizadas para uma operação mais segura, ágil e confiável.</p></div><p className="text-sm text-primary-foreground/60">TiNutri Consultoria · RDC 216 e CVS-5</p></section><section className="grid place-items-center bg-background p-5"><div className="w-full max-w-md rounded-3xl border bg-card p-7 shadow-2xl sm:p-9"><div className="lg:hidden"><Brand /></div><h2 className="mt-8 text-3xl font-bold">Acesse sua estação</h2><p className="mt-2 text-sm text-muted-foreground">Use o acesso fornecido pela TiNutri.</p><form className="mt-7 space-y-4" onSubmit={async (event) => { event.preventDefault(); setError(""); const result = await supabase.auth.signInWithPassword({ email, password }); if (result.error) setError("E-mail ou senha inválidos."); else location.reload(); }}><Field label="E-mail"><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></Field><Field label="Senha"><input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /></Field>{error && <p role="alert" className="text-sm text-destructive">{error}</p>}<Button size="xl" className="w-full" type="submit">Entrar</Button><button type="button" className="block w-full text-center text-xs font-semibold text-muted-foreground underline" onClick={async () => { if (!email) { setError("Informe seu e-mail acima para receber o link."); return; } setError(""); const { error: rpErr } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` }); setError(rpErr ? "Não foi possível enviar o link de redefinição." : "Enviamos um link de redefinição para seu e-mail."); }}>Esqueci minha senha</button></form><div className="my-5 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />OU<span className="h-px flex-1 bg-border" /></div><Button variant="outline" size="xl" className="w-full" onClick={async () => { const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin }); if (result.error) setError("Não foi possível entrar com Google."); }}>Continuar com Google</Button></div></section></main>;
+
+function Brand({ inverse = false }: { inverse?: boolean }) {
+  return <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+    <img src={tinutriLogo} alt="TiNutri" width={40} height={40} className="size-8 shrink-0 rounded-lg object-contain sm:size-10" loading="lazy" />
+    <div className="min-w-0">
+      <strong className={`block truncate font-display text-sm leading-tight sm:text-lg ${inverse ? "text-primary-foreground" : "text-foreground"}`}><span className="sm:hidden">TiNutri</span><span className="hidden sm:inline">TiNutri Smart Label®</span></strong>
+      <span className={`block text-xs ${inverse ? "text-primary-foreground/65" : "text-muted-foreground"}`}><span className="sm:hidden">Smart Label®</span><span className="hidden sm:inline">Validade simples. Segurança sempre.</span></span>
+    </div>
+  </div>;
 }
 
-function Brand({ inverse = false }: { inverse?: boolean }) { return <div className="flex min-w-0 items-center gap-3"><img src={tinutriLogo} alt="TiNutri" width={40} height={40} className="size-10 shrink-0 rounded-xl object-contain" loading="lazy" /><div className="min-w-0"><strong className={`block truncate font-display text-lg leading-tight ${inverse ? "text-primary-foreground" : "text-foreground"}`}>TiNutri Smart Label®</strong><span className={`text-xs ${inverse ? "text-primary-foreground/65" : "text-muted-foreground"}`}>Validade simples. Segurança sempre.</span></div></div> }
+function EmitField({ label, hint, children }: { label: string; hint?: string; children: React.ReactElement<{ id?: string }> }) {
+  const id = useId();
+  return <div className="min-w-0"><div className="mb-2 flex flex-wrap justify-between gap-1 text-xs"><label htmlFor={id} className="font-medium">{label}</label>{hint && <span className="text-muted-foreground">{hint}</span>}</div>{cloneElement(children, { id })}</div>;
+}
+
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) { return <label className="block"><span className="mb-2 flex justify-between text-sm font-bold">{label}{hint && <small className="font-medium text-muted-foreground">{hint}</small>}</span>{children}</label> }
 
 const navItems = [
@@ -952,13 +1108,13 @@ const ROLE_TABS: Record<AppRole, AppTab[]> = {
   nutricionista: ["dashboard", "clients", "products", "team", "emit", "validades", "history"],
   admin_cliente: ["dashboard", "products", "team", "emit", "validades", "history"],
   gerente: ["dashboard", "products", "team", "emit", "validades", "history"],
-  operator: ["emit", "validades", "history"],
+  operator: ["dashboard", "emit", "validades", "history"],
 };
 
 function Nav({ role, tab, setTab, closeOnSelect = false }: { role: AppRole; tab: AppTab; setTab: (id: AppTab) => void; closeOnSelect?: boolean }) {
   const allowed = new Set<AppTab>(ROLE_TABS[role]);
   return navItems.filter((item) => allowed.has(item.id)).map((item) => {
-    const control = <Button key={item.id} variant={tab === item.id ? "secondary" : "ghost"} className="h-11 w-full justify-start" onClick={() => setTab(item.id)}><item.icon />{item.label}</Button>;
+    const control = <Button key={item.id} variant={tab === item.id ? "secondary" : "ghost"} className="workspace-nav-item h-11 w-full justify-start" aria-current={tab === item.id ? "page" : undefined} onClick={() => setTab(item.id)}><item.icon />{item.label}</Button>;
     return closeOnSelect ? <SheetClose asChild key={item.id}>{control}</SheetClose> : control;
   });
 }
@@ -971,27 +1127,38 @@ const ROLE_LABEL: Record<AppRole, string> = {
   operator: "Colaborador",
 };
 
+function WorkspaceActions({ role, closeOnSelect = false }: { role: AppRole; closeOnSelect?: boolean }) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const signOut = async () => {
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
+      location.reload();
+    } catch {
+      setError("Não foi possível sair. Tente novamente.");
+      setPending(false);
+    }
+  };
+  const master = <Button asChild variant="ghost" className="workspace-nav-item h-11 w-full justify-start"><Link to="/admin"><Building2 />Área Master</Link></Button>;
+  return <div className="workspace-sidebar-actions mt-4 space-y-1 border-t pt-4">
+    {role === "admin_master" && (closeOnSelect ? <SheetClose asChild>{master}</SheetClose> : master)}
+    <Button variant="ghost" className="workspace-nav-item h-11 w-full justify-start" disabled={pending} onClick={signOut}><LogOut />{pending ? "Saindo…" : "Sair"}</Button>
+    {error && <p role="alert" className="px-3 pt-2 text-xs text-destructive">{error}</p>}
+  </div>;
+}
+
 function UserStrip({ userName, role, clientName }: { userName: string; role: AppRole | null; clientName: string | null }) {
   if (!role) return null;
-  const isMaster = role === "admin_master";
-  if (isMaster) {
-    return (
-      <div className="mx-auto mt-2 flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        {clientName && <span className="font-bold uppercase tracking-wide text-foreground">{clientName}</span>}
-        {userName && <span>· Usuário: <strong className="text-foreground">{userName}</strong></span>}
-        <span>· Perfil: <strong className="text-foreground">{ROLE_LABEL[role]}</strong></span>
-      </div>
-    );
-  }
   return (
-    <div className="mx-auto mt-2 max-w-7xl">
-      <div className="flex items-center gap-2 text-lg font-extrabold uppercase tracking-wide text-foreground sm:text-xl">
-        <span aria-hidden>🏢</span>
-        <span>Empresa: {clientName ?? "—"}</span>
-      </div>
-      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-        {userName && <span>Usuário: <strong className="text-foreground">{userName}</strong></span>}
-        <span>· Perfil: <strong className="text-foreground">{ROLE_LABEL[role]}</strong></span>
+    <div className="workspace-user ml-auto flex min-w-0 items-center gap-2 text-xs text-muted-foreground" title={[userName, ROLE_LABEL[role], clientName].filter(Boolean).join(" · ")}>
+      <span className="workspace-avatar shrink-0" aria-hidden="true">{(userName || "U").slice(0, 1).toUpperCase()}</span>
+      <div className="min-w-0 text-right">
+        <strong className="block truncate font-semibold text-foreground">{userName || "Sua conta"}</strong>
+        <span className="block truncate text-[10px]">{ROLE_LABEL[role]}{clientName ? ` · ${clientName}` : ""}</span>
       </div>
     </div>
   );
@@ -999,217 +1166,19 @@ function UserStrip({ userName, role, clientName }: { userName: string; role: App
 
 function PanelHeader({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) { return <><p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">{eyebrow}</p><h1 className="mt-2 text-3xl font-bold">{title}</h1><p className="mt-2 text-muted-foreground">{description}</p></> }
 
-function DashboardPanel({ clients, products, collaborators, history, setTab }: { clients: Client[]; products: Product[]; collaborators: Collaborator[]; history: LabelRecord[]; setTab: (tab: AppTab) => void }) { const summaries = [{ label: "Clientes", value: clients.filter(c => c.active).length, icon: Building2, target: "clients" as AppTab }, { label: "Produtos", value: products.length, icon: PackagePlus, target: "products" as AppTab }, { label: "Colaboradores", value: collaborators.length, icon: Users, target: "team" as AppTab }, { label: "Etiquetas emitidas", value: history.length, icon: History, target: "history" as AppTab }]; return <section><PanelHeader eyebrow="Visão geral" title="Dashboard" description="Acesso rápido à operação do TiNutri Smart Label®."/><Button variant="kitchen" size="xl" className="mt-7 w-full sm:w-auto" onClick={() => setTab("emit")}><Printer/>Emitir nova etiqueta</Button><div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">{summaries.map((item) => <Button key={item.label} variant="outline" className="h-auto min-w-0 whitespace-normal rounded-2xl bg-card p-4 text-left shadow-sm" onClick={() => setTab(item.target)}><span className="w-full"><item.icon className="size-5 text-primary"/><strong className="mt-5 block text-2xl">{item.value}</strong><span className="text-xs font-semibold text-muted-foreground sm:text-sm">{item.label}</span></span></Button>)}</div><div className="mt-8"><h2 className="text-lg font-bold">Últimas emissões</h2><div className="mt-3 overflow-hidden rounded-2xl border bg-card">{history.length === 0 ? <p className="p-7 text-center text-sm text-muted-foreground">Nenhuma etiqueta emitida ainda.</p> : history.slice(0, 5).map((item) => <div key={item.id} className="flex items-center justify-between gap-4 border-b p-4 last:border-0"><div className="min-w-0"><strong className="block truncate">{item.product_name}</strong><p className="truncate text-sm text-muted-foreground">{item.client_name} · {item.responsible_name}</p></div><time className="shrink-0 text-xs text-muted-foreground">{format(new Date(item.issued_at), "dd/MM HH:mm")}</time></div>)}</div></div></section>; }
 
-const BRAZILIAN_STATES = [
-  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"
-];
-
-function ClientsPanel({ clients, refresh }: { clients: Client[]; refresh: () => Promise<void> }) {
-  const [search, setSearch] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", legal_name: "", cnpj: "", city: "", state: "", responsible_name: "", email: "", phone: "", address: "", plan: "essencial", active: true });
-  const [message, setMessage] = useState("");
-
-  const filtered = clients.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.legal_name || "").toLowerCase().includes(search.toLowerCase()) ||
-    (c.cnpj || "").includes(search) ||
-    c.city.toLowerCase().includes(search.toLowerCase()) ||
-    c.state.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const resetForm = () => {
-    setForm({ name: "", legal_name: "", cnpj: "", city: "", state: "", responsible_name: "", email: "", phone: "", address: "", plan: "essencial", active: true });
-    setEditingId(null);
-    setShowForm(false);
-    setMessage("");
-  };
-
-  const startEdit = (client: Client) => {
-    setForm({
-      name: client.name,
-      legal_name: client.legal_name || "",
-      cnpj: client.cnpj || "",
-      city: client.city,
-      state: client.state,
-      responsible_name: client.responsible_name || "",
-      email: client.email || "",
-      phone: client.phone || "",
-      address: client.address || "",
-      plan: client.plan || "essencial",
-      active: client.active,
-    });
-    setEditingId(client.id);
-    setShowForm(true);
-    setMessage("");
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setMessage("");
-    if (!form.name.trim() || !form.city.trim() || !form.state.trim()) {
-      setMessage("Preencha o nome, cidade e estado.");
-      return;
-    }
-    const payload = {
-      name: form.name.trim(),
-      legal_name: form.legal_name.trim() || null,
-      cnpj: form.cnpj.trim() || null,
-      city: form.city.trim(),
-      state: form.state.trim(),
-      responsible_name: form.responsible_name.trim() || null,
-      email: form.email.trim() || null,
-      phone: form.phone.trim() || null,
-      address: form.address.trim() || null,
-      plan: form.plan,
-      active: form.active,
-      status: (form.active ? "ativa" : "inativa") as ClientStatus,
-    };
-    if (editingId) {
-      const { error } = await supabase.from("clients").update(payload).eq("id", editingId);
-      if (error) setMessage("Erro ao atualizar cliente.");
-      else { resetForm(); await refresh(); }
-    } else {
-      const { error } = await supabase.from("clients").insert(payload);
-      if (error) setMessage("Erro ao cadastrar cliente.");
-      else { resetForm(); await refresh(); }
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Deseja realmente inativar este cliente?")) return;
-    await supabase.from("clients").update({ active: false }).eq("id", id);
-    await refresh();
-  };
-
-  return (
-    <section>
-      <PanelHeader eyebrow="Administração" title="Clientes" description="Cadastre e gerencie os clientes da consultoria TiNutri." />
-      {!showForm && (
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <Button onClick={() => { resetForm(); setShowForm(true); }} className="shrink-0"><Building2 /> Novo Cliente</Button>
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Pesquisar por nome, CNPJ, cidade ou estado..."
-              className="pl-9"
-            />
-          </div>
-        </div>
-      )}
-      {showForm && (
-        <form className="mt-6 grid gap-4 rounded-2xl border bg-card p-5 sm:grid-cols-2" onSubmit={handleSubmit}>
-          <Field label="Nome do cliente"><input required minLength={2} maxLength={120} value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} /></Field>
-          <Field label="Razão social"><input maxLength={200} value={form.legal_name} onChange={(e) => setForm(p => ({ ...p, legal_name: e.target.value }))} placeholder="Opcional" /></Field>
-          <Field label="CNPJ"><input maxLength={20} value={form.cnpj} onChange={(e) => setForm(p => ({ ...p, cnpj: e.target.value }))} placeholder="Opcional" /></Field>
-          <Field label="Cidade"><input required maxLength={100} value={form.city} onChange={(e) => setForm(p => ({ ...p, city: e.target.value }))} /></Field>
-          <Field label="Estado">
-            <select required value={form.state} onChange={(e) => setForm(p => ({ ...p, state: e.target.value }))}>
-              <option value="">Selecione</option>
-              {BRAZILIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </Field>
-          <Field label="Responsável"><input maxLength={120} value={form.responsible_name} onChange={(e) => setForm(p => ({ ...p, responsible_name: e.target.value }))} placeholder="Nome do responsável" /></Field>
-          <Field label="E-mail"><input type="email" maxLength={160} value={form.email} onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))} placeholder="contato@empresa.com.br" /></Field>
-          <Field label="Telefone"><input maxLength={30} value={form.phone} onChange={(e) => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="(00) 00000-0000" /></Field>
-          <Field label="Plano">
-            <select value={form.plan} onChange={(e) => setForm(p => ({ ...p, plan: e.target.value }))}>
-              <option value="essencial">Essencial</option>
-              <option value="profissional">Profissional</option>
-              <option value="premium">Premium</option>
-            </select>
-          </Field>
-          <Field label="Endereço"><input maxLength={200} value={form.address} onChange={(e) => setForm(p => ({ ...p, address: e.target.value }))} placeholder="Rua, número, bairro" /></Field>
-          <label className="flex items-center gap-3 font-semibold sm:col-span-2">
-            <input className="size-5 w-auto" type="checkbox" checked={form.active} onChange={(e) => setForm(p => ({ ...p, active: e.target.checked }))} />
-            Cliente ativo
-          </label>
-          {message && <p role="alert" className="text-sm text-destructive sm:col-span-2">{message}</p>}
-          <div className="flex gap-3 sm:col-span-2">
-            <Button type="submit">{editingId ? "Salvar alterações" : "Cadastrar cliente"}</Button>
-            <Button type="button" variant="ghost" onClick={resetForm}><X /> Cancelar</Button>
-          </div>
-        </form>
-      )}
-      <div className="mt-5 grid gap-3">
-        {filtered.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">Nenhum cliente encontrado.</p>
-        ) : (
-          filtered.map((c) => (
-            <article key={c.id} className="flex items-start justify-between gap-4 rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <strong className="truncate">{c.name}</strong>
-                  {!c.active && <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Inativo</span>}
-                </div>
-                {c.legal_name && <p className="truncate text-sm text-muted-foreground">{c.legal_name}</p>}
-                <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                  {c.cnpj && <span>CNPJ: {c.cnpj}</span>}
-                  {c.city && <span>{c.city} · {c.state}</span>}
-                  {c.responsible_name && <span>Resp.: {c.responsible_name}</span>}
-                  {c.phone && <span>{c.phone}</span>}
-                  {c.plan && <span className="uppercase">Plano: {c.plan}</span>}
-                  {c.created_at && <span>Desde {format(new Date(c.created_at), "dd/MM/yyyy")}</span>}
-                </div>
-                <p className="mt-1 text-[10px] text-muted-foreground">ID: {c.id}</p>
-                {c.public_code && <ClientQrCard clientName={c.name} publicCode={c.public_code} />}
-              </div>
-              <div className="flex shrink-0 gap-1">
-                <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => startEdit(c)}><Pencil className="size-4" /></Button>
-                <Button variant="ghost" size="icon" aria-label="Excluir" onClick={() => handleDelete(c.id)}><Trash2 className="size-4 text-destructive" /></Button>
-              </div>
-            </article>
-          ))
-        )}
-      </div>
-    </section>
-  );
-}
-
-function ProductsPanel({ clients, products, refresh }: { clients: Client[]; products: Product[]; refresh: () => Promise<void> }) {
-  const empty = { client_id: "", name: "", category: "", shelf_life_days: "3", requires_lot: false, requires_inspection: false, inspection_type: "SIF" as "SIF" | "SISP" | "SIM", inspection_number: "", notes: "" };
-  const [form, setForm] = useState(empty);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const update = (key: string, value: unknown) => setForm((prev) => ({ ...prev, [key]: value }));
-  const reset = () => { setForm(empty); setEditingId(null); };
-  const startEdit = (p: Product) => { setEditingId(p.id); setForm({ client_id: p.client_id, name: p.name, category: p.category, shelf_life_days: String(p.shelf_life_days), requires_lot: p.requires_lot, requires_inspection: p.requires_inspection, inspection_type: (p.inspection_type ?? "SIF") as "SIF" | "SISP" | "SIM", inspection_number: p.inspection_number ?? "", notes: p.notes ?? "" }); };
-  const filtered = products.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()));
-  return <section><PanelHeader eyebrow="Catálogo por cliente" title="Produtos" description="Cadastre as regras que serão aplicadas automaticamente."/>
-    <form className="mt-7 grid gap-4 rounded-2xl border bg-card p-5 sm:grid-cols-2" onSubmit={async (e) => { e.preventDefault(); const payload = { client_id: form.client_id, name: form.name, category: form.category, shelf_life_days: Number(form.shelf_life_days), requires_lot: form.requires_lot, requires_inspection: form.requires_inspection, inspection_type: form.requires_inspection ? form.inspection_type : null, inspection_number: form.requires_inspection ? form.inspection_number : null, notes: form.notes || null }; if (editingId) { await supabase.from("products").update(payload).eq("id", editingId); } else { await supabase.from("products").insert(payload); } reset(); await refresh(); }}>
-      <Field label="Cliente"><select required value={form.client_id} onChange={(e) => update("client_id", e.target.value)}><option value="">Selecione</option>{clients.filter(c => c.active).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
-      <Field label="Produto"><input required minLength={2} maxLength={120} value={form.name} onChange={(e) => update("name", e.target.value)}/></Field>
-      <Field label="Categoria"><input required minLength={2} maxLength={80} value={form.category} onChange={(e) => update("category", e.target.value)}/></Field>
-      <Field label="Validade padrão (dias)"><input required type="number" min="0" max="3650" value={form.shelf_life_days} onChange={(e) => update("shelf_life_days", e.target.value)}/></Field>
-      <label className="flex items-center gap-3 font-semibold"><input className="size-5 w-auto" type="checkbox" checked={form.requires_lot} onChange={(e) => update("requires_lot", e.target.checked)}/> Exige lote</label>
-      <label className="flex items-center gap-3 font-semibold"><input className="size-5 w-auto" type="checkbox" checked={form.requires_inspection} onChange={(e) => update("requires_inspection", e.target.checked)}/> Exige SIF/SISP/SIM</label>
-      {form.requires_inspection && <>
-        <Field label="Tipo"><select value={form.inspection_type} onChange={(e) => update("inspection_type", e.target.value)}><option value="SIF">SIF</option><option value="SISP">SISP</option><option value="SIM">SIM</option></select></Field>
-        <Field label="Número"><input required maxLength={40} value={form.inspection_number} onChange={(e) => update("inspection_number", e.target.value)}/></Field>
-      </>}
-      <div className="sm:col-span-2"><Field label="Observações"><textarea rows={3} maxLength={500} value={form.notes} onChange={(e) => update("notes", e.target.value)} placeholder="Informações adicionais do produto"/></Field></div>
-      <div className="flex gap-3 sm:col-span-2"><Button type="submit">{editingId ? "Salvar alterações" : "Cadastrar produto"}</Button>{editingId && <Button type="button" variant="ghost" onClick={reset}><X/> Cancelar</Button>}</div>
-    </form>
-    <div className="mt-6 relative"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><input className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar produto ou categoria"/></div>
-    <div className="mt-4 divide-y rounded-2xl border bg-card">{filtered.length === 0 ? <p className="p-7 text-center text-sm text-muted-foreground">Nenhum produto cadastrado.</p> : filtered.map((p) => <div key={p.id} className="grid grid-cols-[1fr_auto] items-center gap-3 p-4"><div className="min-w-0"><strong className="truncate block">{p.name}</strong><p className="text-sm text-muted-foreground">{p.category} · {p.shelf_life_days} dias{p.requires_lot && " · lote"}{p.requires_inspection && p.inspection_type && ` · ${p.inspection_type} ${p.inspection_number ?? ""}`}</p></div><div className="flex gap-1"><Button variant="ghost" size="icon" aria-label="Editar" onClick={() => startEdit(p)}><Pencil className="size-4"/></Button><Button variant="ghost" size="icon" aria-label="Excluir" onClick={async () => { if (!confirm("Inativar este produto?")) return; await supabase.from("products").update({ active: false }).eq("id", p.id); await refresh(); }}><Trash2 className="size-4 text-destructive"/></Button></div></div>)}</div>
-  </section>;
-}
-
-function TeamPanel({ clients, collaborators, refresh }: { clients: Client[]; collaborators: Collaborator[]; refresh: () => Promise<void> }) {
+function TeamPanel({ clients, collaborators, refresh, recordActivity, focusedId }: { clients: Client[]; collaborators: Collaborator[]; refresh: () => Promise<void>; recordActivity: ActivityRecorder; focusedId: string | null }) {
   const empty = { client_id: "", name: "", role_title: "", active: true };
   const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [msg, setMsg] = useState("");
   const reset = () => { setForm(empty); setEditingId(null); setMsg(""); };
-  const startEdit = (c: Collaborator) => { setEditingId(c.id); setForm({ client_id: c.client_id, name: c.name, role_title: c.role_title ?? "", active: c.active }); };
+  const startEdit = useCallback((c: Collaborator) => { setEditingId(c.id); setForm({ client_id: c.client_id, name: c.name, role_title: c.role_title ?? "", active: c.active }); }, []);
+  useFocusedRecord(focusedId, collaborators, startEdit);
   const filtered = collaborators.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()) || (c.role_title ?? "").toLowerCase().includes(search.toLowerCase()));
   return <section><PanelHeader eyebrow="Equipe" title="Colaboradores" description="Cadastre os responsáveis que aparecerão nas etiquetas."/>
-    <form className="mt-7 grid gap-4 rounded-2xl border bg-card p-5 sm:grid-cols-3 sm:items-end" onSubmit={async (e) => { e.preventDefault(); setMsg(""); const payload = { client_id: form.client_id, name: form.name.trim(), role_title: form.role_title.trim() || null, active: form.active }; const op = editingId ? supabase.from("collaborators").update(payload).eq("id", editingId) : supabase.from("collaborators").insert(payload); const { error } = await op; if (error) { setMsg("Não foi possível salvar."); return; } reset(); await refresh(); }}>
+    <form className="mt-7 grid gap-4 rounded-2xl border bg-card p-5 sm:grid-cols-3 sm:items-end" onSubmit={async (e) => { e.preventDefault(); setMsg(""); const payload = { client_id: form.client_id, name: form.name.trim(), role_title: form.role_title.trim() || null, active: form.active }; const op = editingId ? supabase.from("collaborators").update(payload).eq("id", editingId).select("id").maybeSingle() : supabase.from("collaborators").insert(payload).select("id").single(); const { data: saved, error } = await op; if (error || !saved) { setMsg("Não foi possível salvar."); return; } await recordActivity(editingId ? "colaborador_atualizado" : "colaborador_criado", payload.client_id, "collaborator", saved.id, payload.name, editingId ? { ...collaborators.find((item) => item.id === editingId) } : {}, payload); reset(); await refresh(); }}>
       <Field label="Cliente"><select required value={form.client_id} onChange={(e) => setForm(p => ({ ...p, client_id: e.target.value }))}><option value="">Selecione</option>{clients.filter(c => c.active).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
       <Field label="Nome"><input required minLength={2} maxLength={120} value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))}/></Field>
       <Field label="Função"><input maxLength={80} value={form.role_title} onChange={(e) => setForm(p => ({ ...p, role_title: e.target.value }))} placeholder="Ex.: Cozinheira"/></Field>
@@ -1218,7 +1187,7 @@ function TeamPanel({ clients, collaborators, refresh }: { clients: Client[]; col
       {msg && <p className="text-sm text-muted-foreground sm:col-span-3">{msg}</p>}
     </form>
     <div className="mt-6 relative"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><input className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar por nome ou função"/></div>
-    <div className="mt-4 grid gap-3 sm:grid-cols-2">{filtered.length === 0 ? <p className="py-10 text-center text-sm text-muted-foreground sm:col-span-2">Nenhum colaborador encontrado.</p> : filtered.map((c) => <article key={c.id} className="flex items-start justify-between gap-4 rounded-2xl border bg-card p-5"><div className="min-w-0"><Users className="text-primary"/><strong className="mt-3 block truncate">{c.name}</strong>{c.role_title && <p className="text-sm font-semibold text-primary">{c.role_title}</p>}<p className="text-xs text-muted-foreground">{clients.find((client) => client.id === c.client_id)?.name}</p></div><div className="flex shrink-0 gap-1"><Button variant="ghost" size="icon" aria-label="Editar" onClick={() => startEdit(c)}><Pencil className="size-4"/></Button><Button variant="ghost" size="icon" aria-label="Inativar" onClick={async () => { if (!confirm("Inativar este colaborador?")) return; await supabase.from("collaborators").update({ active: false }).eq("id", c.id); await refresh(); }}><Trash2 className="size-4 text-destructive"/></Button></div></article>)}</div>
+    <div className="mt-4 grid gap-3 sm:grid-cols-2">{filtered.length === 0 ? <p className="py-10 text-center text-sm text-muted-foreground sm:col-span-2">Nenhum colaborador encontrado.</p> : filtered.map((c) => <article key={c.id} className="flex items-start justify-between gap-4 rounded-2xl border bg-card p-5"><div className="min-w-0"><Users className="text-primary"/><strong className="mt-3 block truncate">{c.name}</strong>{c.role_title && <p className="text-sm font-semibold text-primary">{c.role_title}</p>}<p className="text-xs text-muted-foreground">{clients.find((client) => client.id === c.client_id)?.name}</p></div><div className="flex shrink-0 gap-1"><Button variant="ghost" size="icon" aria-label="Editar" onClick={() => startEdit(c)}><Pencil className="size-4"/></Button><Button variant="ghost" size="icon" aria-label="Inativar" onClick={async () => { if (!confirm("Inativar este colaborador?")) return; const { data: saved, error } = await supabase.from("collaborators").update({ active: false }).eq("id", c.id).select("id").maybeSingle(); if (error || !saved) { setMsg("Não foi possível inativar o colaborador."); return; } await recordActivity("colaborador_inativado", c.client_id, "collaborator", c.id, c.name, { active: c.active }, { active: false }); await refresh(); }}><Trash2 className="size-4 text-destructive"/></Button></div></article>)}</div>
   </section>;
 }
 
@@ -1236,75 +1205,4 @@ function HistoryPanel({ history, onReprint, onDuplicate }: { history: LabelRecor
   );
 
   return <section><PanelHeader eyebrow="Registros" title="Etiquetas emitidas" description="Últimas 100 emissões registradas."/><div className="mt-7 grid gap-3 rounded-2xl border bg-card p-4 sm:grid-cols-2 xl:grid-cols-4"><Field label="Produto"><div className="relative"><Search className="absolute left-3 top-3.5 size-4 text-muted-foreground"/><input className="pl-9" value={productQuery} onChange={(event) => setProductQuery(event.target.value)} placeholder="Pesquisar produto"/></div></Field><Field label="Responsável"><input value={responsibleQuery} onChange={(event) => setResponsibleQuery(event.target.value)} placeholder="Pesquisar responsável"/></Field><Field label="Cliente"><input value={clientQuery} onChange={(event) => setClientQuery(event.target.value)} placeholder="Pesquisar cliente"/></Field><Field label="Data"><input type="date" value={dateQuery} onChange={(event) => setDateQuery(event.target.value)}/></Field></div><div className="mt-4 overflow-hidden rounded-2xl border bg-card">{filtered.length === 0 ? <p className="p-8 text-center text-muted-foreground">Nenhuma etiqueta encontrada.</p> : filtered.map((h) => <article key={h.id} className="grid gap-4 border-b p-4 md:grid-cols-[1.2fr_1fr_auto] md:items-center"><div><strong>{h.product_name}</strong><p className="text-sm text-muted-foreground">{h.client_name}</p></div><div className="text-sm"><p>{h.responsible_name}</p><p className="text-xs text-muted-foreground">Lote: {h.lot_number || "—"} · Aberto: {format(new Date(`${h.opened_on}T12:00:00`), "dd/MM/yyyy")}</p><p className="text-xs font-semibold text-foreground">Validade: {format(new Date(`${h.expires_on}T12:00:00`), "dd/MM/yyyy")} · {h.quantity || 1} etiqueta(s)</p><p className="text-xs text-muted-foreground">{h.print_status === "falha" ? "Impressão com falha — sem baixa" : h.print_status === "preparada" ? "Aguardando confirmação — sem baixa" : "Saída confirmada"}{(h.reprint_count ?? 0) > 0 ? ` · ${h.reprint_count} reimpressão(ões)` : ""}</p><time className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="size-3"/>{format(new Date(h.issued_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</time></div><div className="grid grid-cols-2 gap-2 md:grid-cols-1"><Button variant="outline" size="sm" onClick={() => onReprint(h)}><Printer/>Reimprimir</Button><Button variant="secondary" size="sm" onClick={() => onDuplicate(h)}><Copy/>Duplicar</Button></div></article>)}</div></section>;
-}
-
-/** Painel PVPS: etiquetas com impressão confirmada e ainda ativas, da validade mais próxima para a mais distante. */
-function ValidadesPanel({ history, alertDays, onAlertDaysChange, onSettle }: {
-  history: LabelRecord[];
-  alertDays: number;
-  onAlertDaysChange: (value: number) => void;
-  onSettle: (record: LabelRecord, status: "utilizada" | "consumida" | "descartada") => Promise<void>;
-}) {
-  const [clientQuery, setClientQuery] = useState("");
-  const [productQuery, setProductQuery] = useState("");
-  const [lotQuery, setLotQuery] = useState("");
-  const norm = (value: string) => value.toLocaleLowerCase("pt-BR").trim();
-  const expiryOf = (item: LabelRecord) => new Date(item.expires_at ?? `${item.expires_on}T23:59:00`);
-
-  const rows = useMemo(() => history
-    .filter((item) => (item.print_status ?? "confirmada") === "confirmada" && (item.label_status ?? "ativa") === "ativa")
-    .filter((item) =>
-      norm(item.client_name).includes(norm(clientQuery)) &&
-      norm(item.product_name).includes(norm(productQuery)) &&
-      norm(item.lot_number ?? "").includes(norm(lotQuery)))
-    .sort((a, b) => expiryOf(a).getTime() - expiryOf(b).getTime()), [history, clientQuery, productQuery, lotQuery]);
-
-  const today = format(new Date(), "yyyy-MM-dd");
-  const limit = addDays(new Date(), alertDays);
-  const dayOf = (item: LabelRecord) => format(expiryOf(item), "yyyy-MM-dd");
-  const vencidos = rows.filter((item) => dayOf(item) < today);
-  const hoje = rows.filter((item) => dayOf(item) === today);
-  const proximos = rows.filter((item) => dayOf(item) > today && expiryOf(item) <= limit);
-  const depois = rows.filter((item) => expiryOf(item) > limit);
-
-  const Group = ({ title, tone, items }: { title: string; tone: string; items: LabelRecord[] }) => (
-    <div className="mt-6">
-      <h2 className={`flex items-center gap-2 text-sm font-extrabold uppercase tracking-[0.14em] ${tone}`}>{title} <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{items.length}</span></h2>
-      <div className="mt-3 overflow-hidden rounded-2xl border bg-card">
-        {items.length === 0 ? <p className="p-6 text-center text-sm text-muted-foreground">Nada aqui.</p> : items.map((item) => (
-          <article key={item.id} className="grid gap-3 border-b p-4 last:border-0 md:grid-cols-[1.2fr_1fr_auto] md:items-center">
-            <div className="min-w-0">
-              <strong className="block truncate">{item.product_name}</strong>
-              <p className="truncate text-sm text-muted-foreground">{item.client_name}{item.lot_number ? ` · Lote ${item.lot_number}` : ""}</p>
-            </div>
-            <div className="text-sm">
-              <p className="font-semibold">Validade: {format(expiryOf(item), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
-              <p className="text-xs text-muted-foreground">Resp.: {item.responsible_name} · Emitida em {format(new Date(item.issued_at), "dd/MM/yyyy HH:mm")}{(item.reprint_count ?? 0) > 0 ? ` · ${item.reprint_count} reimpressão(ões)` : ""}</p>
-            </div>
-            <div className="grid grid-cols-3 gap-2 md:grid-cols-1">
-              <Button variant="outline" size="sm" onClick={() => void onSettle(item, "utilizada")}>Utilizada</Button>
-              <Button variant="outline" size="sm" onClick={() => void onSettle(item, "consumida")}>Consumida</Button>
-              <Button variant="secondary" size="sm" onClick={() => void onSettle(item, "descartada")}>Descartada</Button>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-
-  return (
-    <section>
-      <PanelHeader eyebrow="PVPS" title="Painel de validades" description="Primeiro que vence, primeiro que sai. Somente etiquetas com impressão confirmada." />
-      <div className="mt-7 grid gap-3 rounded-2xl border bg-card p-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Field label="Cliente"><input value={clientQuery} onChange={(e) => setClientQuery(e.target.value)} placeholder="Filtrar por cliente" /></Field>
-        <Field label="Produto"><div className="relative"><Search className="absolute left-3 top-3.5 size-4 text-muted-foreground" /><input className="pl-9" value={productQuery} onChange={(e) => setProductQuery(e.target.value)} placeholder="Filtrar por produto" /></div></Field>
-        <Field label="Lote"><input value={lotQuery} onChange={(e) => setLotQuery(e.target.value)} placeholder="Filtrar por lote" /></Field>
-        <Field label="Antecedência do aviso (dias)"><input type="number" min={1} max={90} value={alertDays} onChange={(e) => onAlertDaysChange(Number(e.target.value))} /></Field>
-      </div>
-      <Group title="Vencidos" tone="text-destructive" items={vencidos} />
-      <Group title="Vencem hoje" tone="text-primary" items={hoje} />
-      <Group title={`Próximos de vencer (${alertDays} dia(s))`} tone="text-foreground" items={proximos} />
-      <Group title="Dentro do prazo" tone="text-muted-foreground" items={depois} />
-    </section>
-  );
 }
