@@ -39,7 +39,10 @@ const carteiraSchema = z.object({
   clientId: z.string().uuid(),
 });
 
-const resetPasswordSchema = z.object({ userId: z.string().uuid() });
+const resetPasswordSchema = z.object({
+  userId: z.string().uuid(),
+  redirectTo: z.string().url().optional(),
+});
 
 async function assertAdmin(userId: string, supabase: { from: (table: string) => unknown }) {
   const client = supabase as typeof import("@supabase/supabase-js").SupabaseClient.prototype;
@@ -61,14 +64,18 @@ export const claimFirstAdmin = createServerFn({ method: "POST" })
       .select("id", { count: "exact", head: true });
     if ((count ?? 0) > 0) throw new Error("O administrador inicial já foi configurado.");
 
-    const email = typeof context.claims.email === "string" ? context.claims.email : "administrador@tinutri.app";
+    const email =
+      typeof context.claims.email === "string" ? context.claims.email : "administrador@tinutri.app";
     const name = "Administrador TiNutri";
-    const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
-      user_id: context.userId,
-      name,
-      email,
-      client_id: null,
-    }, { onConflict: "user_id" });
+    const { error: profileError } = await supabaseAdmin.from("profiles").upsert(
+      {
+        user_id: context.userId,
+        name,
+        email,
+        client_id: null,
+      },
+      { onConflict: "user_id" },
+    );
     if (profileError) throw new Error("Não foi possível criar o perfil administrativo.");
     const { error: roleError } = await supabaseAdmin.from("user_roles").insert({
       user_id: context.userId,
@@ -87,7 +94,8 @@ export const inviteOperator = createServerFn({ method: "POST" })
     const { data: created, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
       data: { full_name: data.name },
     });
-    if (error || !created.user) throw new Error(error?.message ?? "Não foi possível enviar o convite.");
+    if (error || !created.user)
+      throw new Error(error?.message ?? "Não foi possível enviar o convite.");
     const { error: profileError } = await supabaseAdmin.from("profiles").insert({
       user_id: created.user.id,
       client_id: data.clientId ?? null,
@@ -113,8 +121,17 @@ export const createUser = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId, context.supabase);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const needsClient = data.role === "admin_cliente" || data.role === "gerente" || data.role === "operator";
+    const needsClient =
+      data.role === "admin_cliente" || data.role === "gerente" || data.role === "operator";
     if (needsClient && !data.clientId) throw new Error("Selecione a empresa do usuário.");
+    if (needsClient) {
+      const { data: company, error } = await supabaseAdmin
+        .from("clients")
+        .select("id")
+        .eq("id", data.clientId!)
+        .maybeSingle();
+      if (error || !company) throw new Error("Selecione uma empresa válida.");
+    }
     let userId: string;
     if (data.password) {
       const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
@@ -123,29 +140,49 @@ export const createUser = createServerFn({ method: "POST" })
         email_confirm: true,
         user_metadata: { full_name: data.name },
       });
-      if (error || !created.user) throw new Error(error?.message ?? "Não foi possível criar o usuário.");
+      if (error || !created.user)
+        throw new Error(error?.message ?? "Não foi possível criar o usuário.");
       userId = created.user.id;
     } else {
-      const { data: created, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
-        data: { full_name: data.name },
-      });
-      if (error || !created.user) throw new Error(error?.message ?? "Não foi possível convidar o usuário.");
+      const { data: created, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+        data.email,
+        {
+          data: { full_name: data.name },
+        },
+      );
+      if (error || !created.user)
+        throw new Error(error?.message ?? "Não foi possível convidar o usuário.");
       userId = created.user.id;
     }
-    await supabaseAdmin.from("profiles").upsert({
-      user_id: userId,
-      client_id: data.clientId ?? null,
-      name: data.name,
-      email: data.email,
-    }, { onConflict: "user_id" });
-    await supabaseAdmin.from("user_roles").insert({ user_id: userId, role: data.role as never });
+    const { error: profileError } = await supabaseAdmin.from("profiles").upsert(
+      {
+        user_id: userId,
+        client_id: needsClient ? (data.clientId ?? null) : null,
+        name: data.name,
+        email: data.email,
+      },
+      { onConflict: "user_id" },
+    );
+    if (profileError)
+      throw new Error(
+        "Conta criada, mas o perfil não pôde ser vinculado. Revise o cadastro antes de tentar novamente.",
+      );
+    const { error: roleError } = await supabaseAdmin
+      .from("user_roles")
+      .insert({ user_id: userId, role: data.role as never });
+    if (roleError)
+      throw new Error(
+        "Conta criada, mas as permissões não foram atribuídas. Revise o cadastro antes de tentar novamente.",
+      );
     if (data.role === "operator" && data.clientId) {
-      await supabaseAdmin.from("collaborators").insert({
+      const { error: collaboratorError } = await supabaseAdmin.from("collaborators").insert({
         user_id: userId,
         client_id: data.clientId,
         name: data.name,
         email: data.email,
       });
+      if (collaboratorError)
+        throw new Error("Conta criada, mas o colaborador não pôde ser vinculado à equipe.");
     }
     return { ok: true, userId };
   });
@@ -158,9 +195,12 @@ export const resetUserPassword = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u, error } = await supabaseAdmin.auth.admin.getUserById(data.userId);
     if (error || !u.user?.email) throw new Error("Usuário não encontrado.");
-    const { error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-      type: "recovery",
-      email: u.user.email,
+    // Use the authenticated request origin, never an arbitrary redirect from input.
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const request = getRequest();
+    const origin = new URL(request.url).origin;
+    const { error: linkError } = await context.supabase.auth.resetPasswordForEmail(u.user.email, {
+      redirectTo: `${origin}/reset-password`,
     });
     if (linkError) throw new Error("Não foi possível enviar o link de redefinição.");
     return { ok: true };
@@ -201,7 +241,11 @@ export const upsertClient = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
-    const { data: ins, error } = await supabaseAdmin.from("clients").insert(payload).select("id").single();
+    const { data: ins, error } = await supabaseAdmin
+      .from("clients")
+      .insert(payload)
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
     return { id: ins.id };
   });
@@ -240,10 +284,21 @@ export const assignNutritionistClient = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId, context.supabase);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [role, company] = await Promise.all([
+      supabaseAdmin
+        .from("user_roles")
+        .select("user_id")
+        .eq("user_id", data.nutritionistUserId)
+        .eq("role", "nutricionista" as never)
+        .maybeSingle(),
+      supabaseAdmin.from("clients").select("id").eq("id", data.clientId).maybeSingle(),
+    ]);
+    if (role.error || !role.data) throw new Error("Selecione uma nutricionista válida.");
+    if (company.error || !company.data) throw new Error("Selecione uma empresa válida.");
     const { error } = await supabaseAdmin
       .from("nutritionist_clients")
       .insert({ nutritionist_user_id: data.nutritionistUserId, client_id: data.clientId });
-    if (error && !/duplicate/i.test(error.message)) throw new Error(error.message);
+    if (error && error.code !== "23505") throw new Error(error.message);
     return { ok: true };
   });
 
@@ -267,7 +322,9 @@ export const listCarteira = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context.userId, context.supabase);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin.from("nutritionist_clients").select("nutritionist_user_id,client_id");
+    const { data, error } = await supabaseAdmin
+      .from("nutritionist_clients")
+      .select("nutritionist_user_id,client_id");
     if (error) throw new Error(error.message);
     return data ?? [];
   });
@@ -283,11 +340,30 @@ export const masterStats = createServerFn({ method: "GET" })
       supabaseAdmin.from("collaborators").select("id,client_id").eq("active", true),
       supabaseAdmin.from("issued_labels").select("id,client_id"),
     ]);
-    const byClient = new Map<string, { name: string; status: string; products: number; collaborators: number; labels: number }>();
-    for (const c of clients.data ?? []) byClient.set(c.id, { name: c.name, status: c.status as unknown as string, products: 0, collaborators: 0, labels: 0 });
-    for (const p of products.data ?? []) { const row = byClient.get(p.client_id); if (row) row.products += 1; }
-    for (const c of collabs.data ?? []) { const row = byClient.get(c.client_id); if (row) row.collaborators += 1; }
-    for (const l of labels.data ?? []) { const row = byClient.get(l.client_id); if (row) row.labels += 1; }
+    const byClient = new Map<
+      string,
+      { name: string; status: string; products: number; collaborators: number; labels: number }
+    >();
+    for (const c of clients.data ?? [])
+      byClient.set(c.id, {
+        name: c.name,
+        status: c.status as unknown as string,
+        products: 0,
+        collaborators: 0,
+        labels: 0,
+      });
+    for (const p of products.data ?? []) {
+      const row = byClient.get(p.client_id);
+      if (row) row.products += 1;
+    }
+    for (const c of collabs.data ?? []) {
+      const row = byClient.get(c.client_id);
+      if (row) row.collaborators += 1;
+    }
+    for (const l of labels.data ?? []) {
+      const row = byClient.get(l.client_id);
+      if (row) row.labels += 1;
+    }
     return {
       totals: {
         clients: byClient.size,

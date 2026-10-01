@@ -6,6 +6,8 @@ Análise do estado atual em **01/10/2026**, baseada no código disponível neste
 
 A adaptação das quatro abas administrativas está em [Área Master responsiva](09-area-master-responsiva.md).
 
+A evolução para gestão e acompanhamento em seis áreas está em [Reformulação da Área Master](15-area-master.md), com [SQL para aplicação manual](sql/15-area-master.sql).
+
 A reformulação da lista e dos formulários de clientes está em [Clientes e modais](10-clientes-e-modais.md).
 
 O catálogo e a criação de categorias pelo campo estão em [Produtos e categorias](11-produtos-e-categorias.md).

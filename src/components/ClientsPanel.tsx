@@ -1,6 +1,7 @@
 import {
   cloneElement,
   useCallback,
+  useEffect,
   useId,
   useRef,
   useState,
@@ -31,10 +32,11 @@ import {
 } from "@/components/ui/dialog";
 import { ClientQrCard } from "@/components/ClientQrCard";
 import { supabase } from "@/integrations/supabase/client";
+import { management, pageResult, type Company, errorMessage } from "@/lib/management";
 import { useFocusedEntity } from "@/hooks/use-focused-entity";
 import { useDebouncedValue, usePaginatedQuery } from "@/hooks/use-paginated-query";
 import { PageLoading, PaginationControls } from "@/components/PaginationControls";
-import { scopeKey, scopeIds, searchColumns } from "@/lib/list-query";
+import { scopeKey, scopeIds, searchColumns, searchPattern } from "@/lib/list-query";
 
 type Status = "ativa" | "inativa" | "suspensa";
 type Client = {
@@ -53,8 +55,13 @@ type Client = {
   plan: string;
   public_code: string;
   created_at?: string;
+  nutritionists?: string[];
 };
 type Props = {
+  master?: boolean;
+  initialFilter?: Status | "all" | "sem_responsavel";
+  onInspect?: (client: Company) => void;
+  onFocusHandled?: () => void;
   scope: string[] | null;
   revision: number;
   refresh: () => Promise<void>;
@@ -119,9 +126,22 @@ const PLAN_LABEL: Record<string, string> = {
 };
 const statusOf = (client: Client): Status =>
   client.status === "suspensa" ? "suspensa" : client.active ? "ativa" : "inativa";
-export function ClientsPanel({ scope, revision, refresh, recordActivity, focusedId }: Props) {
+export function ClientsPanel({
+  scope,
+  revision,
+  refresh,
+  recordActivity,
+  focusedId,
+  master = false,
+  initialFilter = "all",
+  onInspect,
+  onFocusHandled,
+}: Props) {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<Status | "all" | "sem_responsavel">(
+    initialFilter,
+  );
+  useEffect(() => setStatusFilter(initialFilter), [initialFilter]);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingRecord, setEditingRecord] = useState<Client | null>(null);
@@ -139,7 +159,7 @@ export function ClientsPanel({ scope, revision, refresh, recordActivity, focused
       const ids = scopeIds(accessKey);
       if (ids?.length === 0)
         return { rows: [], total: 0, meta: { all: 0, ativa: 0, inativa: 0, suspensa: 0 } };
-      const query = (head: boolean, status: Status | "all") => {
+      const query = (head: boolean, status: Status | "all" | "sem_responsavel") => {
         let q = supabase.from("clients").select("*", { count: "exact", head }).abortSignal(signal);
         if (ids) q = q.in("id", ids);
         if (term) {
@@ -153,11 +173,28 @@ export function ClientsPanel({ scope, revision, refresh, recordActivity, focused
         else if (status !== "all") q = q.eq("active", status === "ativa").neq("status", "suspensa");
         return q;
       };
+      const masterPage = async () => {
+        const digits = term.replace(/\D/g, "");
+        const { data, error } = await management
+          .rpc("master_directory", {
+            p_kind: "empresas",
+            p_search: searchPattern(term) + (digits ? `|${digits.split("").join("[^0-9]*")}` : ""),
+            p_filter: statusFilter === "all" ? "" : statusFilter,
+            p_offset: offset,
+            p_limit: size,
+          })
+          .abortSignal(signal);
+        if (error) throw new Error(errorMessage(error));
+        const page = pageResult<Company>(data);
+        return { data: page.rows, count: page.total, error: null };
+      };
       const [page, ...totals] = await Promise.all([
-        query(false, statusFilter)
-          .order("name")
-          .order("id")
-          .range(offset, offset + size - 1),
+        master
+          ? masterPage()
+          : query(false, statusFilter)
+              .order("name")
+              .order("id")
+              .range(offset, offset + size - 1),
         ...(["all", "ativa", "inativa", "suspensa"] as const).map((status) => query(true, status)),
       ]);
       if (page.error || totals.some((result) => result.error))
@@ -175,10 +212,10 @@ export function ClientsPanel({ scope, revision, refresh, recordActivity, focused
         },
       };
     },
-    [accessKey, term, statusFilter],
+    [accessKey, term, statusFilter, master],
   );
   const listing = usePaginatedQuery(
-    JSON.stringify([accessKey, term, statusFilter]),
+    JSON.stringify([accessKey, term, statusFilter, master]),
     load,
     revision,
   );
@@ -209,6 +246,9 @@ export function ClientsPanel({ scope, revision, refresh, recordActivity, focused
     setOpen(true);
   }, []);
   useFocusedEntity("clients", focusedId, scope, startEdit, setError);
+  useEffect(() => {
+    if (open && focusedId === editingId) onFocusHandled?.();
+  }, [open, focusedId, editingId, onFocusHandled]);
   const update = <K extends keyof typeof EMPTY>(key: K, value: (typeof EMPTY)[K]) =>
     setForm((previous) => ({ ...previous, [key]: value }));
   const startNew = () => {
@@ -311,7 +351,9 @@ export function ClientsPanel({ scope, revision, refresh, recordActivity, focused
           <p className="text-xs font-semibold uppercase tracking-[.14em] text-primary">
             Administração
           </p>
-          <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight">Clientes</h1>
+          <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight">
+            {master ? "Empresas" : "Clientes"}
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Gerencie empresas, contatos e condições de acesso.
           </p>
@@ -354,6 +396,16 @@ export function ClientsPanel({ scope, revision, refresh, recordActivity, focused
               <span>{listing.loading || listing.error ? "—" : counts[status]}</span>
             </button>
           ))}
+          {master && (
+            <button
+              type="button"
+              className="clients-filter"
+              aria-pressed={statusFilter === "sem_responsavel"}
+              onClick={() => setStatusFilter("sem_responsavel")}
+            >
+              Sem nutricionista
+            </button>
+          )}
         </div>
       </div>
       {notice && (
@@ -449,10 +501,20 @@ export function ClientsPanel({ scope, revision, refresh, recordActivity, focused
                   </p>
                 )}
               </div>
+              {master && (
+                <p className="mt-4 text-xs text-muted-foreground">
+                  Nutricionista: {client.nutritionists?.join(", ") || "Sem responsável vinculado"}
+                </p>
+              )}
               {client.public_code && (
                 <ClientQrCard clientName={client.name} publicCode={client.public_code} />
               )}
               <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+                {onInspect && (
+                  <Button variant="outline" onClick={() => onInspect(client as Company)}>
+                    Ficha da empresa
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   className="min-h-11"

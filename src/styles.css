@@ -520,3 +520,24 @@
   .list-pagination select, .history-page input { font-size: 16px; }
   .list-pagination > div:last-child > div { width: 100%; }
 }
+
+/* Área Master: a mesma identidade da estação, com foco nas ações da equipe. */
+.master-workspace, .care-page { --primary: #007a46; --foreground: #253a30; --muted-foreground: #63736a; --border: #e5ebe7; --ring: #007a46; color: #253a30; }
+.master-workspace .workspace-main { max-width: 1440px; }
+.master-workspace input, .master-workspace select, .care-page input, .care-page select, .master-dialog input, .master-dialog select { min-height: 46px; min-width: 0; font-size: 14px; border-radius: 10px; background: white; }
+.master-dialog textarea { width: 100%; min-height: 100px; padding: 12px; border: 1px solid #dce4df; border-radius: 10px; font-size: 14px; }
+.master-filter-grid { display: grid; align-items: end; gap: 16px; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.master-list-row { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; padding: 20px; border: 1px solid #e5ebe7; border-radius: 16px; background: white; }
+.master-list-row > div:first-child { min-width: 180px; }
+.master-tag { display: inline-flex; padding: 5px 8px; border-radius: 6px; background: #f1f3f2; color: #63736a; font-size: 11px; }
+.master-tag.is-green { background: #edf6f0; color: #25623d; }
+.master-tag.is-orange, .master-priority.is-orange { background: #fff4e9; color: #934412; }
+.master-tag.is-red, .master-priority.is-red { background: #fff0ee; color: #a5322a; }
+.master-metric { min-width: 0; cursor: pointer; transition: border-color .15s; }
+.master-metric:hover, .master-metric[aria-pressed="true"] { border-color: #007a46; }
+.master-empty { padding: 32px 20px; border: 1px solid #e5ebe7; border-radius: 16px; background: white; text-align: center; color: #63736a; font-size: 14px; }
+@media(min-width:1280px) { .master-filter-grid { grid-template-columns: repeat(4,minmax(0,1fr)); } }
+@media(max-width:639px) { .master-filter-grid { grid-template-columns: minmax(0,1fr); } .master-workspace input, .master-workspace select, .care-page input, .care-page select, .master-dialog input, .master-dialog select, .master-dialog textarea { font-size: 16px; } .master-list-row { gap: 14px; padding: 16px; } .master-list-row > div:first-child { width: 100%; } .master-list-row > button { width: 100%; } .care-page .master-metric { padding: 12px; } }
+.master-workspace .workspace-main { overflow-wrap: anywhere; }
+.master-workspace .workspace-main > section { min-width: 0; }
+.master-workspace .workspace-main .grid > section { min-width: 0; }

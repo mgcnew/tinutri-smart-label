@@ -11,6 +11,18 @@ import { EVENT_NAMES, type RecentAction } from "@/lib/dashboard";
 
 const FIELD_NAMES: Record<string, string> = {
   name: "Nome",
+  title: "Título",
+  description: "Descrição",
+  kind: "Tipo de acompanhamento",
+  priority: "Prioridade",
+  assigned_name: "Responsável pelo acompanhamento",
+  due_on: "Data prevista",
+  next_visit_on: "Próxima visita",
+  reason: "Motivo",
+  product_name: "Produto",
+  resolution: "Resultado e orientações",
+  role: "Permissão",
+  client_id: "Empresa vinculada",
   category: "Categoria",
   shelf_life_days: "Validade em dias",
   requires_lot: "Exige lote",

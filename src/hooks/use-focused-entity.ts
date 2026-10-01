@@ -4,7 +4,7 @@ import { scopeIds, scopeKey } from "@/lib/list-query";
 
 /** Audit links fetch their exact record regardless of the current list page. */
 export function useFocusedEntity<T>(
-  table: "clients" | "products",
+  table: "clients" | "products" | "collaborators",
   id: string | null,
   scope: string[] | null,
   onFocus: (record: T) => void,

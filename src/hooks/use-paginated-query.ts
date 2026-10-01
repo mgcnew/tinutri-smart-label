@@ -40,9 +40,13 @@ export function usePaginatedQuery<T, M = undefined>(key: string, load: Loader<T,
         setCompletedKey(requestKey);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((failure: unknown) => {
         if (!alive) return;
-        setError("Não foi possível carregar os registros. Tente novamente.");
+        setError(
+          failure instanceof Error && failure.message.startsWith("Este recurso aguarda ativação")
+            ? failure.message
+            : "Não foi possível carregar os registros. Tente novamente.",
+        );
         setCompletedKey(requestKey);
         setLoading(false);
       })

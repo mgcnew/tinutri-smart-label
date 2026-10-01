@@ -21,6 +21,16 @@ export const EXPIRY_WINDOW_NAMES: Record<ExpiryWindow, string> = {
 };
 
 export const EVENT_NAMES: Record<string, string> = {
+  acompanhamento_criado: "registrou o acompanhamento",
+  acompanhamento_atualizado: "atualizou o acompanhamento",
+  usuario_criado: "cadastrou o usuário",
+  usuario_atualizado: "atualizou o acesso de",
+  recuperacao_solicitada: "solicitou a recuperação de acesso de",
+  senha_redefinicao: "solicitou a recuperação de acesso de",
+  carteira_vinculada: "vinculou à carteira",
+  carteira_removida: "removeu da carteira",
+  cliente_suspenso: "suspendeu a empresa",
+  cliente_reativado: "reativou a empresa",
   emissao: "preparou a etiqueta",
   impressao_confirmada: "confirmou a impressão",
   falha_impressao: "registrou uma falha de impressão",

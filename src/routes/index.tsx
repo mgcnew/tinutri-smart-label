@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { addDays, format, isValid } from "date-fns";
-import { AlertTriangle, Building2, CalendarClock, CheckCircle2, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Smartphone, Trash2, Users, X } from "lucide-react";
+import { AlertTriangle, Building2, CalendarClock, CheckCircle2, ClipboardList, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Smartphone, Trash2, Users, X } from "lucide-react";
 import { cloneElement, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,13 @@ import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger 
 import { OperationalDashboard } from "@/components/OperationalDashboard";
 import { AuditActionDetails } from "@/components/AuditActionDetails";
 import { LabelDetails } from "@/components/LabelDetails";
-import { useFocusedRecord } from "@/hooks/use-focused-record";
+import { useFocusedEntity } from "@/hooks/use-focused-entity";
 import { useOperationalOverview } from "@/hooks/use-operational-overview";
 import { type ExpiryWindow, type RecentAction } from "@/lib/dashboard";
 import { AuthLogin } from "@/components/AuthLogin";
 import { supabase } from "@/integrations/supabase/client";
+import { workspaceSearch, type WorkspaceTab } from "@/lib/workspace-search";
+import { CarePanel } from "@/components/master/CarePanel";
 import { ClientsPanel } from "@/components/ClientsPanel";
 import { ProductsPanel } from "@/components/ProductsPanel";
 import { HistoryPanel } from "@/components/HistoryPanel";
@@ -27,6 +29,7 @@ import tinutriLogo from "@/assets/tinutri-logo.png";
 
 
 export const Route = createFileRoute("/")({
+  validateSearch: workspaceSearch,
   head: () => ({
     meta: [
       { title: "TiNutri Smart Label® | Emitir Etiqueta" },
@@ -58,7 +61,7 @@ type QueueItem = {
 type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number; public_token?: string | null; label_kind?: string | null; label_status?: string | null; storage_condition?: string | null; sector?: string | null; opened_at?: string | null; expires_at?: string | null; print_status?: string | null; confirmed_at?: string | null; reprint_count?: number | null };
 type ActivityRecorder = (action: string, clientId: string, entityType: string, entityId: string, name: string, before: Record<string, unknown>, after: Record<string, unknown>) => Promise<void>;
 
-type AppTab = "dashboard" | "clients" | "products" | "team" | "emit" | "validades" | "history";
+type AppTab = WorkspaceTab;
 type AppRole = "admin_master" | "nutricionista" | "admin_cliente" | "gerente" | "operator";
 
 const ALERT_DAYS_KEY = "tinutri.expiry-alert-days";
@@ -108,7 +111,7 @@ function loadSettings(): PrinterSettings {
     if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
     const legacy = window.localStorage.getItem(PRINTER_MODE_LEGACY_KEY);
     if (legacy === "niimbot") return { ...DEFAULT_SETTINGS, type: "niimbot" };
-  } catch {}
+  } catch { /* Preferências locais são opcionais; os valores padrão continuam disponíveis. */ }
   return DEFAULT_SETTINGS;
 }
 
@@ -274,6 +277,11 @@ function printThermalBatch(labels: PrintableLabel[], settings: PrinterSettings):
 
 
 function Index() {
+  const entry = Route.useSearch();
+  const entryKey = JSON.stringify(entry);
+  const appliedEntry = useRef("");
+  const [entryCompany, setEntryCompany] = useState("");
+  const [entryError, setEntryError] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -293,8 +301,8 @@ function Index() {
   const [focusedEntityId, setFocusedEntityId] = useState<string | null>(null);
   const [activityWarning, setActivityWarning] = useState<string | null>(null);
   const [tab, setTab] = useState<AppTab>("dashboard");
-  const overviewScope = dashboardClient && clients.some((client) => client.id === dashboardClient)
-    ? [dashboardClient] : role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : [];
+  const accessScope = role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : [];
+  const overviewScope = dashboardClient && (accessScope === null || accessScope.includes(dashboardClient)) ? [dashboardClient] : accessScope;
   const overview = useOperationalOverview(Boolean(userId && role && !loading && tab === "dashboard"), overviewScope, overviewRevision);
   const [message, setMessage] = useState("");
   const [selectedClient, setSelectedClient] = useState("");
@@ -326,7 +334,7 @@ function Index() {
   const updateAlertDays = (value: number) => {
     const safe = Math.max(1, Math.min(90, Math.floor(value) || 1));
     setAlertDays(safe);
-    try { window.localStorage.setItem(ALERT_DAYS_KEY, String(safe)); } catch {}
+    try { window.localStorage.setItem(ALERT_DAYS_KEY, String(safe)); } catch { /* Preferências locais são opcionais; os valores padrão continuam disponíveis. */ }
   };
 
   useEffect(() => () => { if (niimbotPreview) URL.revokeObjectURL(niimbotPreview.url); }, [niimbotPreview]);
@@ -338,7 +346,7 @@ function Index() {
   const updateSettings = (patch: Partial<PrinterSettings>) => {
     setPrinterSettings((prev) => {
       const next = { ...prev, ...patch };
-      try { window.localStorage.setItem(PRINTER_SETTINGS_KEY, JSON.stringify(next)); } catch {}
+      try { window.localStorage.setItem(PRINTER_SETTINGS_KEY, JSON.stringify(next)); } catch { /* Preferências locais são opcionais; os valores padrão continuam disponíveis. */ }
       return next;
     });
   };
@@ -491,6 +499,31 @@ function Index() {
   };
 
 
+  useEffect(() => {
+    if (loading || !role || !userId || appliedEntry.current === entryKey) return;
+    const requested = workspaceSearch(JSON.parse(entryKey));
+    appliedEntry.current = entryKey;
+    setEntryError("");
+    if (!requested.painel || !ROLE_TABS[role].includes(requested.painel)) return;
+    const allowed = role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : [];
+    if (requested.empresa && allowed !== null && !allowed.includes(requested.empresa)) {
+      setEntryError("Você não tem acesso a esta empresa.");
+      return;
+    }
+    setTab(requested.painel);
+    setValidityWindow(requested.janela ?? "all");
+    setFocusedEntityId(requested.registro ?? null);
+    setEntryCompany(requested.empresa ?? "");
+    setDashboardClient(requested.empresa ?? "");
+    if (requested.empresa) {
+      const companyId = requested.empresa;
+      void supabase.from("clients").select("id,name,active,status,public_code").eq("id", companyId).maybeSingle().then(({data, error}) => {
+        if (error || !data) { setEntryError("Não foi possível abrir a empresa selecionada."); return; }
+        setClients(previous => previous.some(item => item.id === data.id) ? previous : [...previous, data as Client]);
+      });
+    }
+  }, [loading, role, userId, entryKey, carteira, profileClientId]);
+
   if (loading) return <main className="grid min-h-screen place-items-center bg-background"><p className="font-semibold text-muted-foreground">Preparando sua estação…</p></main>;
 
   if (loadingError) return (
@@ -557,6 +590,7 @@ function Index() {
     (detailAction.entity_type === "product" && (overviewScope === null || overviewScope.includes(detailAction.client_id)))
     || (detailAction.entity_type === "collaborator" && collaborators.some((item) => item.id === detailAction.entity_id))
     || (detailAction.entity_type === "client" && role === "admin_master")
+    || (detailAction.entity_type === "care" && (role === "admin_master" || role === "nutricionista") && (overviewScope === null || overviewScope.includes(detailAction.client_id)))
   );
   const recordActivity: ActivityRecorder = async (action, clientId, entityType, entityId, name, before, after) => {
     try {
@@ -838,7 +872,7 @@ function Index() {
     <div className="workspace-shell min-h-screen bg-background">
       <AuditActionDetails action={detailAction?.source === "activity" ? detailAction : null} onClose={() => setDetailAction(null)} onOpenEntity={canOpenAuditEntity && detailAction ? () => {
         setFocusedEntityId(detailAction.entity_id!);
-        setTab(detailAction.entity_type === "product" ? "products" : detailAction.entity_type === "collaborator" ? "team" : "clients");
+        setTab(detailAction.entity_type === "product" ? "products" : detailAction.entity_type === "collaborator" ? "team" : detailAction.entity_type === "care" ? "acompanhamento" : "clients");
         setDetailAction(null);
       } : undefined} />
       <LabelDetails labelId={detailLabelId} action={detailAction?.source === "activity" ? null : detailAction} revision={overviewRevision} onClose={() => { setDetailLabelId(null); setDetailAction(null); }} onSettle={settleLabel} onReprint={reprintLabel} />
@@ -869,6 +903,8 @@ function Index() {
           </div>
         </aside>
         <main className="workspace-main min-w-0 flex-1">
+          {entryError && <p role="alert" className="clients-error mb-5">{entryError}</p>}
+          {entryCompany && <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3 text-sm"><span>Empresa selecionada: <strong>{clients.find(item => item.id === entryCompany)?.name ?? "Carregando…"}</strong></span><Button variant="ghost" size="sm" onClick={() => { setEntryCompany(""); setDashboardClient(""); }}>Limpar seleção</Button></div>}
           {activityWarning && <div role="alert" className="mb-5 flex items-center gap-3 rounded-xl border border-accent bg-card p-4 text-sm"><p className="flex-1">{activityWarning}</p><Button variant="ghost" size="icon" aria-label="Fechar aviso" onClick={() => setActivityWarning(null)}><X /></Button></div>}
           {tab === "dashboard" && <OperationalDashboard overview={overview} clients={clients} userName={userName} role={role} clientId={dashboardClient} onClientChange={setDashboardClient} onNavigate={navigateTab} onWindow={(window) => { setValidityWindow(window); setTab("validades"); }} onLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} onAction={(action) => { setDetailAction(action); setDetailLabelId(action.source === "activity" ? null : action.label_id); }} />}
           {tab === "emit" && <section className="emission-page space-y-6">
@@ -1050,10 +1086,11 @@ function Index() {
             </div>
           </section>}
           {tab === "clients" && <ClientsPanel scope={role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : []} revision={overviewRevision} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
-          {tab === "products" && <ProductsPanel clients={clients} scope={role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : []} revision={overviewRevision} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
-          {tab === "team" && <TeamPanel clients={clients} collaborators={collaborators} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
+          {tab === "products" && <ProductsPanel clients={clients} scope={role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : []} revision={overviewRevision} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} initialClient={entryCompany} />}
+          {tab === "team" && <TeamPanel scope={accessScope} clients={clients} collaborators={collaborators} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
           {tab === "validades" && <ValidadesPanel scope={overviewScope} revision={overviewRevision} alertDays={alertDays} onAlertDaysChange={updateAlertDays} onSettle={settleLabel} window={validityWindow} onWindowChange={setValidityWindow} clientName={clients.find((item) => item.id === dashboardClient)?.name ?? "Todas as empresas acessíveis"} onOpenLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} />}
-          {tab === "history" && <HistoryPanel scope={role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : []} revision={overviewRevision} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
+          {tab === "acompanhamento" && (role === "admin_master" || role === "nutricionista") && <CarePanel scope={role === "admin_master" ? null : carteira} revision={overviewRevision} initialClient={entryCompany} focusedId={focusedEntityId} />}
+          {tab === "history" && <HistoryPanel scope={entryCompany && (accessScope === null || accessScope.includes(entryCompany)) ? [entryCompany] : accessScope} revision={overviewRevision} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
         </main>
       </div>
     </div>
@@ -1085,12 +1122,13 @@ const navItems = [
   { id: "team", label: "Colaboradores", icon: Users },
   { id: "emit", label: "Emitir Etiquetas", icon: Printer },
   { id: "validades", label: "Validades (PVPS)", icon: CalendarClock },
+  { id: "acompanhamento", label: "Acompanhamento", icon: ClipboardList },
   { id: "history", label: "Histórico", icon: History },
 ] as const;
 
 const ROLE_TABS: Record<AppRole, AppTab[]> = {
-  admin_master: ["dashboard", "clients", "products", "team", "emit", "validades", "history"],
-  nutricionista: ["dashboard", "clients", "products", "team", "emit", "validades", "history"],
+  admin_master: ["dashboard", "clients", "products", "team", "emit", "validades", "history", "acompanhamento"],
+  nutricionista: ["dashboard", "clients", "products", "team", "emit", "validades", "history", "acompanhamento"],
   admin_cliente: ["dashboard", "products", "team", "emit", "validades", "history"],
   gerente: ["dashboard", "products", "team", "emit", "validades", "history"],
   operator: ["dashboard", "emit", "validades", "history"],
@@ -1152,7 +1190,7 @@ function UserStrip({ userName, role, clientName }: { userName: string; role: App
 function PanelHeader({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) { return <><p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">{eyebrow}</p><h1 className="mt-2 text-3xl font-bold">{title}</h1><p className="mt-2 text-muted-foreground">{description}</p></> }
 
 
-function TeamPanel({ clients, collaborators, refresh, recordActivity, focusedId }: { clients: Client[]; collaborators: Collaborator[]; refresh: () => Promise<void>; recordActivity: ActivityRecorder; focusedId: string | null }) {
+function TeamPanel({ scope, clients, collaborators, refresh, recordActivity, focusedId }: { scope: string[] | null; clients: Client[]; collaborators: Collaborator[]; refresh: () => Promise<void>; recordActivity: ActivityRecorder; focusedId: string | null }) {
   const empty = { client_id: "", name: "", role_title: "", active: true };
   const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1160,7 +1198,7 @@ function TeamPanel({ clients, collaborators, refresh, recordActivity, focusedId 
   const [msg, setMsg] = useState("");
   const reset = () => { setForm(empty); setEditingId(null); setMsg(""); };
   const startEdit = useCallback((c: Collaborator) => { setEditingId(c.id); setForm({ client_id: c.client_id, name: c.name, role_title: c.role_title ?? "", active: c.active }); }, []);
-  useFocusedRecord(focusedId, collaborators, startEdit);
+  useFocusedEntity("collaborators", focusedId, scope, startEdit, setMsg);
   const filtered = collaborators.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()) || (c.role_title ?? "").toLowerCase().includes(search.toLowerCase()));
   return <section><PanelHeader eyebrow="Equipe" title="Colaboradores" description="Cadastre os responsáveis que aparecerão nas etiquetas."/>
     <form className="mt-7 grid gap-4 rounded-2xl border bg-card p-5 sm:grid-cols-3 sm:items-end" onSubmit={async (e) => { e.preventDefault(); setMsg(""); const payload = { client_id: form.client_id, name: form.name.trim(), role_title: form.role_title.trim() || null, active: form.active }; const op = editingId ? supabase.from("collaborators").update(payload).eq("id", editingId).select("id").maybeSingle() : supabase.from("collaborators").insert(payload).select("id").single(); const { data: saved, error } = await op; if (error || !saved) { setMsg("Não foi possível salvar."); return; } await recordActivity(editingId ? "colaborador_atualizado" : "colaborador_criado", payload.client_id, "collaborator", saved.id, payload.name, editingId ? { ...collaborators.find((item) => item.id === editingId) } : {}, payload); reset(); await refresh(); }}>

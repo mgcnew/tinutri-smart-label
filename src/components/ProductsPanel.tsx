@@ -55,6 +55,7 @@ type Props = {
   revision: number;
   refresh: () => Promise<void>;
   focusedId: string | null;
+  initialClient?: string;
   recordActivity: (
     action: string,
     clientId: string,
@@ -84,13 +85,15 @@ export function ProductsPanel({
   refresh,
   recordActivity,
   focusedId,
+  initialClient = "",
 }: Props) {
   const [form, setForm] = useState(EMPTY);
   const [editingRecord, setEditingRecord] = useState<Product | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [clientFilter, setClientFilter] = useState("");
+  const [clientFilter, setClientFilter] = useState(initialClient);
+  useEffect(() => setClientFilter(initialClient), [initialClient]);
   const [saving, setSaving] = useState(false);
   const [inactivatingId, setInactivatingId] = useState<string | null>(null);
   const [error, setError] = useState("");
