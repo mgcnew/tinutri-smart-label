@@ -1,8 +1,15 @@
-import { cloneElement, useId, useRef, useState, type ReactElement } from "react";
-import { addDays, format, isValid } from "date-fns";
+import {
+  cloneElement,
+  useId,
+  useRef,
+  useState,
+  useCallback,
+  useEffect,
+  type ReactElement,
+} from "react";
+import { addDays, endOfDay, format, isValid } from "date-fns";
 import {
   AlertTriangle,
-  ArrowDown,
   Building2,
   CalendarClock,
   CheckCircle2,
@@ -25,28 +32,26 @@ import {
 import {
   EXPIRY_WINDOW_NAMES,
   expiryOf,
-  expiryWindow,
   remainingTime,
   type ExpiryWindow,
   type OperationalLabel,
 } from "@/lib/dashboard";
-import { categoryKey } from "@/lib/categories";
+import { supabase } from "@/integrations/supabase/client";
+import { useDebouncedValue, usePaginatedQuery } from "@/hooks/use-paginated-query";
+import { PaginationControls } from "@/components/PaginationControls";
+import { scopeKey, scopeIds, searchPattern, expiryRange, windowRange } from "@/lib/list-query";
 
 type Settlement = "utilizada" | "consumida" | "descartada";
 type Props = {
-  history: OperationalLabel[];
+  scope: string[] | null;
+  revision: number;
   alertDays: number;
   onAlertDaysChange: (days: number) => void;
   onSettle: (record: OperationalLabel, status: Settlement) => Promise<boolean>;
   window: ExpiryWindow;
   onWindowChange: (window: ExpiryWindow) => void;
-  now: Date;
   clientName: string;
   onOpenLabel: (id: string) => void;
-  onRefresh: () => void;
-  updatedAt: Date | null;
-  loading: boolean;
-  loadError: string | null;
 };
 const SETTLEMENTS: { value: Settlement; name: string; description: string }[] = [
   { value: "utilizada", name: "Utilizada", description: "A etiqueta foi utilizada na operação." },
@@ -57,24 +62,22 @@ const dateText = (date: Date) =>
   isValid(date) ? format(date, "dd/MM/yyyy 'às' HH:mm") : "Data não informada";
 
 export function ValidadesPanel({
-  history,
+  scope,
+  revision,
   alertDays,
   onAlertDaysChange,
   onSettle,
   window,
   onWindowChange,
-  now,
   clientName,
   onOpenLabel,
-  onRefresh,
-  updatedAt,
-  loading,
-  loadError,
 }: Props) {
   const [clientQuery, setClientQuery] = useState("");
   const [productQuery, setProductQuery] = useState("");
   const [lotQuery, setLotQuery] = useState("");
-  const [visibleLimits, setVisibleLimits] = useState<Record<string, number>>({});
+  const [urgency, setUrgency] = useState("all");
+  const [now, setNow] = useState(() => new Date());
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [target, setTarget] = useState<OperationalLabel | null>(null);
   const [status, setStatus] = useState<Settlement | null>(null);
   const [saving, setSaving] = useState(false);
@@ -84,22 +87,98 @@ export function ValidadesPanel({
   const returnFocus = useRef<HTMLElement | null>(null);
   const filterInput = useRef<HTMLInputElement | null>(null);
   const id = useId();
-  const active = history.filter(
-    (item) => item.print_status === "confirmada" && item.label_status === "ativa",
+  const terms = useDebouncedValue(
+    JSON.stringify([clientQuery.trim(), productQuery.trim(), lotQuery.trim()]),
   );
-  const invalid = active.filter((item) => !isValid(expiryOf(item)));
-  const rows = active
-    .filter(
-      (item) =>
-        isValid(expiryOf(item)) &&
-        categoryKey(item.client_name).includes(categoryKey(clientQuery)) &&
-        categoryKey(item.product_name).includes(categoryKey(productQuery)) &&
-        categoryKey(item.lot_number ?? "").includes(categoryKey(lotQuery)) &&
-        (window === "all" || expiryWindow(item, now) === window),
-    )
-    .sort((a, b) => expiryOf(a).getTime() - expiryOf(b).getTime());
-  const today = format(now, "yyyy-MM-dd");
-  const limit = addDays(now, alertDays);
+  const accessKey = scopeKey(scope);
+  const load = useCallback(
+    async (offset: number, size: number, signal: AbortSignal) => {
+      const instant = new Date();
+      const ids = scopeIds(accessKey);
+      const empty = { expired: 0, today: 0, soon: 0, later: 0 };
+      if (ids?.length === 0) return { rows: [], total: 0, meta: empty };
+      const [client, product, lot] = JSON.parse(terms) as string[];
+      const ranges: Record<string, [Date | null, Date | null]> = {
+        all: [null, null],
+        expired: [null, instant],
+        today: [instant, endOfDay(instant)],
+        soon: [endOfDay(instant), addDays(instant, alertDays)],
+        later: [addDays(instant, alertDays), null],
+      };
+      const query = (head: boolean, group: string) => {
+        let q = supabase
+          .from("issued_labels")
+          .select("*", { count: "exact", head })
+          .eq("print_status", "confirmada")
+          .eq("label_status", "ativa")
+          .abortSignal(signal);
+        if (ids) q = q.in("client_id", ids);
+        for (const [column, value] of [
+          ["client_name", client],
+          ["product_name", product],
+          ["lot_number", lot],
+        ])
+          if (value) q = q.filter(column, "imatch", searchPattern(value));
+        const selectedRange = windowRange(window, instant);
+        const groupRange = ranges[group];
+        const after =
+          [selectedRange[0], groupRange[0]]
+            .filter((date): date is Date => date !== null)
+            .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+        const until =
+          [selectedRange[1], groupRange[1]]
+            .filter((date): date is Date => date !== null)
+            .sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
+        if (after && until && after >= until)
+          q = q.eq("id", "00000000-0000-0000-0000-000000000000");
+        else if (after || until) q = q.or(expiryRange(after, until));
+        return q;
+      };
+      const [page, ...totals] = await Promise.all([
+        query(false, urgency)
+          .order("expires_on")
+          .order("expires_at", { nullsFirst: false })
+          .order("id")
+          .range(offset, offset + size - 1),
+        ...["expired", "today", "soon", "later"].map((group) => query(true, group)),
+      ]);
+      if (page.error || totals.some((result) => result.error))
+        throw page.error ?? totals.find((result) => result.error)?.error;
+      if (page.count === null || totals.some((result) => result.count === null))
+        throw new Error("Contagem indisponível");
+      setNow(instant);
+      setUpdatedAt(instant);
+      return {
+        rows: (page.data ?? []) as OperationalLabel[],
+        total: page.count,
+        meta: {
+          expired: totals[0].count!,
+          today: totals[1].count!,
+          soon: totals[2].count!,
+          later: totals[3].count!,
+        },
+      };
+    },
+    [accessKey, terms, alertDays, window, urgency],
+  );
+  const listing = usePaginatedQuery(
+    JSON.stringify([accessKey, terms, alertDays, window, urgency]),
+    load,
+    revision,
+  );
+  const loading = listing.loading;
+  const loadError = listing.error;
+  const onRefresh = listing.reload;
+  const counts = listing.meta ?? { expired: 0, today: 0, soon: 0, later: 0 };
+  const rows = listing.rows;
+  const invalid = rows.filter((item) => !isValid(expiryOf(item)));
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+  const groupingNow = updatedAt ?? now;
+  const today = format(groupingNow, "yyyy-MM-dd");
+  const limit = addDays(groupingNow, alertDays);
   const groups = [
     {
       key: "expired",
@@ -107,7 +186,7 @@ export function ValidadesPanel({
       description: "Verifique o destino destes produtos.",
       tone: "expired",
       icon: AlertTriangle,
-      items: rows.filter((item) => expiryOf(item) <= now),
+      items: rows.filter((item) => expiryOf(item) <= groupingNow),
     },
     {
       key: "today",
@@ -116,7 +195,7 @@ export function ValidadesPanel({
       tone: "today",
       icon: CalendarClock,
       items: rows.filter(
-        (item) => expiryOf(item) > now && format(expiryOf(item), "yyyy-MM-dd") === today,
+        (item) => expiryOf(item) > groupingNow && format(expiryOf(item), "yyyy-MM-dd") === today,
       ),
     },
     {
@@ -140,12 +219,15 @@ export function ValidadesPanel({
       ),
     },
   ];
-  const hasFilters = Boolean(clientQuery || productQuery || lotQuery || window !== "all");
+  const hasFilters = Boolean(
+    clientQuery || productQuery || lotQuery || window !== "all" || urgency !== "all",
+  );
   const clearFilters = () => {
     setClientQuery("");
     setProductQuery("");
     setLotQuery("");
     onWindowChange("all");
+    setUrgency("all");
   };
   const beginSettlement = (item: OperationalLabel) => {
     returnFocus.current =
@@ -241,7 +323,10 @@ export function ValidadesPanel({
           <FilterField label="Período das validades">
             <select
               value={window}
-              onChange={(event) => onWindowChange(event.target.value as ExpiryWindow)}
+              onChange={(event) => {
+                setUrgency("all");
+                onWindowChange(event.target.value as ExpiryWindow);
+              }}
             >
               {Object.entries(EXPIRY_WINDOW_NAMES).map(([value, name]) => (
                 <option key={value} value={value}>
@@ -293,7 +378,7 @@ export function ValidadesPanel({
             <p role="status" className="text-xs text-muted-foreground">
               {loading
                 ? "Consultando etiquetas…"
-                : `${rows.length} etiqueta${rows.length === 1 ? "" : "s"} para acompanhar`}
+                : `${listing.total} etiqueta${listing.total === 1 ? "" : "s"} neste filtro`}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -302,31 +387,28 @@ export function ValidadesPanel({
                 key={group.key}
                 type="button"
                 className={`validity-metric validity-${group.tone}`}
-                disabled={loading || !group.items.length}
-                aria-label={`Ver ${group.title.toLocaleLowerCase("pt-BR")}: ${group.items.length} etiquetas`}
+                aria-pressed={urgency === group.key}
+                disabled={loading || !counts[group.key as keyof typeof counts]}
+                aria-label={`Ver ${group.title.toLocaleLowerCase("pt-BR")}: ${counts[group.key as keyof typeof counts]} etiquetas`}
                 onClick={() =>
-                  document.getElementById(`${id}-${group.key}`)?.scrollIntoView({
-                    behavior: globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-                      ? "auto"
-                      : "smooth",
-                    block: "start",
-                  })
+                  setUrgency((previous) => (previous === group.key ? "all" : group.key))
                 }
               >
                 <div className="flex items-center justify-between gap-2">
                   <group.icon className="size-4" />
-                  <ArrowDown className="size-3.5 opacity-50" />
+                  {urgency === group.key && <CheckCircle2 className="size-3.5" />}
                 </div>
                 <p className="mt-3 text-xs font-medium">{group.title}</p>
                 <strong className="mt-1 block text-3xl font-semibold tabular-nums">
-                  {loading ? "—" : group.items.length}
+                  {loading ? "—" : counts[group.key as keyof typeof counts]}
                 </strong>
               </button>
             ))}
           </div>
           <p className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed text-muted-foreground">
             <CheckCircle2 className="size-3.5 shrink-0 text-primary" />
-            Somente etiquetas ativas com impressão confirmada. Contagens seguem os filtros acima.
+            Somente etiquetas ativas com impressão confirmada. Toque em um grupo para filtrar a
+            lista.
           </p>
         </div>
       )}
@@ -387,7 +469,7 @@ export function ValidadesPanel({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-base font-semibold">{group.title}</h2>
-                    <span className="validity-group-count">{group.items.length}</span>
+                    <span className="validity-group-count">{group.items.length} nesta página</span>
                   </div>
                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                     {group.description}
@@ -395,7 +477,7 @@ export function ValidadesPanel({
                 </div>
               </header>
               <div className="divide-y">
-                {group.items.slice(0, visibleLimits[group.key] ?? 10).map((item) => (
+                {group.items.map((item) => (
                   <article
                     key={item.id}
                     className="validity-row grid min-w-0 gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_auto]"
@@ -460,27 +542,25 @@ export function ValidadesPanel({
                   </article>
                 ))}
               </div>
-              {group.items.length > (visibleLimits[group.key] ?? 10) && (
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3">
-                  <p className="text-xs text-muted-foreground">
-                    Exibindo {visibleLimits[group.key] ?? 10} de {group.items.length} etiquetas
-                  </p>
-                  <Button
-                    variant="ghost"
-                    className="min-h-11 text-xs text-primary"
-                    onClick={() =>
-                      setVisibleLimits((previous) => ({
-                        ...previous,
-                        [group.key]: (previous[group.key] ?? 10) + 10,
-                      }))
-                    }
-                  >
-                    Mostrar mais etiquetas
-                  </Button>
-                </div>
-              )}
             </section>
           ))
+      )}
+      {urgency !== "all" && (
+        <Button variant="ghost" className="text-xs" onClick={() => setUrgency("all")}>
+          <X />
+          Remover filtro de urgência
+        </Button>
+      )}
+      {!loadError && (
+        <PaginationControls
+          page={listing.page}
+          size={listing.size}
+          total={listing.total}
+          loading={loading}
+          onPageChange={listing.setPage}
+          onSizeChange={listing.setSize}
+          label="etiquetas"
+        />
       )}
       <Dialog
         open={Boolean(target)}

@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { addDays, format, isValid } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { AlertTriangle, Building2, CalendarClock, CheckCircle2, Clock3, Copy, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Smartphone, Trash2, Users, X } from "lucide-react";
+import { AlertTriangle, Building2, CalendarClock, CheckCircle2, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Smartphone, Trash2, Users, X } from "lucide-react";
 import { cloneElement, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,7 @@ import { AuthLogin } from "@/components/AuthLogin";
 import { supabase } from "@/integrations/supabase/client";
 import { ClientsPanel } from "@/components/ClientsPanel";
 import { ProductsPanel } from "@/components/ProductsPanel";
+import { HistoryPanel } from "@/components/HistoryPanel";
 import { ValidadesPanel } from "@/components/ValidadesPanel";
 import { LabelPreview } from "@/components/LabelPreview";
 import { CLIENT_CODE_KEY } from "./e.$code";
@@ -39,7 +39,7 @@ export const Route = createFileRoute("/")({
 });
 
 type ClientStatus = "ativa" | "inativa" | "suspensa";
-type Client = { id: string; name: string; legal_name: string | null; cnpj: string | null; city: string; state: string; active: boolean; status: ClientStatus; responsible_name: string | null; email: string | null; phone: string | null; address: string | null; plan: string; public_code: string; created_at?: string };
+type Client = { id: string; name: string; active: boolean; status: ClientStatus; public_code: string };
 type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null; active: boolean };
 type Collaborator = { id: string; client_id: string; name: string; role_title: string | null; active: boolean };
 type QueueItem = {
@@ -283,8 +283,8 @@ function Index() {
   const [carteira, setCarteira] = useState<string[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const handleProductRecord = useCallback((record: Product | null) => setProducts(record ? [record] : []), []);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
-  const [history, setHistory] = useState<LabelRecord[]>([]);
   const [overviewRevision, setOverviewRevision] = useState(0);
   const [dashboardClient, setDashboardClient] = useState("");
   const [validityWindow, setValidityWindow] = useState<ExpiryWindow>("all");
@@ -294,8 +294,8 @@ function Index() {
   const [activityWarning, setActivityWarning] = useState<string | null>(null);
   const [tab, setTab] = useState<AppTab>("dashboard");
   const overviewScope = dashboardClient && clients.some((client) => client.id === dashboardClient)
-    ? [dashboardClient] : role === "admin_master" ? null : clients.map((client) => client.id);
-  const overview = useOperationalOverview(Boolean(userId && role && !loading && (tab === "dashboard" || tab === "validades")), overviewScope, overviewRevision);
+    ? [dashboardClient] : role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : [];
+  const overview = useOperationalOverview(Boolean(userId && role && !loading && tab === "dashboard"), overviewScope, overviewRevision);
   const [message, setMessage] = useState("");
   const [selectedClient, setSelectedClient] = useState("");
   const [selectedProduct, setSelectedProduct] = useState("");
@@ -400,33 +400,25 @@ function Index() {
         setCarteira([]);
       }
       phase = "carregar os dados da sua estação";
-      const [clientsResult, productsResult, collaboratorsResult] = await Promise.all([
-        supabase.from("clients").select("id,name,legal_name,cnpj,city,state,active,status,responsible_name,email,phone,address,plan,public_code,created_at").order("name").abortSignal(controller.signal),
-        supabase.from("products").select("*").eq("active", true).order("name").abortSignal(controller.signal),
-        supabase.from("collaborators").select("id,client_id,name,role_title,active").eq("active", true).order("name").abortSignal(controller.signal),
-      ]);
-      checkActive();
-      for (const result of [clientsResult, productsResult, collaboratorsResult]) {
-        if (result.error) throw result.error;
+      const allowedClientIds: string[] | null = currentRole === "admin_master" ? null : currentRole === "nutricionista" ? carteiraIds : ownClient ? [ownClient] : [];
+      let clientsQuery = supabase.from("clients").select("id,name,active,status,public_code").order("name").order("id").abortSignal(controller.signal);
+      let collaboratorsQuery = supabase.from("collaborators").select("id,client_id,name,role_title,active").eq("active", true).order("name").abortSignal(controller.signal);
+      if (allowedClientIds) {
+        clientsQuery = clientsQuery.in("id", allowedClientIds.length ? allowedClientIds : ["00000000-0000-0000-0000-000000000000"]);
+        collaboratorsQuery = collaboratorsQuery.in("client_id", allowedClientIds.length ? allowedClientIds : ["00000000-0000-0000-0000-000000000000"]);
       }
-      const clientRows = clientsResult.data;
-      const productRows = productsResult.data;
-      const collaboratorRows = collaboratorsResult.data;
-      // Filtrar conforme perfil (segurança em profundidade — RLS já restringe no banco)
-      const allClients = (clientRows ?? []) as Client[];
-      const allProducts = (productRows ?? []) as Product[];
-      const allCollab = (collaboratorRows ?? []) as Collaborator[];
-      const allowedClientIds: string[] | null =
-        currentRole === "admin_master" ? null
-        : currentRole === "nutricionista" ? carteiraIds
-        : ownClient ? [ownClient] : [];
+      const [clientsResult, collaboratorsResult] = await Promise.all([clientsQuery, collaboratorsQuery]);
+      checkActive();
+      for (const result of [clientsResult, collaboratorsResult]) if (result.error) throw result.error;
+      // Compact names for selectors; full client and product records are loaded on demand.
+      const allClients = (clientsResult.data ?? []) as Client[];
+      const allCollab = (collaboratorsResult.data ?? []) as Collaborator[];
       const filterByClient = <T extends { client_id?: string; id?: string }>(rows: T[], keyIsId = false): T[] => {
         if (allowedClientIds === null) return rows;
         const set = new Set(allowedClientIds);
         return rows.filter((r) => set.has((keyIsId ? r.id : r.client_id) as string));
       };
       setClients(allowedClientIds === null ? allClients : allClients.filter((c) => allowedClientIds!.includes(c.id)));
-      setProducts(filterByClient(allProducts));
       setCollaborators(filterByClient(allCollab));
       if (ownClient) setSelectedClient(ownClient);
       // QR Code do estabelecimento: valida se o usuário realmente pertence/tem acesso àquele cliente
@@ -442,12 +434,6 @@ function Index() {
       } catch { /* ignore */ }
       const suspendedOwn = allClients.find((c) => c.id === ownClient && c.status === "suspensa");
       if (suspendedOwn) return;
-      // Histórico — RLS faz o filtro no banco; operador/admin_cliente verão somente seu cliente
-      phase = "carregar o histórico de etiquetas";
-      const { data: labels, error: historyError } = await supabase.from("issued_labels").select("id,client_id,product_id,responsible_id,client_name,product_name,responsible_name,lot_number,inspection_label,opened_on,issued_at,expires_on,quantity,public_token,label_kind,label_status,storage_condition,sector,opened_at,expires_at,print_status,confirmed_at,reprint_count").order("issued_at", { ascending: false }).limit(500).abortSignal(controller.signal);
-      checkActive();
-      if (historyError) throw historyError;
-      setHistory((labels ?? []) as LabelRecord[]);
       setOverviewRevision((value) => value + 1);
     };
     try {
@@ -476,7 +462,6 @@ function Index() {
   useEffect(() => { void refresh(); }, []);
 
   const activeClients = useMemo(() => clients.filter(c => c.active), [clients]);
-  const visibleProducts = products.filter((item) => item.client_id === selectedClient);
   const visibleCollaborators = collaborators.filter((item) => item.client_id === selectedClient);
   const product = products.find((item) => item.id === selectedProduct);
   const responsible = collaborators.find((item) => item.id === selectedResponsible);
@@ -569,9 +554,9 @@ function Index() {
     setTab(nextTab);
   };
   const canOpenAuditEntity = detailAction?.entity_id && role !== "operator" && (
-    (detailAction.entity_type === "product" && products.some((item) => item.id === detailAction.entity_id))
+    (detailAction.entity_type === "product" && (overviewScope === null || overviewScope.includes(detailAction.client_id)))
     || (detailAction.entity_type === "collaborator" && collaborators.some((item) => item.id === detailAction.entity_id))
-    || (detailAction.entity_type === "client" && role === "admin_master" && clients.some((item) => item.id === detailAction.entity_id))
+    || (detailAction.entity_type === "client" && role === "admin_master")
   );
   const recordActivity: ActivityRecorder = async (action, clientId, entityType, entityId, name, before, after) => {
     try {
@@ -955,7 +940,7 @@ function Index() {
               <div className="emit-form min-w-0 rounded-2xl border bg-card p-5 sm:p-6">
                 <fieldset disabled={Boolean(emissionBusy)} className="min-w-0 space-y-4"><div className="emit-group-title"><span>1</span><h2>Dados da etiqueta</h2></div>
                 <div className="grid gap-4 sm:grid-cols-2"><EmitField label="Cliente"><select value={selectedClient} disabled={role === "operator" || role === "admin_cliente"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); setLabelDraft(null); setLot(""); setShelfDays(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></EmitField>
-                <EmissionProductPicker key={selectedClient} products={visibleProducts} value={selectedProduct} disabled={!selectedClient} onChange={(id) => { setSelectedProduct(id); setLot(""); setLabelDraft(null); const selected = products.find(p => p.id === id); setShelfDays(selected ? String(selected.shelf_life_days) : ""); }} />
+                <EmissionProductPicker key={selectedClient} clientId={selectedClient} value={selectedProduct} disabled={!selectedClient} revision={overviewRevision} onRecord={handleProductRecord} onChange={(selected) => { setSelectedProduct(selected?.id ?? ""); setProducts(selected ? [selected] : []); setLot(""); setLabelDraft(null); setShelfDays(selected ? String(selected.shelf_life_days) : ""); }} />
                 <EmitField label="Responsável"><select value={selectedResponsible} disabled={!selectedClient} onChange={(e) => setSelectedResponsible(e.target.value)}><option value="">Selecione o responsável</option>{visibleCollaborators.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></EmitField>
                 <EmitField label="Tipo da etiqueta"><select value={kind} onChange={(e) => setKind(e.target.value as LabelKind)}>{LABEL_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</select></EmitField></div>
                 <div className="emit-group-title"><span>2</span><h2>Validade e conservação</h2></div>
@@ -1064,11 +1049,11 @@ function Index() {
               </aside>
             </div>
           </section>}
-          {tab === "clients" && <ClientsPanel clients={clients} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
-          {tab === "products" && <ProductsPanel clients={clients} products={products} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
+          {tab === "clients" && <ClientsPanel scope={role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : []} revision={overviewRevision} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
+          {tab === "products" && <ProductsPanel clients={clients} scope={role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : []} revision={overviewRevision} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
           {tab === "team" && <TeamPanel clients={clients} collaborators={collaborators} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
-          {tab === "validades" && <ValidadesPanel history={overview.labels} alertDays={alertDays} onAlertDaysChange={updateAlertDays} onSettle={settleLabel} window={validityWindow} onWindowChange={setValidityWindow} now={overview.now} clientName={clients.find((item) => item.id === dashboardClient)?.name ?? "Todas as empresas acessíveis"} updatedAt={overview.updatedAt} loading={overview.loading} loadError={overview.labelsError} onRefresh={overview.reload} onOpenLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} />}
-          {tab === "history" && <HistoryPanel history={history} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
+          {tab === "validades" && <ValidadesPanel scope={overviewScope} revision={overviewRevision} alertDays={alertDays} onAlertDaysChange={updateAlertDays} onSettle={settleLabel} window={validityWindow} onWindowChange={setValidityWindow} clientName={clients.find((item) => item.id === dashboardClient)?.name ?? "Todas as empresas acessíveis"} onOpenLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} />}
+          {tab === "history" && <HistoryPanel scope={role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : []} revision={overviewRevision} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
         </main>
       </div>
     </div>
@@ -1189,20 +1174,4 @@ function TeamPanel({ clients, collaborators, refresh, recordActivity, focusedId 
     <div className="mt-6 relative"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><input className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar por nome ou função"/></div>
     <div className="mt-4 grid gap-3 sm:grid-cols-2">{filtered.length === 0 ? <p className="py-10 text-center text-sm text-muted-foreground sm:col-span-2">Nenhum colaborador encontrado.</p> : filtered.map((c) => <article key={c.id} className="flex items-start justify-between gap-4 rounded-2xl border bg-card p-5"><div className="min-w-0"><Users className="text-primary"/><strong className="mt-3 block truncate">{c.name}</strong>{c.role_title && <p className="text-sm font-semibold text-primary">{c.role_title}</p>}<p className="text-xs text-muted-foreground">{clients.find((client) => client.id === c.client_id)?.name}</p></div><div className="flex shrink-0 gap-1"><Button variant="ghost" size="icon" aria-label="Editar" onClick={() => startEdit(c)}><Pencil className="size-4"/></Button><Button variant="ghost" size="icon" aria-label="Inativar" onClick={async () => { if (!confirm("Inativar este colaborador?")) return; const { data: saved, error } = await supabase.from("collaborators").update({ active: false }).eq("id", c.id).select("id").maybeSingle(); if (error || !saved) { setMsg("Não foi possível inativar o colaborador."); return; } await recordActivity("colaborador_inativado", c.client_id, "collaborator", c.id, c.name, { active: c.active }, { active: false }); await refresh(); }}><Trash2 className="size-4 text-destructive"/></Button></div></article>)}</div>
   </section>;
-}
-
-function HistoryPanel({ history, onReprint, onDuplicate }: { history: LabelRecord[]; onReprint: (record: LabelRecord) => void; onDuplicate: (record: LabelRecord) => void }) {
-  const [productQuery, setProductQuery] = useState("");
-  const [responsibleQuery, setResponsibleQuery] = useState("");
-  const [clientQuery, setClientQuery] = useState("");
-  const [dateQuery, setDateQuery] = useState("");
-  const normalized = (value: string) => value.toLocaleLowerCase("pt-BR").trim();
-  const filtered = history.filter((item) =>
-    normalized(item.product_name).includes(normalized(productQuery)) &&
-    normalized(item.responsible_name).includes(normalized(responsibleQuery)) &&
-    normalized(item.client_name).includes(normalized(clientQuery)) &&
-    (!dateQuery || item.issued_at.slice(0, 10) === dateQuery),
-  );
-
-  return <section><PanelHeader eyebrow="Registros" title="Etiquetas emitidas" description="Últimas 100 emissões registradas."/><div className="mt-7 grid gap-3 rounded-2xl border bg-card p-4 sm:grid-cols-2 xl:grid-cols-4"><Field label="Produto"><div className="relative"><Search className="absolute left-3 top-3.5 size-4 text-muted-foreground"/><input className="pl-9" value={productQuery} onChange={(event) => setProductQuery(event.target.value)} placeholder="Pesquisar produto"/></div></Field><Field label="Responsável"><input value={responsibleQuery} onChange={(event) => setResponsibleQuery(event.target.value)} placeholder="Pesquisar responsável"/></Field><Field label="Cliente"><input value={clientQuery} onChange={(event) => setClientQuery(event.target.value)} placeholder="Pesquisar cliente"/></Field><Field label="Data"><input type="date" value={dateQuery} onChange={(event) => setDateQuery(event.target.value)}/></Field></div><div className="mt-4 overflow-hidden rounded-2xl border bg-card">{filtered.length === 0 ? <p className="p-8 text-center text-muted-foreground">Nenhuma etiqueta encontrada.</p> : filtered.map((h) => <article key={h.id} className="grid gap-4 border-b p-4 md:grid-cols-[1.2fr_1fr_auto] md:items-center"><div><strong>{h.product_name}</strong><p className="text-sm text-muted-foreground">{h.client_name}</p></div><div className="text-sm"><p>{h.responsible_name}</p><p className="text-xs text-muted-foreground">Lote: {h.lot_number || "—"} · Aberto: {format(new Date(`${h.opened_on}T12:00:00`), "dd/MM/yyyy")}</p><p className="text-xs font-semibold text-foreground">Validade: {format(new Date(`${h.expires_on}T12:00:00`), "dd/MM/yyyy")} · {h.quantity || 1} etiqueta(s)</p><p className="text-xs text-muted-foreground">{h.print_status === "falha" ? "Impressão com falha — sem baixa" : h.print_status === "preparada" ? "Aguardando confirmação — sem baixa" : "Saída confirmada"}{(h.reprint_count ?? 0) > 0 ? ` · ${h.reprint_count} reimpressão(ões)` : ""}</p><time className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="size-3"/>{format(new Date(h.issued_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</time></div><div className="grid grid-cols-2 gap-2 md:grid-cols-1"><Button variant="outline" size="sm" onClick={() => onReprint(h)}><Printer/>Reimprimir</Button><Button variant="secondary" size="sm" onClick={() => onDuplicate(h)}><Copy/>Duplicar</Button></div></article>)}</div></section>;
 }

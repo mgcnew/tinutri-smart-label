@@ -9,6 +9,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
+    "test:lists": "node --experimental-strip-types --test tests/list-query.test.ts",
     "test:dashboard": "node --experimental-strip-types --test tests/dashboard.test.ts",
     "format": "prettier --write ."
   },

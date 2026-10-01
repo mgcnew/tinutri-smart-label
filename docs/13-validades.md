@@ -2,6 +2,8 @@
 
 Atualização em 01/10/2026, aprovada após a reformulação das demais páginas.
 
+**Evolução posterior:** a expansão progressiva descrita abaixo foi substituída por paginação no banco; consulte [Paginação das listas](14-paginacao-das-listas.md).
+
 A página utiliza o padrão visual do painel: cabeçalho com hierarquia clara, cartões brancos, bordas discretas, verde da marca e cores de urgência acompanhadas de texto. Os filtros ficam reunidos em uma área própria, com pesquisa por cliente, produto e lote, período e antecedência do aviso. As buscas ignoram acentos e diferenças entre maiúsculas e minúsculas.
 
 O panorama mostra quatro grupos exclusivos: vencidas, vencem hoje, próximas de vencer e dentro do prazo. O período escolhido no Dashboard continua aplicado ao abrir Validades. As contagens acompanham os filtros e consideram apenas etiquetas ativas com impressão confirmada, obtidas pela consulta paginada do panorama operacional. Não há dependência do limite do histórico recente. Cada grupo apresenta inicialmente dez registros, com opção de mostrar mais, preservando a contagem completa.

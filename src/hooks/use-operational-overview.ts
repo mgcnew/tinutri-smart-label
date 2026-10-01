@@ -1,3 +1,5 @@
+import { addDays, endOfDay } from "date-fns";
+import { expiryRange } from "@/lib/list-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { OperationalLabel, RecentAction } from "@/lib/dashboard";
@@ -33,15 +35,19 @@ export function useOperationalOverview(enabled: boolean, scope: string[] | null,
     const loadLabels = async () => {
       if (clientIds?.length === 0) return [];
       const rows: OperationalLabel[] = [];
-      // Paginação independente do histórico. Não há teto de 500 nem dependência
-      // do limite de resposta configurado no PostgREST (o total vem do count).
+      // Dashboard needs only compact priority rows through the next seven days.
+      // Full validity records belong to the independently paginated list.
       let offset = 0;
       while (true) {
         let query = supabase
           .from("issued_labels")
-          .select("*", { count: "exact" })
+          .select(
+            "id,client_id,client_name,product_id,product_name,lot_number,expires_on,expires_at,storage_condition,responsible_name",
+            { count: "exact" },
+          )
           .eq("print_status", "confirmada")
           .eq("label_status", "ativa")
+          .or(expiryRange(null, endOfDay(addDays(new Date(), 7))))
           .order("expires_at", { ascending: true, nullsFirst: false })
           .order("id")
           .range(offset, offset + 199)
@@ -51,7 +57,7 @@ export function useOperationalOverview(enabled: boolean, scope: string[] | null,
         if (error) throw error;
         if (controller.signal.aborted) throw new Error("Tempo excedido");
         const page = data ?? [];
-        rows.push(...page);
+        rows.push(...(page as OperationalLabel[]));
         offset += page.length;
         if (count !== null && offset >= count) break;
         if (!page.length) {
@@ -59,7 +65,7 @@ export function useOperationalOverview(enabled: boolean, scope: string[] | null,
           break;
         }
       }
-      return rows;
+      return rows as OperationalLabel[];
     };
     const loadActions = async () => {
       if (clientIds?.length === 0) return [];

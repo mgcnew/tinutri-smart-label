@@ -509,3 +509,14 @@
   .thermal-label, .thermal-label * { visibility: visible !important; }
   .thermal-label { position: fixed !important; inset: 0 !important; width: 60mm !important; height: 40mm !important; margin: 0 !important; border: 0 !important; box-shadow: none !important; print-color-adjust: exact; }
 }
+
+/* Navegação de listas mantém alvos de toque e quebra em telas estreitas. */
+.list-pagination { min-width: 0; }
+.list-pagination button { width: 44px; min-width: 44px; min-height: 44px; flex-shrink: 0; }
+.list-pagination select { font-size: 14px; }
+.validity-metric[aria-pressed="true"] { border-color: #007a46; background: #f3faf5; box-shadow: 0 0 0 1px #007a46; }
+.history-page input { min-height: 46px; }
+@media (max-width: 639px) {
+  .list-pagination select, .history-page input { font-size: 16px; }
+  .list-pagination > div:last-child > div { width: 100%; }
+}

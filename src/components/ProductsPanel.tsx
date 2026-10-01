@@ -2,7 +2,7 @@ import {
   cloneElement,
   useCallback,
   useId,
-  useMemo,
+  useEffect,
   useRef,
   useState,
   type FormEvent,
@@ -30,9 +30,13 @@ import {
 import { CategoryInput } from "@/components/CategoryInput";
 import { categoryKey } from "@/lib/categories";
 import { supabase } from "@/integrations/supabase/client";
-import { useFocusedRecord } from "@/hooks/use-focused-record";
+import { useFocusedEntity } from "@/hooks/use-focused-entity";
+import { useDebouncedValue, usePaginatedQuery } from "@/hooks/use-paginated-query";
+import { PageLoading, PaginationControls } from "@/components/PaginationControls";
+import { scopeKey, scopeIds, searchColumns, searchPattern } from "@/lib/list-query";
 
 type Product = {
+  company?: { name: string } | null;
   id: string;
   client_id: string;
   name: string;
@@ -47,7 +51,8 @@ type Product = {
 };
 type Props = {
   clients: { id: string; name: string; active: boolean }[];
-  products: Product[];
+  scope: string[] | null;
+  revision: number;
   refresh: () => Promise<void>;
   focusedId: string | null;
   recordActivity: (
@@ -72,8 +77,16 @@ const EMPTY = {
   notes: "",
 };
 
-export function ProductsPanel({ clients, products, refresh, recordActivity, focusedId }: Props) {
+export function ProductsPanel({
+  clients,
+  scope,
+  revision,
+  refresh,
+  recordActivity,
+  focusedId,
+}: Props) {
   const [form, setForm] = useState(EMPTY);
+  const [editingRecord, setEditingRecord] = useState<Product | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -85,23 +98,78 @@ export function ProductsPanel({ clients, products, refresh, recordActivity, focu
   const newButton = useRef<HTMLButtonElement | null>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const activeClients = clients.filter((client) => client.active);
-  const categories = useMemo(() => {
-    const names = new Map<string, string>();
-    products
-      .filter((product) => product.client_id === form.client_id)
-      .forEach((product) => {
+  const term = useDebouncedValue(search.trim());
+  const accessKey = scopeKey(scope);
+  const load = useCallback(
+    async (offset: number, size: number, signal: AbortSignal) => {
+      const ids = scopeIds(accessKey);
+      if (ids?.length === 0) return { rows: [], total: 0 };
+      let query = supabase
+        .from("products")
+        .select("*,company:clients(name)", { count: "exact" })
+        .eq("active", true)
+        .order("name")
+        .order("id")
+        .range(offset, offset + size - 1)
+        .abortSignal(signal);
+      if (ids) query = query.in("client_id", ids);
+      if (clientFilter) query = query.eq("client_id", clientFilter);
+      if (term) query = query.or(searchColumns(["name", "category"], term));
+      const { data, count, error } = await query;
+      if (error || count === null) throw error ?? new Error("Contagem indisponível");
+      return {
+        rows: (data ?? []) as (Product & { company?: { name: string } | null })[],
+        total: count,
+      };
+    },
+    [accessKey, term, clientFilter],
+  );
+  const listing = usePaginatedQuery(
+    JSON.stringify([accessKey, term, clientFilter]),
+    load,
+    revision,
+  );
+  const filtered = listing.rows;
+  const hasFilters = Boolean(search.trim() || clientFilter);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [categoriesError, setCategoriesError] = useState(false);
+  const categoryTerm = useDebouncedValue(form.category.trim());
+  useEffect(() => {
+    if (!open || !form.client_id) {
+      setCategories([]);
+      return;
+    }
+    const controller = new AbortController();
+    let alive = true;
+    setCategoriesError(false);
+    setCategories([]);
+    let query = supabase
+      .from("products")
+      .select("category")
+      .eq("client_id", form.client_id)
+      .eq("active", true)
+      .order("category")
+      .limit(50)
+      .abortSignal(controller.signal);
+    if (categoryTerm) query = query.filter("category", "imatch", searchPattern(categoryTerm));
+    void query.then(({ data, error }) => {
+      if (!alive) return;
+      if (error) {
+        setCategoriesError(true);
+        return;
+      }
+      const names = new Map<string, string>();
+      (data ?? []).forEach((product) => {
         const name = product.category.trim();
         if (name && !names.has(categoryKey(name))) names.set(categoryKey(name), name);
       });
-    return [...names.values()].sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [products, form.client_id]);
-  const filtered = products.filter(
-    (product) =>
-      (!clientFilter || product.client_id === clientFilter) &&
-      (!search.trim() ||
-        categoryKey(product.name).includes(categoryKey(search)) ||
-        categoryKey(product.category).includes(categoryKey(search))),
-  );
+      setCategories([...names.values()]);
+    });
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [open, form.client_id, categoryTerm, revision]);
   const update = <K extends keyof typeof EMPTY>(key: K, value: (typeof EMPTY)[K]) =>
     setForm((previous) => ({ ...previous, [key]: value }));
   const startNew = () => {
@@ -115,6 +183,7 @@ export function ProductsPanel({ clients, products, refresh, recordActivity, focu
           : "",
     });
     setEditingId(null);
+    setEditingRecord(null);
     setError("");
     setNotice("");
     setOpen(true);
@@ -134,11 +203,12 @@ export function ProductsPanel({ clients, products, refresh, recordActivity, focu
       notes: product.notes ?? "",
     });
     setEditingId(product.id);
+    setEditingRecord(product);
     setError("");
     setNotice("");
     setOpen(true);
   }, []);
-  useFocusedRecord(focusedId, products, startEdit);
+  useFocusedEntity("products", focusedId, scope, startEdit, setError);
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -192,7 +262,7 @@ export function ProductsPanel({ clients, products, refresh, recordActivity, focu
         "product",
         saved.id,
         payload.name,
-        editingId ? { ...products.find((product) => product.id === editingId) } : {},
+        editingId ? { ...editingRecord } : {},
         payload,
       );
       setOpen(false);
@@ -291,19 +361,17 @@ export function ProductsPanel({ clients, products, refresh, recordActivity, focu
           {error}
         </p>
       )}
-      <p role="status" className="text-xs text-muted-foreground">
-        {filtered.length} de {products.length} produto{products.length === 1 ? "" : "s"} ativo
-        {products.length === 1 ? "" : "s"}
-      </p>
       <div className="grid gap-4">
-        {!filtered.length ? (
+        {listing.loading || listing.error ? (
+          <PageLoading error={listing.error} retry={listing.reload} />
+        ) : !filtered.length ? (
           <div className="rounded-2xl border bg-card px-5 py-10 text-center">
             <PackagePlus className="mx-auto size-8 text-muted-foreground" />
             <h2 className="mt-4 text-base font-semibold">
-              {products.length ? "Nenhum produto encontrado" : "Comece seu catálogo de produtos"}
+              {hasFilters ? "Nenhum produto encontrado" : "Comece seu catálogo de produtos"}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {products.length
+              {hasFilters
                 ? "Ajuste a pesquisa ou a empresa selecionada."
                 : "Cadastre os produtos e defina suas validades padrão."}
             </p>
@@ -311,7 +379,7 @@ export function ProductsPanel({ clients, products, refresh, recordActivity, focu
               variant="outline"
               className="mt-5"
               onClick={
-                products.length
+                hasFilters
                   ? () => {
                       setSearch("");
                       setClientFilter("");
@@ -319,7 +387,7 @@ export function ProductsPanel({ clients, products, refresh, recordActivity, focu
                   : startNew
               }
             >
-              {products.length ? "Limpar filtros" : "Cadastrar primeiro produto"}
+              {hasFilters ? "Limpar filtros" : "Cadastrar primeiro produto"}
             </Button>
           </div>
         ) : (
@@ -332,7 +400,8 @@ export function ProductsPanel({ clients, products, refresh, recordActivity, focu
                 <div className="min-w-0 flex-1">
                   <h2 className="break-words text-base font-semibold">{product.name}</h2>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {clients.find((client) => client.id === product.client_id)?.name ??
+                    {product.company?.name ??
+                      clients.find((client) => client.id === product.client_id)?.name ??
                       "Empresa não encontrada"}
                   </p>
                 </div>
@@ -390,6 +459,17 @@ export function ProductsPanel({ clients, products, refresh, recordActivity, focu
           ))
         )}
       </div>
+      {!listing.error && (
+        <PaginationControls
+          page={listing.page}
+          size={listing.size}
+          total={listing.total}
+          loading={listing.loading}
+          onPageChange={listing.setPage}
+          onSizeChange={listing.setSize}
+          label="produtos"
+        />
+      )}
       <Dialog
         open={open}
         onOpenChange={(value) => {
@@ -446,6 +526,12 @@ export function ProductsPanel({ clients, products, refresh, recordActivity, focu
                       }
                     >
                       <option value="">Selecione</option>
+                      {form.client_id &&
+                        !clients.some((client) => client.id === form.client_id) && (
+                          <option value={form.client_id}>
+                            {editingRecord?.company?.name ?? "Empresa do produto"}
+                          </option>
+                        )}
                       {clients
                         .filter(
                           (client) => client.active || (editingId && client.id === form.client_id),
@@ -474,6 +560,11 @@ export function ProductsPanel({ clients, products, refresh, recordActivity, focu
                     options={categories}
                     disabled={!form.client_id || saving}
                   />
+                  {categoriesError && (
+                    <p role="status" className="text-xs text-muted-foreground">
+                      Sugestões indisponíveis. Você pode digitar a categoria.
+                    </p>
+                  )}
                   <FormField label="Validade padrão (dias) *">
                     <input
                       required

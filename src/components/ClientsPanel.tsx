@@ -31,7 +31,10 @@ import {
 } from "@/components/ui/dialog";
 import { ClientQrCard } from "@/components/ClientQrCard";
 import { supabase } from "@/integrations/supabase/client";
-import { useFocusedRecord } from "@/hooks/use-focused-record";
+import { useFocusedEntity } from "@/hooks/use-focused-entity";
+import { useDebouncedValue, usePaginatedQuery } from "@/hooks/use-paginated-query";
+import { PageLoading, PaginationControls } from "@/components/PaginationControls";
+import { scopeKey, scopeIds, searchColumns } from "@/lib/list-query";
 
 type Status = "ativa" | "inativa" | "suspensa";
 type Client = {
@@ -52,7 +55,8 @@ type Client = {
   created_at?: string;
 };
 type Props = {
-  clients: Client[];
+  scope: string[] | null;
+  revision: number;
   refresh: () => Promise<void>;
   focusedId: string | null;
   recordActivity: (
@@ -115,18 +119,12 @@ const PLAN_LABEL: Record<string, string> = {
 };
 const statusOf = (client: Client): Status =>
   client.status === "suspensa" ? "suspensa" : client.active ? "ativa" : "inativa";
-const normalized = (text: string) =>
-  text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("pt-BR")
-    .trim();
-
-export function ClientsPanel({ clients, refresh, recordActivity, focusedId }: Props) {
+export function ClientsPanel({ scope, revision, refresh, recordActivity, focusedId }: Props) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingRecord, setEditingRecord] = useState<Client | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [inactivatingId, setInactivatingId] = useState<string | null>(null);
@@ -134,23 +132,59 @@ export function ClientsPanel({ clients, refresh, recordActivity, focusedId }: Pr
   const [notice, setNotice] = useState("");
   const returnFocus = useRef<HTMLElement | null>(null);
   const newButton = useRef<HTMLButtonElement | null>(null);
-  const query = normalized(search);
-  const digits = search.replace(/\D/g, "");
-  const filtered = clients.filter(
-    (client) =>
-      (statusFilter === "all" || statusOf(client) === statusFilter) &&
-      (!query ||
-        [client.name, client.legal_name ?? "", client.city, client.state, client.cnpj ?? ""].some(
-          (value) => normalized(value).includes(query),
-        ) ||
-        (digits.length > 0 && (client.cnpj ?? "").replace(/\D/g, "").includes(digits))),
+  const term = useDebouncedValue(search.trim());
+  const accessKey = scopeKey(scope);
+  const load = useCallback(
+    async (offset: number, size: number, signal: AbortSignal) => {
+      const ids = scopeIds(accessKey);
+      if (ids?.length === 0)
+        return { rows: [], total: 0, meta: { all: 0, ativa: 0, inativa: 0, suspensa: 0 } };
+      const query = (head: boolean, status: Status | "all") => {
+        let q = supabase.from("clients").select("*", { count: "exact", head }).abortSignal(signal);
+        if (ids) q = q.in("id", ids);
+        if (term) {
+          const digits = term.replace(/\D/g, "");
+          q = q.or(
+            searchColumns(["name", "legal_name", "city", "state", "cnpj"], term) +
+              (digits ? `,cnpj.imatch.${digits.split("").join("[^0-9]*")}` : ""),
+          );
+        }
+        if (status === "suspensa") q = q.eq("status", "suspensa");
+        else if (status !== "all") q = q.eq("active", status === "ativa").neq("status", "suspensa");
+        return q;
+      };
+      const [page, ...totals] = await Promise.all([
+        query(false, statusFilter)
+          .order("name")
+          .order("id")
+          .range(offset, offset + size - 1),
+        ...(["all", "ativa", "inativa", "suspensa"] as const).map((status) => query(true, status)),
+      ]);
+      if (page.error || totals.some((result) => result.error))
+        throw page.error ?? totals.find((result) => result.error)?.error;
+      if (page.count === null || totals.some((result) => result.count === null))
+        throw new Error("Contagem indisponível");
+      return {
+        rows: (page.data ?? []) as Client[],
+        total: page.count,
+        meta: {
+          all: totals[0].count!,
+          ativa: totals[1].count!,
+          inativa: totals[2].count!,
+          suspensa: totals[3].count!,
+        },
+      };
+    },
+    [accessKey, term, statusFilter],
   );
-  const counts = {
-    all: clients.length,
-    ativa: clients.filter((c) => statusOf(c) === "ativa").length,
-    inativa: clients.filter((c) => statusOf(c) === "inativa").length,
-    suspensa: clients.filter((c) => statusOf(c) === "suspensa").length,
-  };
+  const listing = usePaginatedQuery(
+    JSON.stringify([accessKey, term, statusFilter]),
+    load,
+    revision,
+  );
+  const filtered = listing.rows;
+  const counts = listing.meta ?? { all: 0, ativa: 0, inativa: 0, suspensa: 0 };
+  const hasFilters = Boolean(search.trim() || statusFilter !== "all");
 
   const startEdit = useCallback((client: Client) => {
     returnFocus.current =
@@ -169,17 +203,19 @@ export function ClientsPanel({ clients, refresh, recordActivity, focusedId }: Pr
       status: statusOf(client),
     });
     setEditingId(client.id);
+    setEditingRecord(client);
     setError("");
     setNotice("");
     setOpen(true);
   }, []);
-  useFocusedRecord(focusedId, clients, startEdit);
+  useFocusedEntity("clients", focusedId, scope, startEdit, setError);
   const update = <K extends keyof typeof EMPTY>(key: K, value: (typeof EMPTY)[K]) =>
     setForm((previous) => ({ ...previous, [key]: value }));
   const startNew = () => {
     returnFocus.current = newButton.current;
     setForm(EMPTY);
     setEditingId(null);
+    setEditingRecord(null);
     setError("");
     setNotice("");
     setOpen(true);
@@ -224,7 +260,7 @@ export function ClientsPanel({ clients, refresh, recordActivity, focusedId }: Pr
         "client",
         saved.id,
         payload.name,
-        editingId ? { ...clients.find((c) => c.id === editingId) } : {},
+        editingId ? { ...editingRecord } : {},
         payload,
       );
       setOpen(false);
@@ -315,7 +351,7 @@ export function ClientsPanel({ clients, refresh, recordActivity, focusedId }: Pr
                   : status === "inativa"
                     ? "Inativos"
                     : "Suspensos"}
-              <span>{counts[status]}</span>
+              <span>{listing.loading || listing.error ? "—" : counts[status]}</span>
             </button>
           ))}
         </div>
@@ -331,18 +367,17 @@ export function ClientsPanel({ clients, refresh, recordActivity, focusedId }: Pr
           {error}
         </p>
       )}
-      <p role="status" className="text-xs text-muted-foreground">
-        {filtered.length} de {clients.length} cliente{clients.length === 1 ? "" : "s"}
-      </p>
       <div className="grid gap-4">
-        {!filtered.length ? (
+        {listing.loading || listing.error ? (
+          <PageLoading error={listing.error} retry={listing.reload} />
+        ) : !filtered.length ? (
           <div className="rounded-2xl border bg-card px-5 py-10 text-center">
             <Building2 className="mx-auto size-8 text-muted-foreground" />
             <h2 className="mt-4 text-base font-semibold">
-              {clients.length ? "Nenhum cliente encontrado" : "Seu primeiro cliente começa aqui"}
+              {hasFilters ? "Nenhum cliente encontrado" : "Seu primeiro cliente começa aqui"}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {clients.length
+              {hasFilters
                 ? "Tente outro termo ou ajuste o filtro de situação."
                 : "Cadastre uma empresa para organizar sua operação."}
             </p>
@@ -350,7 +385,7 @@ export function ClientsPanel({ clients, refresh, recordActivity, focusedId }: Pr
               variant="outline"
               className="mt-5"
               onClick={
-                clients.length
+                hasFilters
                   ? () => {
                       setSearch("");
                       setStatusFilter("all");
@@ -358,7 +393,7 @@ export function ClientsPanel({ clients, refresh, recordActivity, focusedId }: Pr
                   : startNew
               }
             >
-              {clients.length ? "Limpar filtros" : "Cadastrar primeiro cliente"}
+              {hasFilters ? "Limpar filtros" : "Cadastrar primeiro cliente"}
             </Button>
           </div>
         ) : (
@@ -448,6 +483,17 @@ export function ClientsPanel({ clients, refresh, recordActivity, focusedId }: Pr
           ))
         )}
       </div>
+      {!listing.error && (
+        <PaginationControls
+          page={listing.page}
+          size={listing.size}
+          total={listing.total}
+          loading={listing.loading}
+          onPageChange={listing.setPage}
+          onSizeChange={listing.setSize}
+          label="clientes"
+        />
+      )}
       <Dialog
         open={open}
         onOpenChange={(value) => {

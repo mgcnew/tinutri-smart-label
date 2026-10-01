@@ -14,6 +14,8 @@ A organização da emissão e das configurações está em [Estação de etiquet
 
 A apresentação e o fluxo de baixa estão em [Validades](13-validades.md).
 
+A consulta sob demanda das quatro listas está em [Paginação das listas](14-paginacao-das-listas.md).
+
 ## Leitura sugerida
 
 | Documento | Conteúdo |
