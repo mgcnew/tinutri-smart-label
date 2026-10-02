@@ -1,3 +1,4 @@
+import { SystemSelect } from "@/components/ui/system-select";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { format } from "date-fns";
 import { UserPlus, ShieldCheck } from "lucide-react";
@@ -229,7 +230,7 @@ export function UsersPanel({
           />
         </Field>
         <Field label="Perfil">
-          <select value={role} onChange={(e) => setRole(e.target.value)}>
+          <SystemSelect value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="">Todos</option>
             {Object.entries(ROLE_NAMES)
               .filter(([key]) => key !== "admin")
@@ -238,7 +239,7 @@ export function UsersPanel({
                   {name}
                 </option>
               ))}
-          </select>
+          </SystemSelect>
         </Field>
         <RemoteSelect label="Empresa" value={client} onChange={setClient} />
       </div>
@@ -342,7 +343,7 @@ export function UsersPanel({
               />
             </Field>
             <Field label="Perfil *">
-              <select
+              <SystemSelect
                 value={form.role}
                 onChange={(e) => setForm((old) => ({ ...old, role: e.target.value }))}
               >
@@ -353,7 +354,7 @@ export function UsersPanel({
                       {name}
                     </option>
                   ))}
-              </select>
+              </SystemSelect>
             </Field>
             <p className="flex items-start gap-2 rounded-xl bg-secondary p-3 text-xs text-primary">
               <ShieldCheck className="size-4 shrink-0" />

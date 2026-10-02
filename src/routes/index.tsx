@@ -1,3 +1,4 @@
+import { SystemSelect } from "@/components/ui/system-select";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { addDays, format, isValid } from "date-fns";
 import { AlertTriangle, Building2, CalendarClock, CheckCircle2, ClipboardList, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Smartphone, Trash2, Users, X } from "lucide-react";
@@ -919,23 +920,23 @@ function Index() {
                 <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <EmitField label="Tipo da impressora">
-                    <select value={printerSettings.type} onChange={(e) => updateSettings({ type: e.target.value as PrinterType })}>
+                    <SystemSelect value={printerSettings.type} onChange={(e) => updateSettings({ type: e.target.value as PrinterType })}>
                       {PRINTER_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                    </select>
+                    </SystemSelect>
                   </EmitField>
                   <EmitField label="Modo de conexão">
-                    <select value={printerSettings.connection} onChange={(e) => updateSettings({ connection: e.target.value as ConnectionMode })}>
+                    <SystemSelect value={printerSettings.connection} onChange={(e) => updateSettings({ connection: e.target.value as ConnectionMode })}>
                       {CONNECTION_MODES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                    </select>
+                    </SystemSelect>
                   </EmitField>
                   {printerSettings.connection === "wifi" && <EmitField label="IP da impressora" hint="Ex.: 192.168.1.200">
                     <input value={printerSettings.ip} placeholder="192.168.1.200" onChange={(e) => updateSettings({ ip: e.target.value })} />
                   </EmitField>}
                   <EmitField label="Tamanho da etiqueta">
-                    <select value={printerSettings.size} onChange={(e) => updateSettings({ size: e.target.value as LabelSize })}>
+                    <SystemSelect value={printerSettings.size} onChange={(e) => updateSettings({ size: e.target.value as LabelSize })}>
                       <option value="60x40">60 mm × 40 mm (padrão)</option>
                       <option value="50x30">50 mm × 30 mm (opcional)</option>
-                    </select>
+                    </SystemSelect>
                   </EmitField>
                   <EmitField label="Avisar “próximo de vencer” com quantos dias de antecedência" hint="1 a 90 dias">
                     <input type="number" min={1} max={90} value={alertDays} onChange={(e) => updateAlertDays(Number(e.target.value))} />
@@ -975,10 +976,10 @@ function Index() {
             <div className="emit-layout grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
               <div className="emit-form min-w-0 rounded-2xl border bg-card p-5 sm:p-6">
                 <fieldset disabled={Boolean(emissionBusy)} className="min-w-0 space-y-4"><div className="emit-group-title"><span>1</span><h2>Dados da etiqueta</h2></div>
-                <div className="grid gap-4 sm:grid-cols-2"><EmitField label="Cliente"><select value={selectedClient} disabled={role === "operator" || role === "admin_cliente"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); setLabelDraft(null); setLot(""); setShelfDays(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></EmitField>
+                <div className="grid gap-4 sm:grid-cols-2"><EmitField label="Cliente"><SystemSelect value={selectedClient} disabled={role === "operator" || role === "admin_cliente"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); setLabelDraft(null); setLot(""); setShelfDays(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</SystemSelect></EmitField>
                 <EmissionProductPicker key={selectedClient} clientId={selectedClient} value={selectedProduct} disabled={!selectedClient} revision={overviewRevision} onRecord={handleProductRecord} onChange={(selected) => { setSelectedProduct(selected?.id ?? ""); setProducts(selected ? [selected] : []); setLot(""); setLabelDraft(null); setShelfDays(selected ? String(selected.shelf_life_days) : ""); }} />
-                <EmitField label="Responsável"><select value={selectedResponsible} disabled={!selectedClient} onChange={(e) => setSelectedResponsible(e.target.value)}><option value="">Selecione o responsável</option>{visibleCollaborators.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></EmitField>
-                <EmitField label="Tipo da etiqueta"><select value={kind} onChange={(e) => setKind(e.target.value as LabelKind)}>{LABEL_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</select></EmitField></div>
+                <EmitField label="Responsável"><SystemSelect value={selectedResponsible} disabled={!selectedClient} onChange={(e) => setSelectedResponsible(e.target.value)}><option value="">Selecione o responsável</option>{visibleCollaborators.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</SystemSelect></EmitField>
+                <EmitField label="Tipo da etiqueta"><SystemSelect value={kind} onChange={(e) => setKind(e.target.value as LabelKind)}>{LABEL_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</SystemSelect></EmitField></div>
                 <div className="emit-group-title"><span>2</span><h2>Validade e conservação</h2></div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <EmitField label="Data de manipulação/abertura"><input type="date" value={openedOn} onChange={(e) => setOpenedOn(e.target.value)} /></EmitField>
@@ -990,10 +991,10 @@ function Index() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <EmitField label="Conservação">
-                    <select value={storage} onChange={(e) => setStorage(e.target.value)}>
+                    <SystemSelect value={storage} onChange={(e) => setStorage(e.target.value)}>
                       <option value="">Não informar</option>
                       {STORAGE_PRESETS.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    </SystemSelect>
                   </EmitField>
                   <EmitField label="Setor / local" hint="Opcional"><input maxLength={40} value={sector} onChange={(e) => setSector(e.target.value)} placeholder="Ex.: Cozinha quente" /></EmitField>
                 </div>
@@ -1202,7 +1203,7 @@ function TeamPanel({ scope, clients, collaborators, refresh, recordActivity, foc
   const filtered = collaborators.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()) || (c.role_title ?? "").toLowerCase().includes(search.toLowerCase()));
   return <section><PanelHeader eyebrow="Equipe" title="Colaboradores" description="Cadastre os responsáveis que aparecerão nas etiquetas."/>
     <form className="mt-7 grid gap-4 rounded-2xl border bg-card p-5 sm:grid-cols-3 sm:items-end" onSubmit={async (e) => { e.preventDefault(); setMsg(""); const payload = { client_id: form.client_id, name: form.name.trim(), role_title: form.role_title.trim() || null, active: form.active }; const op = editingId ? supabase.from("collaborators").update(payload).eq("id", editingId).select("id").maybeSingle() : supabase.from("collaborators").insert(payload).select("id").single(); const { data: saved, error } = await op; if (error || !saved) { setMsg("Não foi possível salvar."); return; } await recordActivity(editingId ? "colaborador_atualizado" : "colaborador_criado", payload.client_id, "collaborator", saved.id, payload.name, editingId ? { ...collaborators.find((item) => item.id === editingId) } : {}, payload); reset(); await refresh(); }}>
-      <Field label="Cliente"><select required value={form.client_id} onChange={(e) => setForm(p => ({ ...p, client_id: e.target.value }))}><option value="">Selecione</option>{clients.filter(c => c.active).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+      <Field label="Cliente"><SystemSelect required value={form.client_id} onChange={(e) => setForm(p => ({ ...p, client_id: e.target.value }))}><option value="">Selecione</option>{clients.filter(c => c.active).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SystemSelect></Field>
       <Field label="Nome"><input required minLength={2} maxLength={120} value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))}/></Field>
       <Field label="Função"><input maxLength={80} value={form.role_title} onChange={(e) => setForm(p => ({ ...p, role_title: e.target.value }))} placeholder="Ex.: Cozinheira"/></Field>
       <label className="flex items-center gap-3 font-semibold sm:col-span-3"><input className="size-5 w-auto" type="checkbox" checked={form.active} onChange={(e) => setForm(p => ({ ...p, active: e.target.checked }))}/> Colaborador ativo</label>

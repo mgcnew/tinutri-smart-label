@@ -11,3 +11,9 @@ Empresa, produto, categoria, validade em dias e inspeção quando exigida são v
 Arquivos: `src/components/ProductsPanel.tsx`, `src/components/CategoryInput.tsx`, `src/lib/categories.ts`, integração em `src/routes/index.tsx` e estilos em `src/styles.css`.
 
 Validação com dados simulados: telas de 320, 375, 768 e 1440 px; categoria restrita à empresa; criação e seleção pelo campo; inspeção; cancelamento; falha de gravação; estado pendente; reutilização após salvar; edição; abertura do produto pela auditoria. Nenhum cadastro de teste é enviado ao banco remoto.
+
+## Importação CSV
+
+O botão Importar produtos abre um modal com empresa ativa dentro do escopo de acesso, download do modelo CSV UTF-8 e prévia. Campos obrigatórios: `produto`, `categoria`, `validade_dias`. Campos opcionais: `exige_lote`, `tipo_inspecao`, `numero_inspecao`, `observacoes`. Aceita vírgula ou ponto e vírgula, BOM, aspas escapadas e campos com quebras de linha. Limites: 2 MB e 500 produtos por arquivo.
+
+A validação completa bloqueia a gravação quando há registros inválidos ou nomes repetidos no arquivo. A importação cria novos produtos em uma única inserção, respeita as políticas do banco e registra cada produto na auditoria. Produtos já existentes não são atualizados. Depois da gravação, o lote é limpo para impedir reenvio em caso de falha posterior de auditoria. Testes do parser: `node --experimental-strip-types --test tests/product-import.test.ts`.

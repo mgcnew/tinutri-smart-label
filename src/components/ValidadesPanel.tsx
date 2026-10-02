@@ -1,3 +1,4 @@
+import { SystemSelect } from "@/components/ui/system-select";
 import {
   cloneElement,
   useId,
@@ -321,7 +322,7 @@ export function ValidadesPanel({
             />
           </FilterField>
           <FilterField label="Período das validades">
-            <select
+            <SystemSelect
               value={window}
               onChange={(event) => {
                 setUrgency("all");
@@ -333,7 +334,7 @@ export function ValidadesPanel({
                   {name}
                 </option>
               ))}
-            </select>
+            </SystemSelect>
           </FilterField>
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">

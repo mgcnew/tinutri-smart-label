@@ -1,3 +1,4 @@
+import { SystemSelect } from "@/components/ui/system-select";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { management, pageResult, type MasterUser } from "@/lib/management";
@@ -123,7 +124,7 @@ export function RemoteSelect({
         disabled={disabled}
       />
       <Field label={label}>
-        <select
+        <SystemSelect
           value={value}
           required={required}
           disabled={disabled || Boolean(listing.error)}
@@ -139,7 +140,7 @@ export function RemoteSelect({
               {row.name}
             </option>
           ))}
-        </select>
+        </SystemSelect>
       </Field>
       {listing.error ? (
         <p role="alert" className="text-xs text-destructive">

@@ -1,3 +1,4 @@
+import { SystemSelect } from "@/components/ui/system-select";
 import { useCallback, useState } from "react";
 import { format, startOfDay, addDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,14 +65,14 @@ export function ActivitiesPanel({
           />
         </Field>
         <Field label="Registro">
-          <select value={entity} onChange={(e) => setEntity(e.target.value)}>
+          <SystemSelect value={entity} onChange={(e) => setEntity(e.target.value)}>
             <option value="">Todos</option>
             <option value="client">Empresa</option>
             <option value="user">Usuário</option>
             <option value="product">Produto</option>
             <option value="collaborator">Colaborador</option>
             <option value="care">Acompanhamento</option>
-          </select>
+          </SystemSelect>
         </Field>
         <Field label="Data">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />

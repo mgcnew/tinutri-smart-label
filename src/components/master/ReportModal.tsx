@@ -1,3 +1,4 @@
+import { SystemSelect } from "@/components/ui/system-select";
 import { useEffect, useRef, useState } from "react";
 import { addDays, format, startOfDay, isValid } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -202,10 +203,10 @@ export function ReportModal({
     >
       <div className="space-y-4">
         <Field label="Conteúdo">
-          <select disabled={busy} value={type} onChange={(e) => setType(e.target.value)}>
+          <SystemSelect disabled={busy} value={type} onChange={(e) => setType(e.target.value)}>
             <option value="care">Pendências, ocorrências e visitas</option>
             <option value="labels">Etiquetas e baixas</option>
-          </select>
+          </SystemSelect>
         </Field>
         <RemoteSelect
           label="Empresa"

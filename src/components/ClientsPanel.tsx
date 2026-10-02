@@ -1,3 +1,4 @@
+import { SystemSelect } from "@/components/ui/system-select";
 import {
   cloneElement,
   useCallback,
@@ -629,7 +630,7 @@ export function ClientsPanel({
                     />
                   </FormField>
                   <FormField label="Estado *">
-                    <select
+                    <SystemSelect
                       required
                       value={form.state}
                       onChange={(event) => update("state", event.target.value)}
@@ -640,7 +641,7 @@ export function ClientsPanel({
                           {state}
                         </option>
                       ))}
-                    </select>
+                    </SystemSelect>
                   </FormField>
                   <FormField label="Endereço">
                     <input
@@ -680,7 +681,7 @@ export function ClientsPanel({
                 </FormSection>
                 <FormSection title="Gestão" description="Plano e situação do cadastro.">
                   <FormField label="Plano">
-                    <select
+                    <SystemSelect
                       value={form.plan}
                       onChange={(event) => update("plan", event.target.value)}
                     >
@@ -690,17 +691,17 @@ export function ClientsPanel({
                         </option>
                       ))}
                       {!(form.plan in PLAN_LABEL) && <option value={form.plan}>{form.plan}</option>}
-                    </select>
+                    </SystemSelect>
                   </FormField>
                   <FormField label="Situação">
-                    <select
+                    <SystemSelect
                       value={form.status}
                       onChange={(event) => update("status", event.target.value as Status)}
                     >
                       <option value="ativa">Ativo</option>
                       <option value="inativa">Inativo</option>
                       <option value="suspensa">Suspenso</option>
-                    </select>
+                    </SystemSelect>
                   </FormField>
                 </FormSection>
               </fieldset>

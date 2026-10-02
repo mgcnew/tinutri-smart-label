@@ -1,3 +1,4 @@
+import { SystemSelect } from "@/components/ui/system-select";
 import {
   cloneElement,
   useCallback,
@@ -27,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ProductImportDialog } from "@/components/ProductImportDialog";
 import { CategoryInput } from "@/components/CategoryInput";
 import { categoryKey } from "@/lib/categories";
 import { supabase } from "@/integrations/supabase/client";
@@ -321,10 +323,19 @@ export function ProductsPanel({
             Organize os produtos e as regras aplicadas às etiquetas.
           </p>
         </div>
-        <Button ref={newButton} className="dashboard-primary h-11" onClick={startNew}>
-          <Plus />
-          Cadastrar produto
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ProductImportDialog
+            clients={activeClients.filter((client) => scope === null || scope.includes(client.id))}
+            initialClient={clientFilter}
+            refresh={refresh}
+            recordActivity={recordActivity}
+            onSuccess={setNotice}
+          />
+          <Button ref={newButton} className="dashboard-primary h-11" onClick={startNew}>
+            <Plus />
+            Cadastrar produto
+          </Button>
+        </div>
       </header>
       <div className="clients-toolbar grid gap-3 rounded-2xl border bg-card p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)]">
         <div className="relative">
@@ -340,7 +351,7 @@ export function ProductsPanel({
             placeholder="Pesquisar produto ou categoria"
           />
         </div>
-        <select
+        <SystemSelect
           aria-label="Filtrar produtos por empresa"
           value={clientFilter}
           onChange={(event) => setClientFilter(event.target.value)}
@@ -351,7 +362,7 @@ export function ProductsPanel({
               {client.name}
             </option>
           ))}
-        </select>
+        </SystemSelect>
       </div>
       {notice && (
         <div role="status" className="clients-notice flex items-center gap-2">
@@ -517,7 +528,7 @@ export function ProductsPanel({
               <fieldset disabled={saving} className="min-w-0 px-5 py-5 sm:px-6">
                 <FormSection title="Identificação" description="Produto, empresa e categoria.">
                   <FormField label="Empresa *">
-                    <select
+                    <SystemSelect
                       required
                       value={form.client_id}
                       onChange={(event) =>
@@ -545,7 +556,7 @@ export function ProductsPanel({
                             {!client.active ? " (inativa)" : ""}
                           </option>
                         ))}
-                    </select>
+                    </SystemSelect>
                   </FormField>
                   <FormField label="Produto *">
                     <input
@@ -603,7 +614,7 @@ export function ProductsPanel({
                   {form.requires_inspection && (
                     <>
                       <FormField label="Tipo de inspeção *">
-                        <select
+                        <SystemSelect
                           value={form.inspection_type}
                           onChange={(event) =>
                             update(
@@ -615,7 +626,7 @@ export function ProductsPanel({
                           <option value="SIF">SIF</option>
                           <option value="SISP">SISP</option>
                           <option value="SIM">SIM</option>
-                        </select>
+                        </SystemSelect>
                       </FormField>
                       <FormField label="Número de inspeção *">
                         <input

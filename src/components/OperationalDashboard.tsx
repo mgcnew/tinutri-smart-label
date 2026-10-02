@@ -1,3 +1,4 @@
+import { SystemSelect } from "@/components/ui/system-select";
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -94,7 +95,7 @@ export function OperationalDashboard({
         {clients.length > 1 ? (
           <label className="flex min-w-0 flex-1 items-center gap-3 text-xs font-semibold sm:max-w-sm">
             Empresa
-            <select
+            <SystemSelect
               aria-label="Empresa"
               className="!min-w-0 !rounded-lg !py-2 text-sm"
               value={clientId}
@@ -106,7 +107,7 @@ export function OperationalDashboard({
                   {client.name}
                 </option>
               ))}
-            </select>
+            </SystemSelect>
           </label>
         ) : (
           <p className="text-sm font-semibold">
@@ -240,7 +241,7 @@ export function OperationalDashboard({
             </p>
             <label className="mt-4 block">
               <span className="sr-only">Período das prioridades</span>
-              <select
+              <SystemSelect
                 className="!rounded-lg !py-2 text-xs"
                 value={listWindow}
                 onChange={(event) => setListWindow(event.target.value as ExpiryWindow)}
@@ -251,7 +252,7 @@ export function OperationalDashboard({
                     {EXPIRY_WINDOW_NAMES[window]}
                   </option>
                 ))}
-              </select>
+              </SystemSelect>
             </label>
           </div>
           {loading ? (

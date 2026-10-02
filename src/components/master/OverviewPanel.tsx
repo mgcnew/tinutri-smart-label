@@ -1,3 +1,4 @@
+import { SystemSelect } from "@/components/ui/system-select";
 import { useCallback, useState } from "react";
 import {
   Building2,
@@ -52,7 +53,7 @@ export function OverviewPanel({
         description="Priorize o que precisa de atenção nas empresas e no acompanhamento profissional."
         action={
           <div className="flex flex-wrap gap-2">
-            <select
+            <SystemSelect
               aria-label="Período dos indicadores"
               className="!w-auto"
               value={days}
@@ -61,7 +62,7 @@ export function OverviewPanel({
               <option value={7}>Últimos 7 dias</option>
               <option value={30}>Últimos 30 dias</option>
               <option value={90}>Últimos 90 dias</option>
-            </select>
+            </SystemSelect>
             <Button variant="outline" onClick={onReport}>
               Relatório
             </Button>

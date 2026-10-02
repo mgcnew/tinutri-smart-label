@@ -1,3 +1,4 @@
+import { SystemSelect } from "@/components/ui/system-select";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Plus, CalendarClock, ClipboardList, CheckCircle2, AlertTriangle } from "lucide-react";
@@ -259,22 +260,22 @@ export function CarePanel({
         </Field>
         <RemoteSelect label="Empresa" value={client} onChange={setClient} scope={scope} />
         <Field label="Tipo">
-          <select value={kind} onChange={(e) => setKind(e.target.value)}>
+          <SystemSelect value={kind} onChange={(e) => setKind(e.target.value)}>
             <option value="">Todos</option>
             {Object.entries(KIND_NAMES).map(([value, name]) => (
               <option key={value} value={value}>
                 {name}
               </option>
             ))}
-          </select>
+          </SystemSelect>
         </Field>
         <Field label="Situação">
-          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <SystemSelect value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="all">Todas</option>
             <option value="abertas">Em aberto</option>
             <option value="atrasadas">Atrasadas</option>
             <option value="concluida">Concluídas</option>
-          </select>
+          </SystemSelect>
         </Field>
       </div>
       <Feedback error={!open ? error : undefined} notice={notice} />
@@ -370,7 +371,7 @@ export function CarePanel({
                 }
               />
               <Field label="Tipo *">
-                <select
+                <SystemSelect
                   value={form.kind}
                   disabled={Boolean(target)}
                   onChange={(e) => update("kind", e.target.value as CareRecord["kind"])}
@@ -380,7 +381,7 @@ export function CarePanel({
                       {name}
                     </option>
                   ))}
-                </select>
+                </SystemSelect>
               </Field>
             </div>
             <Field label="Título *">
@@ -433,7 +434,7 @@ export function CarePanel({
                 />
               </Field>
               <Field label="Situação">
-                <select
+                <SystemSelect
                   value={form.status}
                   onChange={(e) => update("status", e.target.value as CareRecord["status"])}
                 >
@@ -442,29 +443,32 @@ export function CarePanel({
                       {name}
                     </option>
                   ))}
-                </select>
+                </SystemSelect>
               </Field>
               <Field label="Prioridade">
-                <select
+                <SystemSelect
                   value={form.priority}
                   onChange={(e) => update("priority", e.target.value as CareRecord["priority"])}
                 >
                   <option value="baixa">Baixa</option>
                   <option value="normal">Normal</option>
                   <option value="alta">Alta</option>
-                </select>
+                </SystemSelect>
               </Field>
             </div>
             {form.kind === "ocorrencia" && (
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Motivo">
-                  <select value={form.reason} onChange={(e) => update("reason", e.target.value)}>
+                  <SystemSelect
+                    value={form.reason}
+                    onChange={(e) => update("reason", e.target.value)}
+                  >
                     <option value="descarte">Descarte</option>
                     <option value="processo">Processo</option>
                     <option value="impressao">Impressão</option>
                     <option value="orientacao">Orientação</option>
                     <option value="outro">Outro</option>
-                  </select>
+                  </SystemSelect>
                 </Field>
                 <Field label="Produto relacionado">
                   <input

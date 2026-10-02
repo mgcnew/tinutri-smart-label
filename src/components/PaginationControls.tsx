@@ -1,3 +1,4 @@
+import { SystemSelect } from "@/components/ui/system-select";
 import { useId } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,7 @@ export function PaginationControls({
         </p>
         <label htmlFor={id} className="flex items-center gap-2 text-xs text-muted-foreground">
           Por página
-          <select
+          <SystemSelect
             id={id}
             aria-label="Registros por página"
             value={size}
@@ -53,7 +54,7 @@ export function PaginationControls({
                 {value}
               </option>
             ))}
-          </select>
+          </SystemSelect>
         </label>
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t pt-3">

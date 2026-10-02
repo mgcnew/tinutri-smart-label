@@ -117,3 +117,11 @@ Pontos favoráveis no código: rótulos envolvendo controles, botões com `aria-
 Pontos pendentes de verificação ou ajuste futuro: contraste medido, teclado em fluxos completos, zoom 200%, leitor de tela, tamanho de alvos secundários, comunicação de falhas de gravação, relação de rótulos master com inputs dentro de wrappers, overflow mobile, loading/busy de impressão e mensagens em português. Há cores fixas emerald/amber/zinc em badges master, fora dos tokens semânticos.
 
 O design system fornece uma base reutilizável, mas ainda não há catálogo visual/Storybook, documentação de estados por componente, ensaios automatizados de acessibilidade ou guideline compartilhada de composição das telas.
+
+## Dropdowns do sistema
+
+Os seletores visíveis usam `src/components/ui/system-select.tsx`, apoiado no Select do Radix existente. Cadastro de empresas, produtos, importação, equipe, filtros, paginação, emissão, impressoras e área master compartilham a mesma superfície: fundo do tema, bordas arredondadas, sombra, foco verde e indicação da opção selecionada. O menu usa portal, respeita o espaço disponível e permite rolagem em listas longas.
+
+O componente mantém as opções JSX e eventos dos formulários existentes. Um select nativo oculto preserva a validação obrigatória e os dados do formulário; quando inválido, o foco retorna ao controle visível e uma mensagem informa que é necessário selecionar uma opção. Setas, Home, End, Enter, busca por digitação e Escape usam a navegação acessível do Radix. O menu aberto fecha com Escape antes do modal.
+
+Verificação em navegador com dados locais: seleção por mouse e teclado, envio e validação obrigatória, fieldset desabilitado, lista de 70 opções em modal e layout de 375 px. Nenhum dado de teste enviado ao banco.

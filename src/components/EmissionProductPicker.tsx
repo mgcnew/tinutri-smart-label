@@ -1,3 +1,4 @@
+import { SystemSelect } from "@/components/ui/system-select";
 import { useCallback, useEffect, useId, useState } from "react";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -102,7 +103,7 @@ export function EmissionProductPicker({
           disabled={disabled}
         />
       </div>
-      <select
+      <SystemSelect
         id={id}
         value={value}
         disabled={disabled || Boolean(listing.error)}
@@ -126,7 +127,7 @@ export function EmissionProductPicker({
             {row.name}
           </option>
         ))}
-      </select>
+      </SystemSelect>
       {selectionError && (
         <p role="alert" className="mt-2 text-xs text-destructive">
           Não foi possível carregar o produto selecionado. Selecione novamente.
