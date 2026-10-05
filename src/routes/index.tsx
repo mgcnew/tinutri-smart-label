@@ -74,7 +74,7 @@ function loadAlertDays(): number {
 
 const PRINTER_NOT_FOUND_MESSAGE = "Impressora não encontrada. Verifique a conexão Bluetooth, Wi-Fi ou a configuração da impressora.";
 
-type PrinterType = "niimbot" | "elgin" | "bematech" | "zebra" | "tomate" | "argox" | "outra";
+type PrinterType = "elgin";
 type ConnectionMode = "browser" | "wifi" | "bluetooth" | "usb";
 type LabelSize = "60x40" | "50x30";
 type PrinterSettings = {
@@ -86,17 +86,10 @@ type PrinterSettings = {
 };
 
 const PRINTER_SETTINGS_KEY = "tinutri.printer-settings";
-const PRINTER_MODE_LEGACY_KEY = "tinutri.printer-mode";
 const DEFAULT_SETTINGS: PrinterSettings = { type: "elgin", connection: "browser", ip: "", size: "60x40", showTime: true };
 
 const PRINTER_TYPES: { id: PrinterType; label: string }[] = [
-  { id: "niimbot", label: "NiiMbot" },
-  { id: "elgin", label: "Elgin" },
-  { id: "bematech", label: "Bematech" },
-  { id: "zebra", label: "Zebra" },
-  { id: "tomate", label: "Tomate" },
-  { id: "argox", label: "Argox" },
-  { id: "outra", label: "Outra impressora térmica" },
+  { id: "elgin", label: "Elgin L42 Pro" },
 ];
 const CONNECTION_MODES: { id: ConnectionMode; label: string }[] = [
   { id: "browser", label: "Impressão pelo navegador" },
@@ -109,139 +102,13 @@ function loadSettings(): PrinterSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
   try {
     const raw = window.localStorage.getItem(PRINTER_SETTINGS_KEY);
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
-    const legacy = window.localStorage.getItem(PRINTER_MODE_LEGACY_KEY);
-    if (legacy === "niimbot") return { ...DEFAULT_SETTINGS, type: "niimbot" };
+    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw), type: "elgin" };
   } catch { /* Preferências locais são opcionais; os valores padrão continuam disponíveis. */ }
   return DEFAULT_SETTINGS;
 }
 
 function sizeMm(size: LabelSize) {
   return size === "50x30" ? { w: 50, h: 30 } : { w: 60, h: 40 };
-}
-
-async function generateNiimbotPng(label: PrintableLabel, size: LabelSize): Promise<Blob | null> {
-  // Bitmap monocromático no tamanho real @ ~203 DPI (8 px/mm)
-  const PX_PER_MM = 8;
-  const { w, h } = sizeMm(size);
-  const scale = size === "50x30" ? 0.78 : 1;
-  const W = w * PX_PER_MM;
-  const H = h * PX_PER_MM;
-  const canvas = document.createElement("canvas");
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#000000";
-  ctx.textBaseline = "top";
-  ctx.textAlign = "left";
-
-  const load = (src: string) => new Promise<HTMLImageElement | null>((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    img.src = src;
-  });
-  const [logo, qr] = await Promise.all([
-    load(new URL(tinutriLogo, window.location.origin).toString()),
-    label.qrDataUrl ? load(label.qrDataUrl) : Promise.resolve(null),
-  ]);
-
-  const pad = Math.round(10 * scale);
-  const fs = (n: number) => Math.max(8, Math.round(n * scale));
-  const qrSize = qr ? Math.round(100 * scale) : 0;
-  const colW = W - pad * 2 - (qr ? qrSize + Math.round(8 * scale) : 0);
-
-  // Marca
-  let y = pad;
-  const logoSize = Math.round(22 * scale);
-  if (logo) ctx.drawImage(logo, pad, y, logoSize, logoSize);
-  ctx.font = `800 ${fs(12)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText("TiNutri Smart Label®", pad + logoSize + Math.round(6 * scale), y + Math.round(6 * scale));
-  y += logoSize + Math.round(4 * scale);
-
-  // Tipo da etiqueta (tarja preta)
-  const kindText = kindLabel(label.kind);
-  ctx.font = `800 ${fs(11)}px Arial, Helvetica, sans-serif`;
-  const kindW = ctx.measureText(kindText).width + Math.round(12 * scale);
-  const kindH = Math.round(20 * scale);
-  ctx.fillRect(pad, y, kindW, kindH);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(kindText, pad + Math.round(6 * scale), y + Math.round(4 * scale));
-  ctx.fillStyle = "#000000";
-  y += kindH + Math.round(6 * scale);
-
-  // Produto (até 2 linhas)
-  ctx.font = `900 ${fs(26)}px Arial, Helvetica, sans-serif`;
-  const words = label.product.toUpperCase().split(" ");
-  const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const next = current ? `${current} ${word}` : word;
-    if (ctx.measureText(next).width > W - pad * 2 && current) { lines.push(current); current = word; } else current = next;
-  }
-  if (current) lines.push(current);
-  for (const text of lines.slice(0, 2)) {
-    ctx.fillText(text, pad, y);
-    y += Math.round(27 * scale);
-  }
-
-  // Manipulação / abertura
-  ctx.font = `700 ${fs(11)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText("MANIP./ABERTURA:", pad, y);
-  ctx.font = `700 ${fs(16)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText(label.opened, pad, y + Math.round(13 * scale));
-  y += Math.round(34 * scale);
-
-  // Validade — maior destaque
-  ctx.fillRect(pad, y, colW, Math.max(1, Math.round(2 * scale)));
-  y += Math.round(5 * scale);
-  ctx.font = `700 ${fs(11)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText("VALIDADE:", pad, y);
-  ctx.font = `900 ${fs(28)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText(label.expires, pad, y + Math.round(13 * scale));
-  y += Math.round(48 * scale);
-
-  // Metadados
-  ctx.font = `700 ${fs(11)}px Arial, Helvetica, sans-serif`;
-  const meta = [
-    label.storage ? `CONSERVAÇÃO: ${label.storage.toUpperCase()}` : "",
-    label.lot ? `LOTE: ${label.lot.toUpperCase()}` : "",
-    label.sector ? `SETOR: ${label.sector.toUpperCase()}` : "",
-    label.inspection ? label.inspection.toUpperCase() : "",
-    `RESP.: ${label.responsible.toUpperCase()}`,
-  ].filter(Boolean);
-  const lineH = Math.round(13 * scale);
-  let metaY = Math.min(y, H - pad - lineH * meta.length);
-  for (const text of meta) {
-    let t = text;
-    while (ctx.measureText(t).width > colW && t.length > 4) t = t.slice(0, -2);
-    ctx.fillText(t === text ? text : `${t}…`, pad, metaY);
-    metaY += lineH;
-  }
-
-  // QR Code de rastreio
-  if (qr) {
-    ctx.drawImage(qr, W - pad - qrSize, H - pad - qrSize - Math.round(11 * scale), qrSize, qrSize);
-    ctx.font = `700 ${fs(9)}px Arial, Helvetica, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.fillText("RASTREIO", W - pad - qrSize / 2, H - pad - Math.round(9 * scale));
-    ctx.textAlign = "left";
-  }
-
-  return await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
-}
-
-type NiimbotPreview = { url: string; filename: string };
-
-async function buildNiimbotPreview(label: PrintableLabel, settings: PrinterSettings): Promise<NiimbotPreview | null> {
-  const blob = await generateNiimbotPng(label, settings.size);
-  if (!blob) return null;
-  const safe = label.product.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "etiqueta";
-  return { url: URL.createObjectURL(blob), filename: `niimbot-${safe}-${settings.size}mm.png` };
 }
 
 /** Imprime uma etiqueta física por item da lista, cada uma em sua própria página. */
@@ -327,7 +194,6 @@ function Index() {
   const emissionLock = useRef(false);
   const settingsButton = useRef<HTMLButtonElement | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
-  const [niimbotPreview, setNiimbotPreview] = useState<NiimbotPreview | null>(null);
   const [lastFailedPrint, setLastFailedPrint] = useState<QueueItem[] | null>(null);
   const [pendingPrint, setPendingPrint] = useState<{ rows: { id: string; client_id: string; product_name: string }[]; total: number; product: string } | null>(null);
   const [alertDays, setAlertDays] = useState(3);
@@ -338,7 +204,6 @@ function Index() {
     try { window.localStorage.setItem(ALERT_DAYS_KEY, String(safe)); } catch { /* Preferências locais são opcionais; os valores padrão continuam disponíveis. */ }
   };
 
-  useEffect(() => () => { if (niimbotPreview) URL.revokeObjectURL(niimbotPreview.url); }, [niimbotPreview]);
 
   useEffect(() => { setPrinterSettings(loadSettings()); }, []);
   // QR Code apenas ilustrativo na pré-visualização; o token real é gerado ao emitir.
@@ -683,7 +548,6 @@ function Index() {
 
   const dispatchPrint = async (items: QueueItem[]) => {
     if (items.length === 0) return false;
-    const isNiimbot = printerSettings.type === "niimbot";
     const units = await expandUnits(items);
     const rows = units.map(({ item, label }) => ({
       client_id: item.client_id, product_id: item.product_id, responsible_id: item.responsible_id, issued_by: userId,
@@ -701,16 +565,9 @@ function Index() {
     const created = (inserted ?? []) as { id: string; client_id: string; product_name: string }[];
     await Promise.all(created.map((row) => logLabelEvent(row.id, row.client_id, "emissao")));
     const lastLabel = units[units.length - 1].label;
-    if (isNiimbot) {
-      const preview = await buildNiimbotPreview(lastLabel, printerSettings);
-      if (!preview) { setLastFailedPrint(items); await markPrintFailed(created, "preview_indisponivel"); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
-      setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
-      setMessage(`Etiqueta pronta para o app NiiMbot. Toque em "Baixar PNG" para enviar à impressora.`);
-    } else {
-      const ok = printThermalBatch(units.map((u) => u.label), printerSettings);
-      if (!ok) { setLastFailedPrint(items); await markPrintFailed(created, "impressora_indisponivel"); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
-      setMessage(`${units.length} etiqueta(s) enviada(s) para a impressora. Confirme abaixo se a impressão saiu correta.`);
-    }
+    const ok = printThermalBatch(units.map((u) => u.label), printerSettings);
+    if (!ok) { setLastFailedPrint(items); await markPrintFailed(created, "impressora_indisponivel"); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
+    setMessage(`${units.length} etiqueta(s) enviada(s) para a impressora. Confirme abaixo se a impressão saiu correta.`);
     setPendingPrint({ rows: created, total: created.length, product: lastLabel.product });
     setLabel(lastLabel);
     setLastFailedPrint(null);
@@ -808,13 +665,6 @@ function Index() {
       token,
       qrDataUrl: await qrFor(token),
     };
-    if (printerSettings.type === "niimbot") {
-      const preview = await buildNiimbotPreview(sample, printerSettings);
-      if (!preview) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return; }
-      setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
-      setMessage('Etiqueta de teste pronta. Toque em "Baixar PNG" para enviar ao app NiiMbot.');
-      return;
-    }
     const ok = printThermalBatch([sample], printerSettings);
     setMessage(ok ? "Etiqueta de teste enviada para impressão." : PRINTER_NOT_FOUND_MESSAGE);
   };
@@ -839,12 +689,7 @@ function Index() {
     };
     setLabel(historicalLabel);
     setTab("emit");
-    if (printerSettings.type === "niimbot") {
-      const preview = await buildNiimbotPreview(historicalLabel, printerSettings);
-      if (!preview) { setMessage(PRINTER_NOT_FOUND_MESSAGE); return; }
-      setNiimbotPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return preview; });
-      setMessage('Etiqueta pronta. Toque em "Baixar PNG" para enviar ao app NiiMbot.');
-    } else if (!printThermalBatch(Array.from({ length: record.quantity || 1 }, () => historicalLabel), printerSettings)) {
+    if (!printThermalBatch(Array.from({ length: record.quantity || 1 }, () => historicalLabel), printerSettings)) {
       setMessage(PRINTER_NOT_FOUND_MESSAGE);
       return;
     }
@@ -911,7 +756,7 @@ function Index() {
           {tab === "emit" && <section className="emission-page space-y-6">
             <header className="dashboard-heading"><div><p className="text-xs font-semibold uppercase tracking-[.14em] text-primary">Estação de etiquetagem</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Emitir etiquetas</h1><p className="mt-2 text-sm text-muted-foreground">Prepare uma etiqueta ou monte uma fila para imprimir em lote.</p></div></header>
             <div className="emit-printer flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
-              <div className="flex min-w-0 items-center gap-3"><Printer className="size-5 shrink-0 text-primary" /><div className="min-w-0"><p className="text-xs text-muted-foreground">Impressora e etiqueta</p><p className="mt-1 break-words text-sm font-medium">{PRINTER_TYPES.find(t => t.id === printerSettings.type)?.label} · {printerSettings.size.replace("x", " × ")} mm <span className="text-xs text-muted-foreground">· {printerSettings.type === "niimbot" ? "PNG para o app NiiMbot" : CONNECTION_MODES.find(c => c.id === printerSettings.connection)?.label}</span></p></div></div>
+              <div className="flex min-w-0 items-center gap-3"><Printer className="size-5 shrink-0 text-primary" /><div className="min-w-0"><p className="text-xs text-muted-foreground">Impressora e etiqueta</p><p className="mt-1 break-words text-sm font-medium">{PRINTER_TYPES.find(t => t.id === printerSettings.type)?.label} · {printerSettings.size.replace("x", " × ")} mm <span className="text-xs text-muted-foreground">· {CONNECTION_MODES.find(c => c.id === printerSettings.connection)?.label}</span></p></div></div>
               <Button ref={settingsButton} variant="outline" className="min-h-11" onClick={() => { setMessage(""); setShowPrinterSettings(true); }}><Settings2 />Configurações</Button>
             </div>
             <Dialog open={showPrinterSettings} onOpenChange={setShowPrinterSettings}>
@@ -919,10 +764,8 @@ function Index() {
                 <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 text-left sm:px-6"><DialogTitle>Configurações de impressão</DialogTitle><DialogDescription className="mt-2 text-xs leading-relaxed">As alterações são salvas automaticamente neste navegador.</DialogDescription></DialogHeader>
                 <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <EmitField label="Tipo da impressora">
-                    <SystemSelect value={printerSettings.type} onChange={(e) => updateSettings({ type: e.target.value as PrinterType })}>
-                      {PRINTER_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                    </SystemSelect>
+                  <EmitField label="Impressora">
+                    <input value={PRINTER_TYPES[0].label} readOnly aria-readonly="true" />
                   </EmitField>
                   <EmitField label="Modo de conexão">
                     <SystemSelect value={printerSettings.connection} onChange={(e) => updateSettings({ connection: e.target.value as ConnectionMode })}>
@@ -947,11 +790,8 @@ function Index() {
 
                   <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
                     <Button variant="outline" disabled={Boolean(emissionBusy) || Boolean(pendingPrint)} onClick={() => { setMessage(""); void performEmission("test", testPrint); }}><Printer /> Imprimir 1 etiqueta de teste</Button>
-                    {printerSettings.type === "niimbot" && (
-                      <p className="text-xs text-muted-foreground">NiiMbot: a etiqueta será baixada como PNG para envio pelo app oficial.</p>
-                    )}
                   </div>
-                  {printerSettings.type === "elgin" && <details className="sm:col-span-2 rounded-xl border bg-muted/30 p-4 text-xs leading-6"><summary className="cursor-pointer font-semibold">Orientações para Elgin e impressão pelo computador</summary>
+                  <details className="sm:col-span-2 rounded-xl border bg-muted/30 p-4 text-xs leading-6"><summary className="cursor-pointer font-semibold">Orientações para Elgin e impressão pelo computador</summary>
                     <strong className="block text-sm">Elgin L42 Pro Full (USB no computador)</strong>
                     <p className="mt-1 text-muted-foreground">
                       Na janela de impressão que abrir, escolha a <strong>Elgin L42</strong>, deixe as margens em zero e a escala em 100% (sem “ajustar à página”).
@@ -964,11 +804,10 @@ function Index() {
                     <p className="mt-2 flex gap-2 text-muted-foreground"><Smartphone className="mt-0.5 size-4 shrink-0" />
                       No iPhone você cria e consulta etiquetas normalmente. Imprimir direto na Elgin pelo celular exige uma integração compatível, que ainda não está disponível aqui — prepare no celular e imprima pelo computador ligado à impressora.
                     </p>
-                  </details>}
+                  </details>
                 </div>
 
                   {message && <p role={emissionError ? "alert" : "status"} className={`${emissionError ? "clients-error" : "clients-notice"} mt-4`}>{message}</p>}
-                  {niimbotPreview && <a className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm text-white" href={niimbotPreview.url} download={niimbotPreview.filename}>Baixar PNG de teste</a>}
                 </div>
                 <div className="client-dialog-footer shrink-0 border-t px-5 py-4 text-right sm:px-6"><Button className="dashboard-primary" onClick={() => setShowPrinterSettings(false)}>Concluir</Button></div>
               </DialogContent>
@@ -1024,17 +863,6 @@ function Index() {
                     {lastFailedPrint && lastFailedPrint.length > 0 && (
                       <Button variant="kitchen" size="sm" disabled={Boolean(emissionBusy) || Boolean(pendingPrint)} onClick={() => void performEmission("retry", retryLastPrint)}><Printer /> Tentar novamente</Button>
                     )}
-                  </div>
-                )}
-                {niimbotPreview && (
-                  <div className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-secondary p-3">
-                    <img src={niimbotPreview.url} alt="Pré-visualização NiiMbot" className="h-16 w-24 rounded-md border bg-white object-contain" />
-                    <div className="min-w-0 flex-1">
-                      <strong className="block text-sm">Etiqueta NiiMbot pronta</strong>
-                      <p className="truncate text-xs text-muted-foreground">{niimbotPreview.filename}</p>
-                    </div>
-                    <a href={niimbotPreview.url} download={niimbotPreview.filename} className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"><Printer className="size-4" /> Baixar PNG</a>
-                    <Button variant="ghost" size="icon" aria-label="Fechar" onClick={() => { URL.revokeObjectURL(niimbotPreview.url); setNiimbotPreview(null); }}><X /></Button>
                   </div>
                 )}
                 <div className="emit-actions mt-5 grid gap-2 border-t pt-5 sm:grid-cols-2">
