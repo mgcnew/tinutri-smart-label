@@ -240,16 +240,12 @@
 .auth-password-toggle:hover { color: var(--auth-green); }
 .auth-recovery { min-height: 32px; color: var(--auth-green); font-size: 12px; font-weight: 600; text-underline-offset: 3px; cursor: pointer; }
 .auth-recovery:hover { text-decoration: underline; }
-.auth-submit, .auth-google { display: flex; width: 100%; min-height: 48px; align-items: center; justify-content: center; gap: 10px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background-color .15s; }
+.auth-submit { display: flex; width: 100%; min-height: 48px; align-items: center; justify-content: center; gap: 10px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background-color .15s; }
 .auth-submit { margin-top: 2px; background: var(--auth-green); color: #fff; }
 .auth-submit:hover { background: #00653a; }
-.auth-google { border: 1px solid #dce4df; background: #fff; color: #35483d; }
-.auth-google:hover { background: #f5f8f6; }
 .auth-page button:focus-visible { outline: 2px solid var(--auth-green); outline-offset: 3px; }
 .auth-page button:disabled { opacity: .6; cursor: wait; }
 .auth-field input:disabled { opacity: .7; }
-.auth-divider { display: flex; align-items: center; gap: 14px; margin: 24px 0 18px; color: #7b887f; font-size: 11px; }
-.auth-divider::before, .auth-divider::after { content: ""; height: 1px; flex: 1; background: #e9eeeb; }
 .auth-access-note { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 24px; color: #63736a; font-size: 11px; line-height: 1.6; text-align: center; }
 .auth-access-note svg { flex-shrink: 0; }
 .auth-feedback { padding: 12px 14px; border: 1px solid; border-radius: 10px; font-size: 12px; line-height: 1.6; }
