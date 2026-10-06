@@ -36,6 +36,8 @@ export type PrintableLabel = {
   sector?: string;
   lot?: string;
   inspection?: string;
+  /** "Leite, Soja": alérgenos de declaração obrigatória. */
+  allergens?: string;
   responsible: string;
   issued: Date;
   /** identificador não sensível usado no QR Code */
@@ -110,6 +112,7 @@ body{font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:none;text-ren
 export function labelMarkup(label: PrintableLabel, logoUrl: string) {
   const line = (k: string, v: string) => `<div>${escapeHtml(k)} ${escapeHtml(v)}</div>`;
   const meta = [
+    label.allergens ? line("ALÉRGENOS:", label.allergens.toUpperCase()) : "",
     label.storage ? line("CONSERVAÇÃO:", label.storage.toUpperCase()) : "",
     label.lot ? line("LOTE:", label.lot.toUpperCase()) : "",
     label.sector ? line("SETOR:", label.sector.toUpperCase()) : "",

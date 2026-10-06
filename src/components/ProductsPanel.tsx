@@ -33,6 +33,9 @@ import { CategoryInput } from "@/components/CategoryInput";
 import { categoryKey } from "@/lib/categories";
 import { supabase } from "@/integrations/supabase/client";
 import { useFocusedEntity } from "@/hooks/use-focused-entity";
+import { STORAGE_PRESETS } from "@/lib/label";
+import { ALLERGENS, allergenText, normalizeAllergens } from "@/lib/allergens";
+import { MAX_SHELF_DAYS, normalizeShelfByStorage } from "@/lib/shelf-life";
 import { useDebouncedValue, usePaginatedQuery } from "@/hooks/use-paginated-query";
 import { PageLoading, PaginationControls } from "@/components/PaginationControls";
 import { scopeKey, scopeIds, searchColumns, searchPattern } from "@/lib/list-query";
@@ -50,6 +53,8 @@ type Product = {
   inspection_number: string | null;
   notes: string | null;
   active: boolean;
+  shelf_life_by_storage?: unknown;
+  allergens?: string[] | null;
 };
 type Props = {
   clients: { id: string; name: string; active: boolean }[];
@@ -78,6 +83,8 @@ const EMPTY = {
   inspection_type: "SIF" as "SIF" | "SISP" | "SIM",
   inspection_number: "",
   notes: "",
+  by_storage: {} as Record<string, string>,
+  allergens: [] as string[],
 };
 
 export function ProductsPanel({
@@ -206,6 +213,10 @@ export function ProductsPanel({
       inspection_type: product.inspection_type ?? "SIF",
       inspection_number: product.inspection_number ?? "",
       notes: product.notes ?? "",
+      allergens: normalizeAllergens(product.allergens),
+      by_storage: Object.fromEntries(
+        Object.entries(normalizeShelfByStorage(product.shelf_life_by_storage)).map(([key, value]) => [key, String(value)]),
+      ),
     });
     setEditingId(product.id);
     setEditingRecord(product);
@@ -233,6 +244,17 @@ export function ProductsPanel({
       setError("Confira empresa, produto, categoria, validade e dados de inspeção.");
       return;
     }
+    const byStorage: Record<string, number> = {};
+    for (const preset of STORAGE_PRESETS) {
+      const raw = (form.by_storage[preset] ?? "").trim();
+      if (!raw) continue;
+      const value = Number(raw);
+      if (!Number.isInteger(value) || value < 0 || value > MAX_SHELF_DAYS) {
+        setError(`Validade por conservação inválida em “${preset}”. Use de 0 a ${MAX_SHELF_DAYS} dias ou deixe em branco.`);
+        return;
+      }
+      byStorage[preset] = value;
+    }
     setSaving(true);
     const category =
       categories.find((name) => categoryKey(name) === categoryKey(form.category)) ??
@@ -247,6 +269,8 @@ export function ProductsPanel({
       inspection_type: form.requires_inspection ? form.inspection_type : null,
       inspection_number: form.requires_inspection ? form.inspection_number.trim() : null,
       notes: form.notes.trim() || null,
+      shelf_life_by_storage: byStorage,
+      allergens: normalizeAllergens(form.allergens),
     };
     try {
       const { data: saved, error: saveError } = editingId
@@ -436,6 +460,11 @@ export function ProductsPanel({
                 {product.requires_inspection && (
                   <span className="rounded-lg border px-3 py-2 text-muted-foreground">
                     {product.inspection_type} {product.inspection_number}
+                  </span>
+                )}
+                {allergenText(product.allergens) && (
+                  <span className="rounded-lg border px-3 py-2 text-muted-foreground">
+                    Alérgenos: {allergenText(product.allergens)}
                   </span>
                 )}
               </div>
@@ -639,6 +668,47 @@ export function ProductsPanel({
                     </>
                   )}
                 </FormSection>
+                <fieldset className="client-form-section rounded-xl border p-3">
+                  <legend className="px-1 text-sm font-semibold">Alérgenos (impressos na etiqueta)</legend>
+                  <div className="mt-1 grid gap-2 sm:grid-cols-2">
+                    {ALLERGENS.map((allergen) => (
+                      <label key={allergen.code} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={form.allergens.includes(allergen.code)}
+                          onChange={(event) =>
+                            update(
+                              "allergens",
+                              event.target.checked
+                                ? [...form.allergens, allergen.code]
+                                : form.allergens.filter((code) => code !== allergen.code),
+                            )
+                          }
+                        />
+                        {allergen.name}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <details className="client-form-section rounded-xl border p-3" open={Object.keys(form.by_storage).length > 0}>
+                  <summary className="cursor-pointer text-sm font-semibold">Validade por conservação (opcional)</summary>
+                  <p className="mt-2 text-xs text-muted-foreground">Quando a conservação escolhida na emissão tiver prazo aqui, ele substitui a validade padrão. Em branco, vale a validade padrão.</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {STORAGE_PRESETS.map((preset) => (
+                      <FormField key={preset} label={preset}>
+                        <input
+                          type="number"
+                          min={0}
+                          max={MAX_SHELF_DAYS}
+                          inputMode="numeric"
+                          placeholder="Padrão"
+                          value={form.by_storage[preset] ?? ""}
+                          onChange={(event) => update("by_storage", { ...form.by_storage, [preset]: event.target.value })}
+                        />
+                      </FormField>
+                    ))}
+                  </div>
+                </details>
                 <div className="client-form-section">
                   <FormField label="Observações">
                     <textarea

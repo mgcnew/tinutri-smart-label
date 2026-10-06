@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 
 import tinutriLogo from "@/assets/tinutri-logo.png";
 import { supabase } from "@/integrations/supabase/client";
+import { DiscardReasonField } from "@/components/DiscardReasonField";
+import { settleLabelRecord } from "@/lib/settlement-actions";
+import { allergenText } from "@/lib/allergens";
+import { formatCloseReason, type Settlement } from "@/lib/settlement";
 import { kindLabel, resolveStatus, STATUS_TEXT, type LabelKind, type LabelLifecycle, type LabelStatus } from "@/lib/label";
 
 export const Route = createFileRoute("/label/$token")({
@@ -36,6 +40,7 @@ type LabelRow = {
   label_status: LabelLifecycle;
   label_kind: LabelKind;
   issued_at: string;
+  allergens: string[] | null;
 };
 
 const STATUS_STYLE: Record<LabelStatus, string> = {
@@ -58,6 +63,13 @@ function LabelLookup() {
   const { token } = Route.useParams();
   const [row, setRow] = useState<LabelRow | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing">("loading");
+  // Só aparece para quem está logado e tem acesso à etiqueta (a política do banco decide).
+  const [actor, setActor] = useState<{ id: string; clientId: string; userId: string; userName: string; canSettle: boolean } | null>(null);
+  const [discarding, setDiscarding] = useState(false);
+  const [reasonCode, setReasonCode] = useState("");
+  const [reasonNote, setReasonNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -68,6 +80,15 @@ function LabelLookup() {
       if (error || !found) { setState("missing"); return; }
       setRow(found);
       setState("ready");
+      const { data: auth } = await supabase.auth.getUser();
+      const user = auth.user;
+      if (!user || !alive) return;
+      const [{ data: own }, { data: profile }] = await Promise.all([
+        supabase.from("issued_labels").select("id,client_id,label_status,print_status").eq("public_token", token).maybeSingle(),
+        supabase.from("profiles").select("name,email").eq("user_id", user.id).maybeSingle(),
+      ]);
+      if (!alive || !own) return;
+      setActor({ id: own.id, clientId: own.client_id, userId: user.id, userName: profile?.name ?? profile?.email ?? "", canSettle: own.label_status === "ativa" && own.print_status === "confirmada" });
     })();
     return () => { alive = false; };
   }, [token]);
@@ -89,6 +110,21 @@ function LabelLookup() {
   }
 
   const status = resolveStatus(row.label_status, row.expires_at);
+
+  const settle = async (choice: Settlement) => {
+    if (!actor || busy) return;
+    const reason = choice === "descartada" ? formatCloseReason(reasonCode, reasonNote) : null;
+    if (choice === "descartada" && !reason) { setFeedback("Informe o motivo do descarte."); return; }
+    setBusy(true); setFeedback("");
+    const { result } = await settleLabelRecord({ id: actor.id, clientId: actor.clientId, userId: actor.userId, userName: actor.userName, status: choice, reason });
+    setBusy(false);
+    if (result === "erro") { setFeedback("Não foi possível registrar a baixa. Tente novamente."); return; }
+    if (result === "ja-baixada") { setFeedback("Esta etiqueta já recebeu baixa."); setActor({ ...actor, canSettle: false }); return; }
+    setRow({ ...row, label_status: choice });
+    setActor({ ...actor, canSettle: false });
+    setDiscarding(false);
+    setFeedback(`Baixa registrada: ${choice}.`);
+  };
 
   return (
     <main className="min-h-screen bg-background px-4 py-8">
@@ -116,11 +152,30 @@ function LabelLookup() {
             <Row term="Conservação" value={row.storage_condition ?? "—"} />
             <Row term="Lote" value={row.lot_number ?? "—"} />
             {row.inspection_label && <Row term="Inspeção" value={row.inspection_label} />}
+            {allergenText(row.allergens) && <Row term="Alérgenos" value={allergenText(row.allergens)!} strong />}
             <Row term="Responsável" value={row.responsible_name} />
             <Row term="Localização atual" value={row.location ?? "Não informada"} />
             <Row term="Emitida em" value={fmt(row.issued_at)} />
           </dl>
         </section>
+
+        {actor?.canSettle && (
+          <section className="mt-4 rounded-3xl border bg-card p-5 shadow-sm">
+            <h2 className="text-sm font-bold">Dar baixa nesta etiqueta</h2>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <button type="button" disabled={busy} className="min-h-12 rounded-xl border text-sm font-semibold" onClick={() => void settle("utilizada")}>Utilizada</button>
+              <button type="button" disabled={busy} className="min-h-12 rounded-xl border text-sm font-semibold" onClick={() => void settle("consumida")}>Consumida</button>
+              <button type="button" disabled={busy} className="min-h-12 rounded-xl border text-sm font-semibold" onClick={() => setDiscarding(true)}>Descartada</button>
+            </div>
+            {discarding && (
+              <div>
+                <DiscardReasonField code={reasonCode} note={reasonNote} onCode={setReasonCode} onNote={setReasonNote} disabled={busy} />
+                <button type="button" disabled={busy || !formatCloseReason(reasonCode, reasonNote)} className="mt-3 min-h-12 w-full rounded-xl bg-destructive text-sm font-bold text-destructive-foreground disabled:opacity-50" onClick={() => void settle("descartada")}>Confirmar descarte</button>
+              </div>
+            )}
+          </section>
+        )}
+        {feedback && <p role="status" className="mt-3 text-center text-sm font-semibold">{feedback}</p>}
 
         <p className="mt-4 text-center text-xs text-muted-foreground">
           Situação calculada com base na validade registrada. Código {row.public_token.slice(0, 8)}…

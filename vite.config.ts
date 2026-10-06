@@ -8,6 +8,8 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   vite: {
+    server: { port: 8081, strictPort: true },
+    preview: { port: 8081, strictPort: true },
     optimizeDeps: {
       ignoreOutdatedRequests: true,
       noDiscovery: true,

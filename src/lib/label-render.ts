@@ -287,6 +287,8 @@ export async function renderLabelCanvas(
 
   // Metadados, em ordem de prioridade; o que não couber é omitido.
   const meta: string[] = [];
+  // Alérgenos primeiro: é a informação de segurança que não pode ser a omitida quando faltar espaço.
+  if (label.allergens) meta.push(`ALÉRGENOS: ${label.allergens.toUpperCase()}`);
   if (o.showStorage && label.storage) meta.push(`CONSERVAÇÃO: ${label.storage.toUpperCase()}`);
   if (o.showLot && label.lot) meta.push(`LOTE: ${label.lot.toUpperCase()}`);
   if (o.showInspection && label.inspection) meta.push(label.inspection.toUpperCase());

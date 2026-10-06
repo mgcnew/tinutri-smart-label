@@ -11,6 +11,11 @@
     "lint": "eslint .",
     "test:lists": "node --experimental-strip-types --test tests/list-query.test.ts",
     "test:zpl": "node --experimental-strip-types --test tests/zpl.test.ts tests/agent.test.ts",
+    "test:shelf": "node --experimental-strip-types --test tests/shelf-life.test.ts",
+    "test:settlement": "node --experimental-strip-types --test tests/settlement.test.ts",
+    "test:allergens": "node --experimental-strip-types --test tests/allergens.test.ts",
+    "test:audit": "node --experimental-strip-types --test tests/audit-report.test.ts",
+    "test:alerts": "node --experimental-strip-types --test tests/alert-plan.test.ts",
     "test:dashboard": "node --experimental-strip-types --test tests/dashboard.test.ts",
     "format": "prettier --write ."
   },

@@ -1,3 +1,6 @@
+import { LossesDialog } from "@/components/LossesDialog";
+import { DiscardReasonField } from "@/components/DiscardReasonField";
+import { formatCloseReason } from "@/lib/settlement";
 import { SystemSelect } from "@/components/ui/system-select";
 import {
   cloneElement,
@@ -48,7 +51,7 @@ type Props = {
   revision: number;
   alertDays: number;
   onAlertDaysChange: (days: number) => void;
-  onSettle: (record: OperationalLabel, status: Settlement) => Promise<boolean>;
+  onSettle: (record: OperationalLabel, status: Settlement, reason?: string | null) => Promise<boolean>;
   window: ExpiryWindow;
   onWindowChange: (window: ExpiryWindow) => void;
   clientName: string;
@@ -81,6 +84,9 @@ export function ValidadesPanel({
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [target, setTarget] = useState<OperationalLabel | null>(null);
   const [status, setStatus] = useState<Settlement | null>(null);
+  const [showLosses, setShowLosses] = useState(false);
+  const [reasonCode, setReasonCode] = useState("");
+  const [reasonNote, setReasonNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -235,16 +241,23 @@ export function ValidadesPanel({
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setTarget(item);
     setStatus(null);
+    setReasonCode("");
+    setReasonNote("");
     setError("");
     setNotice("");
   };
   const settle = async () => {
     if (!target || !status || lock.current) return;
+    const reason = status === "descartada" ? formatCloseReason(reasonCode, reasonNote) : null;
+    if (status === "descartada" && !reason) {
+      setError("Informe o motivo do descarte.");
+      return;
+    }
     lock.current = true;
     setSaving(true);
     setError("");
     try {
-      if (!(await onSettle(target, status))) {
+      if (!(await onSettle(target, status, reason))) {
         setError(
           "Não foi possível registrar a baixa. Seus dados foram mantidos; atualize a página e tente novamente.",
         );
@@ -271,16 +284,22 @@ export function ValidadesPanel({
             Priorize o que vence primeiro e registre o destino das etiquetas.
           </p>
         </div>
-        <Button
-          variant="outline"
-          className="min-h-11"
-          disabled={loading || saving}
-          onClick={onRefresh}
-        >
-          <RefreshCw className={loading ? "animate-spin" : ""} />
-          {loading ? "Atualizando…" : "Atualizar"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="min-h-11" onClick={() => setShowLosses(true)}>
+            Perdas e descartes
+          </Button>
+          <Button
+            variant="outline"
+            className="min-h-11"
+            disabled={loading || saving}
+            onClick={onRefresh}
+          >
+            <RefreshCw className={loading ? "animate-spin" : ""} />
+            {loading ? "Atualizando…" : "Atualizar"}
+          </Button>
+        </div>
       </header>
+      <LossesDialog open={showLosses} onClose={() => setShowLosses(false)} scopeKey={accessKey} />
       <div className="validities-context flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
         <p className="flex min-w-0 items-center gap-2">
           <Building2 className="size-4 shrink-0" />
@@ -629,6 +648,9 @@ export function ValidadesPanel({
                 </label>
               ))}
             </fieldset>
+            {status === "descartada" && (
+              <DiscardReasonField code={reasonCode} note={reasonNote} onCode={setReasonCode} onNote={setReasonNote} disabled={saving} />
+            )}
             {error && (
               <p role="alert" className="clients-error mt-4">
                 {error}
@@ -642,7 +664,7 @@ export function ValidadesPanel({
               </Button>
               <Button
                 className="dashboard-primary"
-                disabled={!status || saving}
+                disabled={!status || saving || (status === "descartada" && !formatCloseReason(reasonCode, reasonNote))}
                 onClick={() => void settle()}
               >
                 {saving ? (

@@ -47,6 +47,38 @@ export function EmissionProductPicker({
     },
     [clientId, term],
   );
+  const [frequent, setFrequent] = useState<Product[]>([]);
+  // Mais usados: contagem das últimas emissões da empresa, igual em qualquer aparelho.
+  useEffect(() => {
+    setFrequent([]);
+    if (!clientId) return;
+    const controller = new AbortController();
+    void (async () => {
+      const { data: recent, error } = await supabase
+        .from("issued_labels")
+        .select("product_id")
+        .eq("client_id", clientId)
+        .not("product_id", "is", null)
+        .order("issued_at", { ascending: false })
+        .limit(300)
+        .abortSignal(controller.signal);
+      if (error || !recent) return;
+      const counts = new Map<string, number>();
+      for (const row of recent) if (row.product_id) counts.set(row.product_id, (counts.get(row.product_id) ?? 0) + 1);
+      const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([id]) => id);
+      if (top.length === 0) return;
+      const { data: products } = await supabase
+        .from("products")
+        .select("*")
+        .eq("client_id", clientId)
+        .eq("active", true)
+        .in("id", top)
+        .abortSignal(controller.signal);
+      if (controller.signal.aborted || !products) return;
+      setFrequent(top.map((id) => products.find((p) => p.id === id)).filter((p): p is Product => Boolean(p)));
+    })();
+    return () => controller.abort();
+  }, [clientId, revision]);
   const listing = usePaginatedQuery(JSON.stringify([clientId, term]), load, revision);
   // Keep the selected snapshot while searching other pages. Duplication may reference
   // a product outside the first page, so retrieve that one by id.
@@ -88,6 +120,27 @@ export function EmissionProductPicker({
       <label htmlFor={id} className="mb-2 block text-xs font-medium">
         Produto
       </label>
+      {!disabled && frequent.length > 0 && (
+        <div className="mb-2" role="group" aria-label="Produtos mais usados">
+          <p className="mb-1 text-xs text-muted-foreground">Mais usados</p>
+          <div className="flex flex-wrap gap-2">
+            {frequent.map((product) => (
+              <button
+                key={product.id}
+                type="button"
+                className="emit-count"
+                aria-pressed={product.id === value}
+                onClick={() => {
+                  setSelected(product);
+                  onChange(product);
+                }}
+              >
+                {product.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="relative mb-2">
         <Search
           aria-hidden="true"

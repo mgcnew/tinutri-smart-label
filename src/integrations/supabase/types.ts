@@ -165,6 +165,7 @@ export type Database = {
           client_name: string
           closed_at: string | null
           closed_by: string | null
+          allergens: string[]
           closed_reason: string | null
           confirmed_at: string | null
           confirmed_by: string | null
@@ -198,6 +199,7 @@ export type Database = {
           client_name: string
           closed_at?: string | null
           closed_by?: string | null
+          allergens?: string[]
           closed_reason?: string | null
           confirmed_at?: string | null
           confirmed_by?: string | null
@@ -231,6 +233,7 @@ export type Database = {
           client_name?: string
           closed_at?: string | null
           closed_by?: string | null
+          allergens?: string[]
           closed_reason?: string | null
           confirmed_at?: string | null
           confirmed_by?: string | null
@@ -422,6 +425,8 @@ export type Database = {
           notes: string | null
           requires_inspection: boolean
           requires_lot: boolean
+          allergens: string[]
+          shelf_life_by_storage: Json
           shelf_life_days: number
           storage_condition: string | null
           updated_at: string
@@ -443,6 +448,8 @@ export type Database = {
           notes?: string | null
           requires_inspection?: boolean
           requires_lot?: boolean
+          allergens?: string[]
+          shelf_life_by_storage?: Json
           shelf_life_days: number
           storage_condition?: string | null
           updated_at?: string
@@ -464,6 +471,8 @@ export type Database = {
           notes?: string | null
           requires_inspection?: boolean
           requires_lot?: boolean
+          allergens?: string[]
+          shelf_life_by_storage?: Json
           shelf_life_days?: number
           storage_condition?: string | null
           updated_at?: string

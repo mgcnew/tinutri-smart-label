@@ -27,6 +27,16 @@ import { CLIENT_CODE_KEY } from "./e.$code";
 import { claimFirstAdmin } from "@/lib/admin.functions";
 import { buildPrintDocument, kindLabel, LABEL_KINDS, newLabelToken, qrFor, STORAGE_PRESETS, type LabelKind, type PrintableLabel } from "@/lib/label";
 import tinutriLogo from "@/assets/tinutri-logo.png";
+import { NetworkPrinterSetup } from "@/components/NetworkPrinterSetup";
+import { BUILTIN_LAYOUTS, renderLabelZpl } from "@/lib/label-render";
+import { enqueueJob, isAgentOnline, LABELS_PER_JOB, listAgents, waitForJob } from "@/lib/print-queue";
+import { joinZpl } from "@/lib/zpl";
+import { useAlerts } from "@/hooks/use-alerts";
+import { useAlertSound } from "@/hooks/use-alert-sound";
+import { AlertBanner, AlertSoundToggle } from "@/components/AlertCenter";
+import { allergenText, normalizeAllergens } from "@/lib/allergens";
+import { shelfDaysFor } from "@/lib/shelf-life";
+import { settleLabelRecord } from "@/lib/settlement-actions";
 
 
 export const Route = createFileRoute("/")({
@@ -44,8 +54,8 @@ export const Route = createFileRoute("/")({
 
 type ClientStatus = "ativa" | "inativa" | "suspensa";
 type Client = { id: string; name: string; active: boolean; status: ClientStatus; public_code: string };
-type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null; active: boolean };
-type Collaborator = { id: string; client_id: string; name: string; role_title: string | null; active: boolean };
+type Product = { id: string; client_id: string; name: string; category: string; shelf_life_days: number; requires_lot: boolean; requires_inspection: boolean; inspection_type: "SIF" | "SISP" | "SIM" | null; inspection_number: string | null; notes: string | null; active: boolean; shelf_life_by_storage?: unknown; allergens?: string[] | null };
+type Collaborator = { id: string; client_id: string; name: string; role_title: string | null; active: boolean; user_id?: string | null };
 type QueueItem = {
   id: string;
   label: PrintableLabel;
@@ -57,9 +67,10 @@ type QueueItem = {
   expires_iso: string;
   opened_at: string;
   expires_at: string;
+  allergens: string[];
 };
 
-type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number; public_token?: string | null; label_kind?: string | null; label_status?: string | null; storage_condition?: string | null; sector?: string | null; opened_at?: string | null; expires_at?: string | null; print_status?: string | null; confirmed_at?: string | null; reprint_count?: number | null };
+type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number; public_token?: string | null; label_kind?: string | null; label_status?: string | null; storage_condition?: string | null; sector?: string | null; opened_at?: string | null; expires_at?: string | null; print_status?: string | null; confirmed_at?: string | null; reprint_count?: number | null; allergens?: string[] | null };
 type ActivityRecorder = (action: string, clientId: string, entityType: string, entityId: string, name: string, before: Record<string, unknown>, after: Record<string, unknown>) => Promise<void>;
 
 type AppTab = WorkspaceTab;
@@ -81,12 +92,14 @@ type PrinterSettings = {
   type: PrinterType;
   connection: ConnectionMode;
   ip: string;
+  /** Impressora de rede cadastrada (modo Wi-Fi / IP): as etiquetas vão pela fila até o agente local. */
+  printerId: string;
   size: LabelSize;
   showTime: boolean;
 };
 
 const PRINTER_SETTINGS_KEY = "tinutri.printer-settings";
-const DEFAULT_SETTINGS: PrinterSettings = { type: "elgin", connection: "browser", ip: "", size: "60x40", showTime: true };
+const DEFAULT_SETTINGS: PrinterSettings = { type: "elgin", connection: "browser", ip: "", printerId: "", size: "60x40", showTime: true };
 
 const PRINTER_TYPES: { id: PrinterType; label: string }[] = [
   { id: "elgin", label: "Elgin L42 Pro" },
@@ -194,10 +207,14 @@ function Index() {
   const emissionLock = useRef(false);
   const settingsButton = useRef<HTMLButtonElement | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const queueRestored = useRef(false);
   const [lastFailedPrint, setLastFailedPrint] = useState<QueueItem[] | null>(null);
   const [pendingPrint, setPendingPrint] = useState<{ rows: { id: string; client_id: string; product_name: string }[]; total: number; product: string } | null>(null);
   const [alertDays, setAlertDays] = useState(3);
   useEffect(() => { setAlertDays(loadAlertDays()); }, []);
+  const { counts: alertCounts, items: alertItems } = useAlerts(Boolean(userId && role && !loading), accessScope, overviewRevision, alertDays);
+  const alertSound = useAlertSound(alertCounts);
+  const urgentCount = (alertCounts?.expired ?? 0) + (alertCounts?.today ?? 0);
   const updateAlertDays = (value: number) => {
     const safe = Math.max(1, Math.min(90, Math.floor(value) || 1));
     setAlertDays(safe);
@@ -206,6 +223,34 @@ function Index() {
 
 
   useEffect(() => { setPrinterSettings(loadSettings()); }, []);
+
+  // Fila de etiquetas sobrevive a recarregar a página: guarda só dados, e os QR Codes são refeitos ao restaurar.
+  const queueKey = userId ? `tinutri.emission-queue.${userId}` : null;
+  useEffect(() => {
+    if (!queueKey || queueRestored.current) return;
+    queueRestored.current = true;
+    void (async () => {
+      try {
+        const raw = window.localStorage.getItem(queueKey);
+        if (!raw) return;
+        const saved = JSON.parse(raw) as unknown;
+        if (!Array.isArray(saved)) return;
+        const restored: QueueItem[] = [];
+        for (const entry of saved as (Omit<QueueItem, "label"> & { label: Omit<PrintableLabel, "issued" | "qrDataUrl"> & { issued: string } })[]) {
+          if (!entry?.label?.token || !entry.client_id || !entry.product_id) continue;
+          restored.push({ ...entry, label: { ...entry.label, issued: new Date(entry.label.issued), qrDataUrl: await qrFor(entry.label.token) } });
+        }
+        if (restored.length > 0) setQueue((current) => [...restored, ...current]);
+      } catch { /* Fila local é opcional: se estiver corrompida, começa vazia. */ }
+    })();
+  }, [queueKey]);
+  useEffect(() => {
+    if (!queueKey || !queueRestored.current) return;
+    try {
+      if (queue.length === 0) window.localStorage.removeItem(queueKey);
+      else window.localStorage.setItem(queueKey, JSON.stringify(queue.map((item) => ({ ...item, label: { ...item.label, qrDataUrl: undefined } }))));
+    } catch { /* Sem armazenamento local a fila continua funcionando só na sessão. */ }
+  }, [queue, queueKey]);
   // QR Code apenas ilustrativo na pré-visualização; o token real é gerado ao emitir.
   useEffect(() => { void qrFor(newLabelToken()).then(setPreviewQr); }, []);
 
@@ -216,6 +261,8 @@ function Index() {
       return next;
     });
   };
+
+  const selectNetworkPrinter = useCallback((printerId: string) => updateSettings({ printerId }), []);
 
   const refresh = async () => {
     setLoadingError(null);
@@ -276,7 +323,7 @@ function Index() {
       phase = "carregar os dados da sua estação";
       const allowedClientIds: string[] | null = currentRole === "admin_master" ? null : currentRole === "nutricionista" ? carteiraIds : ownClient ? [ownClient] : [];
       let clientsQuery = supabase.from("clients").select("id,name,active,status,public_code").order("name").order("id").abortSignal(controller.signal);
-      let collaboratorsQuery = supabase.from("collaborators").select("id,client_id,name,role_title,active").eq("active", true).order("name").abortSignal(controller.signal);
+      let collaboratorsQuery = supabase.from("collaborators").select("id,client_id,name,role_title,active,user_id").eq("active", true).order("name").abortSignal(controller.signal);
       if (allowedClientIds) {
         clientsQuery = clientsQuery.in("id", allowedClientIds.length ? allowedClientIds : ["00000000-0000-0000-0000-000000000000"]);
         collaboratorsQuery = collaboratorsQuery.in("client_id", allowedClientIds.length ? allowedClientIds : ["00000000-0000-0000-0000-000000000000"]);
@@ -337,6 +384,15 @@ function Index() {
 
   const activeClients = useMemo(() => clients.filter(c => c.active), [clients]);
   const visibleCollaborators = collaborators.filter((item) => item.client_id === selectedClient);
+  // Responsável pré-selecionado: o próprio usuário, se for colaborador; senão o último escolhido nesta empresa.
+  useEffect(() => {
+    if (!selectedClient || selectedResponsible) return;
+    const own = visibleCollaborators.find((item) => item.user_id && item.user_id === userId);
+    let remembered: string | null = null;
+    try { remembered = window.localStorage.getItem(`tinutri.last-responsible.${selectedClient}`); } catch { /* Preferência local opcional. */ }
+    const pick = own ?? visibleCollaborators.find((item) => item.id === remembered);
+    if (pick) setSelectedResponsible(pick.id);
+  }, [selectedClient, selectedResponsible, visibleCollaborators, userId]);
   const product = products.find((item) => item.id === selectedProduct);
   const responsible = collaborators.find((item) => item.id === selectedResponsible);
   const client = clients.find((item) => item.id === selectedClient);
@@ -359,6 +415,7 @@ function Index() {
     sector: sector.trim() || undefined,
     lot: (labelDraft?.lot ?? lot) || undefined,
     inspection: product?.requires_inspection && product.inspection_type && product.inspection_number ? `${product.inspection_type}: ${product.inspection_number}` : undefined,
+    allergens: allergenText(product?.allergens),
     responsible: labelDraft?.responsible || responsible?.name || "RESPONSÁVEL",
     issued: new Date(),
     qrDataUrl: previewQr,
@@ -489,6 +546,7 @@ function Index() {
       expires_iso: expiry,
       opened_at: openedAt.toISOString(),
       expires_at: expiresAt.toISOString(),
+      allergens: normalizeAllergens(product.allergens),
       label: {
         kind,
         product: labelDraft?.product.trim() || product.name,
@@ -498,6 +556,7 @@ function Index() {
         sector: sector.trim() || undefined,
         lot: (labelDraft?.lot ?? lot).trim() || undefined,
         inspection,
+        allergens: allergenText(product.allergens),
         responsible: labelDraft?.responsible.trim() || responsible.name,
         issued,
         token,
@@ -548,11 +607,19 @@ function Index() {
 
   const dispatchPrint = async (items: QueueItem[]) => {
     if (items.length === 0) return false;
+    const useNetworkQueue = printerSettings.connection === "wifi" && Boolean(printerSettings.printerId);
+    // Sem agente conectado nada seria impresso: avisa antes de registrar etiquetas que ficariam órfãs.
+    if (useNetworkQueue && !(await networkAgentOnline(items[0].client_id))) {
+      setLastFailedPrint(items);
+      setMessage("O agente de impressão está desligado. Abra o programa no computador da impressora e tente novamente.");
+      return false;
+    }
     const units = await expandUnits(items);
     const rows = units.map(({ item, label }) => ({
       client_id: item.client_id, product_id: item.product_id, responsible_id: item.responsible_id, issued_by: userId,
       client_name: clients.find(c => c.id === item.client_id)?.name ?? "", product_name: label.product, responsible_name: label.responsible,
       lot_number: label.lot ?? null, inspection_label: label.inspection ?? null,
+      allergens: item.allergens,
       opened_on: item.opened_iso, expires_on: item.expires_iso, quantity: 1,
       public_token: label.token, label_kind: label.kind,
       storage_condition: label.storage ?? null, sector: label.sector ?? null,
@@ -565,10 +632,56 @@ function Index() {
     const created = (inserted ?? []) as { id: string; client_id: string; product_name: string }[];
     await Promise.all(created.map((row) => logLabelEvent(row.id, row.client_id, "emissao")));
     const lastLabel = units[units.length - 1].label;
+    if (useNetworkQueue) return finishNetworkPrint(items, units.map((u) => u.label), created, lastLabel);
     const ok = printThermalBatch(units.map((u) => u.label), printerSettings);
     if (!ok) { setLastFailedPrint(items); await markPrintFailed(created, "impressora_indisponivel"); setMessage(PRINTER_NOT_FOUND_MESSAGE); return false; }
     setMessage(`${units.length} etiqueta(s) enviada(s) para a impressora. Confirme abaixo se a impressão saiu correta.`);
     setPendingPrint({ rows: created, total: created.length, product: lastLabel.product });
+    setLabel(lastLabel);
+    setLastFailedPrint(null);
+    await refresh();
+    return true;
+  };
+
+  const networkAgentOnline = async (clientId: string) => {
+    try { return (await listAgents(clientId)).some((a) => isAgentOnline(a)); } catch { return false; }
+  };
+
+  /** Renderiza o ZPL, enfileira em lotes e acompanha o agente. Só o que a impressora aceitou entra no PVPS. */
+  const sendToNetworkPrinter = async (clientId: string, labels: PrintableLabel[], ids: string[]) => {
+    const { w, h } = sizeMm(printerSettings.size);
+    for (let start = 0; start < labels.length; start += LABELS_PER_JOB) {
+      const slice = labels.slice(start, start + LABELS_PER_JOB);
+      const zpl = joinZpl(await Promise.all(slice.map((l) => renderLabelZpl(l, { widthMm: w, heightMm: h }, BUILTIN_LAYOUTS[0]))));
+      const jobId = await enqueueJob({ clientId, printerId: printerSettings.printerId, payload: zpl, labelIds: ids.slice(start, start + LABELS_PER_JOB), userId: userId ?? "" });
+      const result = await waitForJob(jobId);
+      if (!result.ok) return { ...result, printed: start };
+    }
+    return { ok: true as const, printed: labels.length };
+  };
+
+  const finishNetworkPrint = async (items: QueueItem[], labels: PrintableLabel[], created: { id: string; client_id: string; product_name: string }[], lastLabel: PrintableLabel) => {
+    setMessage(`Enviando ${labels.length} etiqueta(s) para a impressora…`);
+    let result: Awaited<ReturnType<typeof sendToNetworkPrinter>>;
+    try { result = await sendToNetworkPrinter(created[0].client_id, labels, created.map((r) => r.id)); }
+    catch { result = { ok: false, reason: "Não foi possível enviar à fila de impressão.", printed: 0 }; }
+    const printedRows = created.slice(0, result.printed);
+    const failedRows = created.slice(result.printed);
+    // O agente só marca "enviada" depois que a impressora recebeu os dados: isso dispensa a confirmação manual.
+    if (printedRows.length > 0) {
+      const { error } = await supabase.from("issued_labels")
+        .update({ print_status: "confirmada", confirmed_at: new Date().toISOString(), confirmed_by: userId } as never)
+        .in("id", printedRows.map((r) => r.id)).eq("print_status", "preparada");
+      if (!error) await Promise.all(printedRows.map((r) => logLabelEvent(r.id, r.client_id, "impressao_confirmada", 1, { via: "agente_rede" })));
+    }
+    if (!result.ok) {
+      await markPrintFailed(failedRows, "falha_agente_rede").catch(() => undefined);
+      setLastFailedPrint(items);
+      setMessage(`${result.reason}${printedRows.length > 0 ? ` ${printedRows.length} etiqueta(s) já tinham saído; reimprima apenas as demais pelo histórico.` : ""}`);
+      await refresh();
+      return false;
+    }
+    setMessage(`${labels.length} etiqueta(s) impressas e registradas no controle de validades.`);
     setLabel(lastLabel);
     setLastFailedPrint(null);
     await refresh();
@@ -609,11 +722,11 @@ function Index() {
   };
 
   /** Baixa manual no painel PVPS (utilizada, consumida ou descartada). */
-  const settleLabel = async (record: LabelRecord, status: "utilizada" | "consumida" | "descartada") => {
-    const { data: settled, error } = await supabase.from("issued_labels").update({ label_status: status, closed_at: new Date().toISOString(), closed_by: userId } as never).eq("id", record.id).eq("label_status", "ativa").eq("print_status", "confirmada").select("id").maybeSingle();
-    if (error) { setMessage("Não foi possível registrar a baixa."); return false; }
-    if (!settled) { setMessage("Esta etiqueta já recebeu baixa. Atualize o panorama."); await refresh(); return false; }
-    await logLabelEvent(record.id, record.client_id, `baixa_${status}`);
+  const settleLabel = async (record: LabelRecord, status: "utilizada" | "consumida" | "descartada", reason?: string | null) => {
+    const { result, eventLogged } = await settleLabelRecord({ id: record.id, clientId: record.client_id, userId, userName, status, reason });
+    if (result === "erro") { setMessage("Não foi possível registrar a baixa."); return false; }
+    if (result === "ja-baixada") { setMessage("Esta etiqueta já recebeu baixa. Atualize o panorama."); await refresh(); return false; }
+    if (!eventLogged) setActivityWarning("A etiqueta foi atualizada, mas não foi possível registrar esta ação na linha do tempo.");
     await refresh();
     return true;
   };
@@ -665,6 +778,17 @@ function Index() {
       token,
       qrDataUrl: await qrFor(token),
     };
+    if (printerSettings.connection === "wifi" && printerSettings.printerId) {
+      const cid = client?.id;
+      if (!cid || !(await networkAgentOnline(cid))) { setMessage("O agente de impressão está desligado. Abra o programa no computador da impressora."); return; }
+      const { w, h } = sizeMm(printerSettings.size);
+      try {
+        const jobId = await enqueueJob({ clientId: cid, printerId: printerSettings.printerId, payload: await renderLabelZpl(sample, { widthMm: w, heightMm: h }, BUILTIN_LAYOUTS[0]), labelIds: [], userId: userId ?? "" });
+        const result = await waitForJob(jobId);
+        setMessage(result.ok ? "Etiqueta de teste enviada para a impressora." : result.reason);
+      } catch { setMessage("Não foi possível enviar o teste à fila de impressão."); }
+      return;
+    }
     const ok = printThermalBatch([sample], printerSettings);
     setMessage(ok ? "Etiqueta de teste enviada para impressão." : PRINTER_NOT_FOUND_MESSAGE);
   };
@@ -682,6 +806,7 @@ function Index() {
       sector: record.sector ?? undefined,
       lot: record.lot_number ?? undefined,
       inspection: record.inspection_label ?? undefined,
+      allergens: allergenText(record.allergens),
       responsible: record.responsible_name,
       issued: new Date(record.issued_at),
       token: record.public_token ?? undefined,
@@ -706,6 +831,10 @@ function Index() {
     setSelectedProduct(record.product_id ?? "");
     setSelectedResponsible(record.responsible_id ?? "");
     setOpenedOn(record.opened_on);
+    setOpenedTime(record.opened_at ? format(new Date(record.opened_at), "HH:mm") : format(new Date(), "HH:mm"));
+    if (record.label_kind) setKind(record.label_kind as LabelKind);
+    setStorage(record.storage_condition ?? "");
+    setSector(record.sector ?? "");
     setLot(record.lot_number ?? "");
     setQuantity(String(record.quantity || 1));
     setLabel(null);
@@ -729,12 +858,13 @@ function Index() {
               <SheetTrigger asChild><Button variant="ghost" size="icon" aria-label="Abrir menu"><Menu /></Button></SheetTrigger>
               <SheetContent side="left" className="flex w-[86%] max-w-xs flex-col gap-0 p-5">
                 <SheetHeader className="border-b pb-5 text-left"><SheetTitle><Brand /></SheetTitle></SheetHeader>
-                <nav aria-label="Menu principal" className="mt-6 min-h-0 flex-1 space-y-2 overflow-y-auto"><Nav role={role} tab={tab} setTab={navigateTab} closeOnSelect /></nav>
+                <nav aria-label="Menu principal" className="mt-6 min-h-0 flex-1 space-y-2 overflow-y-auto"><Nav role={role} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount }} closeOnSelect /></nav>
                 <WorkspaceActions role={role} closeOnSelect />
               </SheetContent>
             </Sheet>
           </div>
           <Brand />
+          <div className="ml-auto"><AlertSoundToggle enabled={alertSound.enabled} blocked={alertSound.blocked} onEnable={() => void alertSound.enable()} onDisable={alertSound.disable} /></div>
           <UserStrip userName={userName} role={role} clientName={clients.find((c) => c.id === (profileClientId ?? selectedClient))?.name ?? null} />
         </div>
       </header>
@@ -743,12 +873,13 @@ function Index() {
           <div className="workspace-sidebar-content flex flex-col">
             <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Navegação</p>
             <nav aria-label="Menu principal" className="min-h-0 flex-1 space-y-2 overflow-y-auto">
-              <Nav role={role} tab={tab} setTab={navigateTab} />
+              <Nav role={role} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount }} />
             </nav>
             <WorkspaceActions role={role} />
           </div>
         </aside>
         <main className="workspace-main min-w-0 flex-1">
+          <AlertBanner counts={alertCounts} items={alertItems} soonDays={alertDays} onOpen={(window) => { setValidityWindow(window); setTab("validades"); }} />
           {entryError && <p role="alert" className="clients-error mb-5">{entryError}</p>}
           {entryCompany && <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3 text-sm"><span>Empresa selecionada: <strong>{clients.find(item => item.id === entryCompany)?.name ?? "Carregando…"}</strong></span><Button variant="ghost" size="sm" onClick={() => { setEntryCompany(""); setDashboardClient(""); }}>Limpar seleção</Button></div>}
           {activityWarning && <div role="alert" className="mb-5 flex items-center gap-3 rounded-xl border border-accent bg-card p-4 text-sm"><p className="flex-1">{activityWarning}</p><Button variant="ghost" size="icon" aria-label="Fechar aviso" onClick={() => setActivityWarning(null)}><X /></Button></div>}
@@ -772,9 +903,15 @@ function Index() {
                       {CONNECTION_MODES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                     </SystemSelect>
                   </EmitField>
-                  {printerSettings.connection === "wifi" && <EmitField label="IP da impressora" hint="Ex.: 192.168.1.200">
-                    <input value={printerSettings.ip} placeholder="192.168.1.200" onChange={(e) => updateSettings({ ip: e.target.value })} />
-                  </EmitField>}
+                  {printerSettings.connection === "wifi" && (
+                    <NetworkPrinterSetup
+                      clientId={client?.id ?? null}
+                      clientName={client?.name}
+                      canManage={role !== null && role !== "operator"}
+                      printerId={printerSettings.printerId}
+                      onSelect={selectNetworkPrinter}
+                    />
+                  )}
                   <EmitField label="Tamanho da etiqueta">
                     <SystemSelect value={printerSettings.size} onChange={(e) => updateSettings({ size: e.target.value as LabelSize })}>
                       <option value="60x40">60 mm × 40 mm (padrão)</option>
@@ -816,8 +953,8 @@ function Index() {
               <div className="emit-form min-w-0 rounded-2xl border bg-card p-5 sm:p-6">
                 <fieldset disabled={Boolean(emissionBusy)} className="min-w-0 space-y-4"><div className="emit-group-title"><span>1</span><h2>Dados da etiqueta</h2></div>
                 <div className="grid gap-4 sm:grid-cols-2"><EmitField label="Cliente"><SystemSelect value={selectedClient} disabled={role === "operator" || role === "admin_cliente"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); setLabelDraft(null); setLot(""); setShelfDays(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</SystemSelect></EmitField>
-                <EmissionProductPicker key={selectedClient} clientId={selectedClient} value={selectedProduct} disabled={!selectedClient} revision={overviewRevision} onRecord={handleProductRecord} onChange={(selected) => { setSelectedProduct(selected?.id ?? ""); setProducts(selected ? [selected] : []); setLot(""); setLabelDraft(null); setShelfDays(selected ? String(selected.shelf_life_days) : ""); }} />
-                <EmitField label="Responsável"><SystemSelect value={selectedResponsible} disabled={!selectedClient} onChange={(e) => setSelectedResponsible(e.target.value)}><option value="">Selecione o responsável</option>{visibleCollaborators.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</SystemSelect></EmitField>
+                <EmissionProductPicker key={selectedClient} clientId={selectedClient} value={selectedProduct} disabled={!selectedClient} revision={overviewRevision} onRecord={handleProductRecord} onChange={(selected) => { setSelectedProduct(selected?.id ?? ""); setProducts(selected ? [selected] : []); setLot(""); setLabelDraft(null); setShelfDays(selected ? String(shelfDaysFor(selected, storage)) : ""); }} />
+                <EmitField label="Responsável"><SystemSelect value={selectedResponsible} disabled={!selectedClient} onChange={(e) => { setSelectedResponsible(e.target.value); try { window.localStorage.setItem(`tinutri.last-responsible.${selectedClient}`, e.target.value); } catch { /* Preferência local opcional. */ } }}><option value="">Selecione o responsável</option>{visibleCollaborators.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</SystemSelect></EmitField>
                 <EmitField label="Tipo da etiqueta"><SystemSelect value={kind} onChange={(e) => setKind(e.target.value as LabelKind)}>{LABEL_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</SystemSelect></EmitField></div>
                 <div className="emit-group-title"><span>2</span><h2>Validade e conservação</h2></div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -830,7 +967,7 @@ function Index() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <EmitField label="Conservação">
-                    <SystemSelect value={storage} onChange={(e) => setStorage(e.target.value)}>
+                    <SystemSelect value={storage} onChange={(e) => { setStorage(e.target.value); if (product) setShelfDays(String(shelfDaysFor(product, e.target.value))); }}>
                       <option value="">Não informar</option>
                       {STORAGE_PRESETS.map((s) => <option key={s} value={s}>{s}</option>)}
                     </SystemSelect>
@@ -963,10 +1100,10 @@ const ROLE_TABS: Record<AppRole, AppTab[]> = {
   operator: ["dashboard", "emit", "validades", "history"],
 };
 
-function Nav({ role, tab, setTab, closeOnSelect = false }: { role: AppRole; tab: AppTab; setTab: (id: AppTab) => void; closeOnSelect?: boolean }) {
+function Nav({ role, tab, setTab, badges = {}, closeOnSelect = false }: { role: AppRole; tab: AppTab; setTab: (id: AppTab) => void; badges?: Partial<Record<AppTab, number>>; closeOnSelect?: boolean }) {
   const allowed = new Set<AppTab>(ROLE_TABS[role]);
   return navItems.filter((item) => allowed.has(item.id)).map((item) => {
-    const control = <Button key={item.id} variant={tab === item.id ? "secondary" : "ghost"} className="workspace-nav-item h-11 w-full justify-start" aria-current={tab === item.id ? "page" : undefined} onClick={() => setTab(item.id)}><item.icon />{item.label}</Button>;
+    const control = <Button key={item.id} variant={tab === item.id ? "secondary" : "ghost"} className="workspace-nav-item h-11 w-full justify-start" aria-current={tab === item.id ? "page" : undefined} onClick={() => setTab(item.id)}><item.icon />{item.label}{(badges[item.id] ?? 0) > 0 && <span className="ml-auto rounded-full bg-destructive px-2 py-0.5 text-xs font-bold text-destructive-foreground" aria-label={`${badges[item.id]} vencidas ou vencendo hoje`}>{badges[item.id]! > 99 ? "99+" : badges[item.id]}</span>}</Button>;
     return closeOnSelect ? <SheetClose asChild key={item.id}>{control}</SheetClose> : control;
   });
 }

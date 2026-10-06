@@ -1,3 +1,5 @@
+import { DiscardReasonField } from "@/components/DiscardReasonField";
+import { discardReasonName, formatCloseReason, parseCloseReason } from "@/lib/settlement";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ExternalLink, History, LoaderCircle, Printer } from "lucide-react";
@@ -26,6 +28,7 @@ type Props = {
   onSettle: (
     label: OperationalLabel,
     status: "utilizada" | "consumida" | "descartada",
+    reason?: string | null,
   ) => Promise<boolean>;
   onReprint: (label: OperationalLabel) => Promise<void>;
 };
@@ -44,6 +47,11 @@ const LIFECYCLE_NAMES: Record<string, string> = {
   cancelada: "Cancelada",
 };
 
+const discardLabel = (value: string | null) => {
+  const { code, note } = parseCloseReason(value);
+  return code ? `${discardReasonName(code)}${note ? ` — ${note}` : ""}` : "Não informado";
+};
+
 export function LabelDetails({ labelId, action, revision, onClose, onSettle, onReprint }: Props) {
   const [label, setLabel] = useState<OperationalLabel | null>(null);
   const [events, setEvents] = useState<LabelEvent[]>([]);
@@ -53,6 +61,9 @@ export function LabelDetails({ labelId, action, revision, onClose, onSettle, onR
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [discarding, setDiscarding] = useState(false);
+  const [reasonCode, setReasonCode] = useState("");
+  const [reasonNote, setReasonNote] = useState("");
 
   useEffect(() => {
     if (!labelId) return;
@@ -107,10 +118,12 @@ export function LabelDetails({ labelId, action, revision, onClose, onSettle, onR
 
   const settle = async (status: "utilizada" | "consumida" | "descartada") => {
     if (!label || busy) return;
+    const reason = status === "descartada" ? formatCloseReason(reasonCode, reasonNote) : null;
+    if (status === "descartada" && !reason) { setNotice("Informe o motivo do descarte."); return; }
     setBusy(true);
     setNotice(null);
     try {
-      if (await onSettle(label, status)) setAttempt((value) => value + 1);
+      if (await onSettle(label, status, reason)) { setAttempt((value) => value + 1); setDiscarding(false); setReasonCode(""); setReasonNote(""); }
       else setNotice("Não foi possível registrar a baixa. Tente novamente.");
     } catch {
       setNotice("Não foi possível registrar a baixa. Tente novamente.");
@@ -182,6 +195,9 @@ export function LabelDetails({ labelId, action, revision, onClose, onSettle, onR
                   ["Emitida em", format(new Date(label.issued_at), "dd/MM/yyyy HH:mm")],
                   ["Inspeção", label.inspection_label ?? "Não informada"],
                   ["Reimpressões", String(label.reprint_count)],
+                  ...(label.label_status === "descartada"
+                    ? [["Motivo do descarte", discardLabel(label.closed_reason)]]
+                    : []),
                 ].map(([term, value]) => (
                   <div key={term}>
                     <dt className="text-xs text-muted-foreground">{term}</dt>
@@ -198,12 +214,20 @@ export function LabelDetails({ labelId, action, revision, onClose, onSettle, onR
                         key={status}
                         variant="outline"
                         disabled={busy}
-                        onClick={() => void settle(status)}
+                        onClick={() => (status === "descartada" ? setDiscarding(true) : void settle(status))}
                       >
                         {LIFECYCLE_NAMES[status]}
                       </Button>
                     ))}
                   </div>
+                  {discarding && (
+                    <div>
+                      <DiscardReasonField code={reasonCode} note={reasonNote} onCode={setReasonCode} onNote={setReasonNote} disabled={busy} />
+                      <Button className="mt-3" disabled={busy || !formatCloseReason(reasonCode, reasonNote)} onClick={() => void settle("descartada")}>
+                        Confirmar descarte
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
               {notice && (
