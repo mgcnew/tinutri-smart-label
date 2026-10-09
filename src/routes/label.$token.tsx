@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
 
-import tinutriLogo from "@/assets/tinutri-logo.png";
+import tinutriLogo from "@/assets/tinutri-logo-ui.webp";
 import { supabase } from "@/integrations/supabase/client";
 import { DiscardReasonField } from "@/components/DiscardReasonField";
 import { settleLabelRecord } from "@/lib/settlement-actions";

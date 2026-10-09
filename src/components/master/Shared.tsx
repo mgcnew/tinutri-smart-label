@@ -36,7 +36,7 @@ export function MasterModal({
     >
       <DialogContent
         className={`client-dialog master-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] ${wide ? "max-w-3xl" : "max-w-xl"} flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0`}
-        overlayClassName="bg-black/35 backdrop-blur-[2px]"
+        overlayClassName="bg-black/35"
         onEscapeKeyDown={(e) => {
           if (busy) e.preventDefault();
         }}
@@ -50,7 +50,7 @@ export function MasterModal({
             {description}
           </DialogDescription>
         </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
+        <div className="min-h-0 flex-1 thin-scroll overflow-y-auto p-5">{children}</div>
         {footer && <div className="client-dialog-footer shrink-0 border-t p-5">{footer}</div>}
       </DialogContent>
     </Dialog>

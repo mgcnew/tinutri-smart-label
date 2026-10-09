@@ -100,7 +100,7 @@ export function CategoryInput({
           id={`${id}-list`}
           role="listbox"
           aria-label="Categorias da empresa"
-          className="category-options mt-2 max-h-44 overflow-y-auto rounded-xl border bg-card p-1"
+          className="category-options mt-2 max-h-44 thin-scroll overflow-y-auto rounded-xl border bg-card p-1"
         >
           {choices.map((choice, index) => (
             <button

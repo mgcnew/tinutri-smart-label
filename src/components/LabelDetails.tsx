@@ -139,7 +139,7 @@ export function LabelDetails({ labelId, action, revision, onClose, onSettle, onR
         if (!open && !busy) onClose();
       }}
     >
-      <DialogContent className="max-h-[90svh] w-[calc(100%_-_2rem)] max-w-2xl overflow-y-auto rounded-2xl bg-card p-5 sm:p-7">
+      <DialogContent className="max-h-[90svh] w-[calc(100%_-_2rem)] max-w-2xl thin-scroll overflow-y-auto rounded-2xl bg-card p-5 sm:p-7">
         <DialogHeader>
           <DialogTitle className="pr-6 text-xl">
             {label?.product_name ?? "Detalhes da etiqueta"}

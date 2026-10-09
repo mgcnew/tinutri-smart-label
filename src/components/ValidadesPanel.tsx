@@ -593,7 +593,7 @@ export function ValidadesPanel({
       >
         <DialogContent
           className="client-dialog validity-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] max-w-lg flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0"
-          overlayClassName="bg-black/35 backdrop-blur-[2px]"
+          overlayClassName="bg-black/35"
           onEscapeKeyDown={(event) => {
             if (saving) event.preventDefault();
           }}
@@ -613,7 +613,7 @@ export function ValidadesPanel({
               ativas.
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <div className="min-h-0 flex-1 thin-scroll overflow-y-auto p-5">
             {target && (
               <div className="mb-5 rounded-xl border bg-muted/30 p-4">
                 <h3 className="break-words text-sm font-semibold">{target.product_name}</h3>

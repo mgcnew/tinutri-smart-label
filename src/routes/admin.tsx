@@ -27,7 +27,7 @@ import { CompanyModal } from "@/components/master/CompanyModal";
 import { ReportModal } from "@/components/master/ReportModal";
 import type { Company } from "@/lib/management";
 import type { RecentAction } from "@/lib/dashboard";
-import logo from "@/assets/tinutri-logo.png";
+import logo from "@/assets/tinutri-logo-ui.webp";
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Área Master · TiNutri Smart Label®" }] }),
   component: AdminMaster,
@@ -169,7 +169,7 @@ function AdminMaster() {
     }
   };
   const menu = (
-    <nav aria-label="Seções da Área Master" className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+    <nav aria-label="Seções da Área Master" className="min-h-0 flex-1 space-y-2 thin-scroll overflow-y-auto">
       {sections.map((item) => (
         <Button
           key={item.id}

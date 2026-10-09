@@ -1,6 +1,5 @@
-import { toDataURL } from "qrcode";
 
-import tinutriLogo from "@/assets/tinutri-logo.png";
+import tinutriLogo from "@/assets/tinutri-logo-print.png";
 
 export type LabelKind = "manipulado" | "aberto" | "fracionado" | "recebido";
 export type LabelLifecycle = "ativa" | "utilizada" | "consumida" | "descartada" | "cancelada";
@@ -79,6 +78,8 @@ export function newLabelToken() {
 }
 
 export async function qrFor(token: string) {
+  // Carregado sob demanda: a biblioteca de QR não entra no primeiro carregamento da página.
+  const { toDataURL } = await import("qrcode");
   return toDataURL(labelUrl(token), { width: 320, margin: 0, errorCorrectionLevel: "M", color: { dark: "#000000", light: "#FFFFFF" } });
 }
 

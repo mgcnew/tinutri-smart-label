@@ -568,7 +568,7 @@ export function ClientsPanel({
       >
         <DialogContent
           className="client-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0"
-          overlayClassName="bg-black/35 backdrop-blur-[2px]"
+          overlayClassName="bg-black/35"
           onEscapeKeyDown={(event) => {
             if (saving) event.preventDefault();
           }}
@@ -593,7 +593,7 @@ export function ClientsPanel({
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={save} aria-busy={saving} className="flex min-h-0 flex-1 flex-col">
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 thin-scroll overflow-y-auto">
               <fieldset disabled={saving} className="min-w-0 px-5 py-5 sm:px-6">
                 <FormSection title="Identificação" description="Dados da empresa e localização.">
                   <FormField label="Nome do cliente *">

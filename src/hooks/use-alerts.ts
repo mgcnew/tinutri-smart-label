@@ -45,7 +45,8 @@ export function useAlerts(enabled: boolean, scope: string[] | null, revision: nu
     let alive = true;
     const run = () => void load().then((result) => { if (alive) { setCounts(result.counts); setItems(result.items); } }).catch(() => undefined);
     run();
-    const timer = setInterval(run, REFRESH_MS);
+    // Aba escondida não consulta o banco; ao voltar, o evento abaixo atualiza na hora.
+    const timer = setInterval(() => { if (document.visibilityState === "visible") run(); }, REFRESH_MS);
     // Voltar para a aba depois de um tempo atualiza na hora, sem esperar o próximo ciclo.
     const onVisible = () => { if (document.visibilityState === "visible") run(); };
     document.addEventListener("visibilitychange", onVisible);

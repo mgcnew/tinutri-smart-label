@@ -1,7 +1,5 @@
-import { SystemSelect } from "@/components/ui/system-select";
 import { useCallback, useEffect, useId, useState } from "react";
-import { Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { SearchCombobox } from "@/components/ui/search-combobox";
 import { supabase } from "@/integrations/supabase/client";
 import { useDebouncedValue, usePaginatedQuery } from "@/hooks/use-paginated-query";
 import { searchColumns } from "@/lib/list-query";
@@ -64,8 +62,12 @@ export function EmissionProductPicker({
         .abortSignal(controller.signal);
       if (error || !recent) return;
       const counts = new Map<string, number>();
-      for (const row of recent) if (row.product_id) counts.set(row.product_id, (counts.get(row.product_id) ?? 0) + 1);
-      const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([id]) => id);
+      for (const row of recent)
+        if (row.product_id) counts.set(row.product_id, (counts.get(row.product_id) ?? 0) + 1);
+      const top = [...counts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([id]) => id);
       if (top.length === 0) return;
       const { data: products } = await supabase
         .from("products")
@@ -75,7 +77,9 @@ export function EmissionProductPicker({
         .in("id", top)
         .abortSignal(controller.signal);
       if (controller.signal.aborted || !products) return;
-      setFrequent(top.map((id) => products.find((p) => p.id === id)).filter((p): p is Product => Boolean(p)));
+      setFrequent(
+        top.map((id) => products.find((p) => p.id === id)).filter((p): p is Product => Boolean(p)),
+      );
     })();
     return () => controller.abort();
   }, [clientId, revision]);
@@ -141,92 +145,33 @@ export function EmissionProductPicker({
           </div>
         </div>
       )}
-      <div className="relative mb-2">
-        <Search
-          aria-hidden="true"
-          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-        />
-        <input
-          aria-label="Buscar produto para emissão"
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          className="pl-10"
-          placeholder="Buscar por produto ou categoria"
-          disabled={disabled}
-        />
-      </div>
-      <SystemSelect
+      <SearchCombobox
         id={id}
         value={value}
-        disabled={disabled || Boolean(listing.error)}
-        onChange={(event) => {
-          const record = rows.find((row) => row.id === event.target.value) ?? null;
+        selectedLabel={selected?.id === value ? selected.name : undefined}
+        options={rows.map((row) => ({ id: row.id, label: row.name, hint: row.category }))}
+        query={query}
+        onQueryChange={setQuery}
+        onSelect={(productId) => {
+          const record = rows.find((row) => row.id === productId) ?? null;
           setSelected(record);
           onChange(record);
         }}
-      >
-        <option value="">
-          {disabled
-            ? "Selecione o cliente primeiro"
-            : listing.loading
-              ? "Consultando produtos…"
-              : listing.total
-                ? "Selecione o produto"
-                : "Nenhum produto encontrado"}
-        </option>
-        {rows.map((row) => (
-          <option key={row.id} value={row.id}>
-            {row.name}
-          </option>
-        ))}
-      </SystemSelect>
+        loading={listing.loading}
+        total={listing.total}
+        page={listing.page}
+        size={listing.size}
+        onPageChange={listing.setPage}
+        error={listing.error}
+        onReload={listing.reload}
+        disabled={disabled}
+        disabledPlaceholder="Selecione o cliente primeiro"
+        placeholder="Buscar produto ou categoria"
+      />
       {selectionError && (
         <p role="alert" className="mt-2 text-xs text-destructive">
           Não foi possível carregar o produto selecionado. Selecione novamente.
         </p>
-      )}
-      {listing.error ? (
-        <p role="alert" className="mt-2 text-xs text-destructive">
-          {listing.error}
-          <Button variant="ghost" className="mt-1 text-xs" onClick={listing.reload}>
-            Tentar novamente
-          </Button>
-        </p>
-      ) : (
-        !disabled && (
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span role="status">
-              {listing.loading
-                ? "Consultando produtos…"
-                : `${listing.total} produto${listing.total === 1 ? "" : "s"} · Página ${listing.page} de ${Math.max(1, Math.ceil(listing.total / listing.size))}`}
-            </span>
-            {listing.total > listing.size && (
-              <span className="flex gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={listing.loading || listing.page === 1}
-                  onClick={() => listing.setPage(listing.page - 1)}
-                  aria-label="Produtos anteriores"
-                >
-                  Anterior
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={listing.loading || listing.page * listing.size >= listing.total}
-                  onClick={() => listing.setPage(listing.page + 1)}
-                  aria-label="Próximos produtos"
-                >
-                  Próximos
-                </Button>
-              </span>
-            )}
-          </div>
-        )
       )}
     </div>
   );

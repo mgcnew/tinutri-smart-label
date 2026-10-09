@@ -1,11 +1,9 @@
-import { SystemSelect } from "@/components/ui/system-select";
-import { useCallback, useEffect, useState } from "react";
+import { SearchCombobox } from "@/components/ui/search-combobox";
+import { useCallback, useEffect, useId, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { management, pageResult, type MasterUser } from "@/lib/management";
 import { searchPattern, scopeKey, scopeIds } from "@/lib/list-query";
 import { useDebouncedValue, usePaginatedQuery } from "@/hooks/use-paginated-query";
-import { Button } from "@/components/ui/button";
-import { Field } from "./Shared";
 type Option = { id: string; name: string };
 export function RemoteSelect({
   label,
@@ -28,6 +26,7 @@ export function RemoteSelect({
   disabled?: boolean;
   required?: boolean;
 }) {
+  const id = useId();
   const [search, setSearch] = useState("");
   const [pinned, setPinned] = useState<Option | undefined>(initial);
   const term = useDebouncedValue(search);
@@ -110,70 +109,37 @@ export function RemoteSelect({
       : listing.rows;
   return (
     <div className="space-y-2">
+      <label htmlFor={id} className="block text-sm font-bold">
+        {label}
+      </label>
       {kind === "person" && (
         <p className="text-xs text-muted-foreground">
           Até 50 sugestões. Pesquise pelo nome para localizar outros responsáveis.
         </p>
       )}
-      <input
-        type="search"
-        aria-label={`Pesquisar ${label.toLowerCase()}`}
-        placeholder={`Pesquisar ${label.toLowerCase()}`}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
+      <SearchCombobox
+        id={id}
+        value={value}
+        selectedLabel={rows.find((row) => row.id === value)?.name}
+        options={rows.map((row) => ({ id: row.id, label: row.name }))}
+        query={search}
+        onQueryChange={setSearch}
+        onSelect={(optionId) => {
+          setPinned(rows.find((row) => row.id === optionId));
+          onChange(optionId);
+        }}
+        loading={listing.loading}
+        total={listing.total}
+        page={listing.page}
+        size={listing.size}
+        onPageChange={listing.setPage}
+        error={listing.error ? "Não foi possível carregar as opções." : null}
+        onReload={listing.reload}
         disabled={disabled}
+        required={required}
+        placeholder={`Pesquisar ${label.toLowerCase().replace(/ \*$/, "")}`}
+        clearLabel={required ? undefined : "Limpar seleção"}
       />
-      <Field label={label}>
-        <SystemSelect
-          value={value}
-          required={required}
-          disabled={disabled || Boolean(listing.error)}
-          onChange={(e) => {
-            const row = rows.find((item) => item.id === e.target.value);
-            setPinned(row);
-            onChange(e.target.value);
-          }}
-        >
-          <option value="">{listing.loading ? "Consultando…" : "Selecione"}</option>
-          {rows.map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.name}
-            </option>
-          ))}
-        </SystemSelect>
-      </Field>
-      {listing.error ? (
-        <p role="alert" className="text-xs text-destructive">
-          Não foi possível carregar as opções.
-          <Button variant="ghost" type="button" onClick={listing.reload}>
-            Tentar novamente
-          </Button>
-        </p>
-      ) : (
-        listing.total > listing.size && (
-          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>Página {listing.page}</span>
-            <span className="flex gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={listing.loading || listing.page <= 1}
-                onClick={() => listing.setPage(listing.page - 1)}
-              >
-                Anterior
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={listing.loading || listing.page * listing.size >= listing.total}
-                onClick={() => listing.setPage(listing.page + 1)}
-              >
-                Próxima
-              </Button>
-            </span>
-          </div>
-        )
-      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import tinutriLogo from "@/assets/tinutri-logo.png";
+import tinutriLogo from "@/assets/tinutri-logo-print.png";
 import { kindLabel, type PrintableLabel } from "@/lib/label";
 import { bitmapToZpl, DOTS_PER_MM, labelDots, type ZplOptions } from "@/lib/zpl";
 

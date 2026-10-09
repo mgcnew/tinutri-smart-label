@@ -78,7 +78,7 @@ export function AuditActionDetails({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="max-h-[90svh] w-[calc(100%_-_2rem)] max-w-xl overflow-y-auto rounded-2xl bg-card">
+      <DialogContent className="max-h-[90svh] w-[calc(100%_-_2rem)] max-w-xl thin-scroll overflow-y-auto rounded-2xl bg-card">
         <DialogHeader>
           <DialogTitle>Registro da ação</DialogTitle>
           <DialogDescription>

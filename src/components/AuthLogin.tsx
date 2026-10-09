@@ -1,7 +1,7 @@
 import { ArrowRight, Eye, EyeOff, LoaderCircle, LockKeyhole } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
-import tinutriLogo from "@/assets/tinutri-logo.png";
+import tinutriLogo from "@/assets/tinutri-logo-ui.webp";
 import { supabase } from "@/integrations/supabase/client";
 
 export function AuthLogin() {
@@ -75,8 +75,8 @@ export function AuthLogin() {
           <img
             src={tinutriLogo}
             alt="TiNutri — Soluções em consultoria de alimentos"
-            width={1022}
-            height={1152}
+            width={192}
+            height={216}
             className="auth-logo"
           />
           <p className="auth-product">

@@ -129,7 +129,7 @@ export function ProductImportDialog({
         }}
       >
         <DialogContent
-          className="client-dialog product-dialog max-h-[90svh] w-[calc(100%_-_2rem)] max-w-2xl overflow-y-auto rounded-2xl"
+          className="client-dialog product-dialog max-h-[90svh] w-[calc(100%_-_2rem)] max-w-2xl thin-scroll overflow-y-auto rounded-2xl"
           onEscapeKeyDown={(event) => {
             if (busy) event.preventDefault();
           }}

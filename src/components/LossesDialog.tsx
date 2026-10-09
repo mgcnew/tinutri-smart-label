@@ -81,7 +81,7 @@ export function LossesDialog({ open, onClose, scopeKey }: { open: boolean; onClo
           <DialogTitle>Perdas e descartes</DialogTitle>
           <DialogDescription className="mt-2 text-xs">Etiquetas baixadas como descartadas no período.</DialogDescription>
         </DialogHeader>
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 space-y-5 thin-scroll overflow-y-auto p-5">
           <SystemSelect aria-label="Período" value={days} onChange={(e) => setDays(Number(e.target.value))}>
             <option value={7}>Últimos 7 dias</option>
             <option value={30}>Últimos 30 dias</option>

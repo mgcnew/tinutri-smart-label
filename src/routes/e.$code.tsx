@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 
-import tinutriLogo from "@/assets/tinutri-logo.png";
+import tinutriLogo from "@/assets/tinutri-logo-ui.webp";
 
 export const CLIENT_CODE_KEY = "tinutri.client-code";
 

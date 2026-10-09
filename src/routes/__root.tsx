@@ -35,7 +35,8 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error: raised, reset }: { error: unknown; reset: () => void }) {
+  const error = raised instanceof Error ? raised : new Error(String(raised));
   console.error(error);
   const router = useRouter();
   useEffect(() => {
@@ -78,7 +79,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "theme-color", content: "#007a46" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "TiNutri Smart Label® | Etiquetas de Validade para Alimentos" },
       { name: "description", content: "Emita etiquetas térmicas padronizadas de identificação e validade de alimentos em poucos segundos. Solução prática para restaurantes, padarias, supermercados e" },
       { name: "author", content: "TiNutri" },

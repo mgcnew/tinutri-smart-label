@@ -2,7 +2,7 @@ import { SystemSelect } from "@/components/ui/system-select";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { addDays, format, isValid } from "date-fns";
 import { AlertTriangle, Building2, CalendarClock, CheckCircle2, ClipboardList, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Smartphone, Trash2, Users, X } from "lucide-react";
-import { cloneElement, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { cloneElement, lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,16 +17,11 @@ import { type ExpiryWindow, type RecentAction } from "@/lib/dashboard";
 import { AuthLogin } from "@/components/AuthLogin";
 import { supabase } from "@/integrations/supabase/client";
 import { workspaceSearch, type WorkspaceTab } from "@/lib/workspace-search";
-import { CarePanel } from "@/components/master/CarePanel";
-import { ClientsPanel } from "@/components/ClientsPanel";
-import { ProductsPanel } from "@/components/ProductsPanel";
-import { HistoryPanel } from "@/components/HistoryPanel";
-import { ValidadesPanel } from "@/components/ValidadesPanel";
 import { LabelPreview } from "@/components/LabelPreview";
 import { CLIENT_CODE_KEY } from "./e.$code";
 import { claimFirstAdmin } from "@/lib/admin.functions";
 import { buildPrintDocument, kindLabel, LABEL_KINDS, newLabelToken, qrFor, STORAGE_PRESETS, type LabelKind, type PrintableLabel } from "@/lib/label";
-import tinutriLogo from "@/assets/tinutri-logo.png";
+import tinutriLogo from "@/assets/tinutri-logo-ui.webp";
 import { NetworkPrinterSetup } from "@/components/NetworkPrinterSetup";
 import { BUILTIN_LAYOUTS, renderLabelZpl } from "@/lib/label-render";
 import { enqueueJob, isAgentOnline, LABELS_PER_JOB, listAgents, waitForJob } from "@/lib/print-queue";
@@ -38,6 +33,13 @@ import { ThemeToggle } from "@/components/PreferenceRow";
 import { allergenText, normalizeAllergens } from "@/lib/allergens";
 import { shelfDaysFor } from "@/lib/shelf-life";
 import { settleLabelRecord } from "@/lib/settlement-actions";
+
+// Cada painel vira um arquivo à parte: quem abre o dashboard não baixa clientes, produtos, histórico etc.
+const CarePanel = lazy(() => import("@/components/master/CarePanel").then((m) => ({ default: m.CarePanel })));
+const ClientsPanel = lazy(() => import("@/components/ClientsPanel").then((m) => ({ default: m.ClientsPanel })));
+const ProductsPanel = lazy(() => import("@/components/ProductsPanel").then((m) => ({ default: m.ProductsPanel })));
+const HistoryPanel = lazy(() => import("@/components/HistoryPanel").then((m) => ({ default: m.HistoryPanel })));
+const ValidadesPanel = lazy(() => import("@/components/ValidadesPanel").then((m) => ({ default: m.ValidadesPanel })));
 
 
 export const Route = createFileRoute("/")({
@@ -857,14 +859,15 @@ function Index() {
         setDetailAction(null);
       } : undefined} />
       <LabelDetails labelId={detailLabelId} action={detailAction?.source === "activity" ? null : detailAction} revision={overviewRevision} onClose={() => { setDetailLabelId(null); setDetailAction(null); }} onSettle={settleLabel} onReprint={reprintLabel} />
-      <header className="workspace-header sticky top-0 z-30 border-b bg-card/95 px-4 backdrop-blur sm:px-6">
+      <header className="workspace-header sticky top-0 z-30 border-b bg-card px-4 sm:px-6">
         <div className="workspace-topbar flex min-w-0 items-center gap-3">
           <div className="lg:hidden">
             <Sheet>
               <SheetTrigger asChild><Button variant="ghost" size="icon" aria-label="Abrir menu"><Menu /></Button></SheetTrigger>
               <SheetContent side="left" className="flex w-[86%] max-w-xs flex-col gap-0 p-5">
-                <SheetHeader className="border-b pb-5 text-left"><SheetTitle><Brand /></SheetTitle></SheetHeader>
-                <nav aria-label="Menu principal" className="mt-6 min-h-0 flex-1 space-y-2 overflow-y-auto"><Nav role={role} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount }} closeOnSelect /></nav>
+                <SheetHeader className="border-b pb-4 text-left"><SheetTitle><Brand /></SheetTitle></SheetHeader>
+                {role && <div className="mt-4 flex items-center gap-3 rounded-xl bg-secondary px-3 py-2.5"><span className="workspace-avatar shrink-0" aria-hidden="true">{(userName || "U").slice(0, 1).toUpperCase()}</span><div className="min-w-0"><strong className="block truncate text-sm font-semibold">{userName || "Sua conta"}</strong><span className="block truncate text-xs text-muted-foreground">{ROLE_LABEL[role]}{profileClientId ? ` · ${clients.find((c) => c.id === profileClientId)?.name ?? ""}` : ""}</span></div></div>}
+                <nav aria-label="Menu principal" className="thin-scroll mt-6 min-h-0 flex-1 space-y-2 thin-scroll overflow-y-auto"><Nav role={role} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount }} closeOnSelect /></nav>
                 <WorkspaceActions role={role} preferences={preferences} closeOnSelect />
               </SheetContent>
             </Sheet>
@@ -877,7 +880,7 @@ function Index() {
         <aside className="workspace-sidebar hidden w-60 shrink-0 lg:block">
           <div className="workspace-sidebar-content flex flex-col">
             <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Navegação</p>
-            <nav aria-label="Menu principal" className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+            <nav aria-label="Menu principal" className="thin-scroll min-h-0 flex-1 space-y-2 thin-scroll overflow-y-auto">
               <Nav role={role} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount }} />
             </nav>
             <WorkspaceActions role={role} preferences={preferences} />
@@ -896,9 +899,9 @@ function Index() {
               <Button ref={settingsButton} variant="outline" className="min-h-11" onClick={() => { setMessage(""); setShowPrinterSettings(true); }}><Settings2 />Configurações</Button>
             </div>
             <Dialog open={showPrinterSettings} onOpenChange={setShowPrinterSettings}>
-              <DialogContent className="client-dialog printer-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0" overlayClassName="bg-black/35 backdrop-blur-[2px]" onCloseAutoFocus={(event) => { event.preventDefault(); settingsButton.current?.focus(); }}>
+              <DialogContent className="client-dialog printer-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0" overlayClassName="bg-black/35" onCloseAutoFocus={(event) => { event.preventDefault(); settingsButton.current?.focus(); }}>
                 <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 text-left sm:px-6"><DialogTitle>Configurações de impressão</DialogTitle><DialogDescription className="mt-2 text-xs leading-relaxed">As alterações são salvas automaticamente neste navegador.</DialogDescription></DialogHeader>
-                <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+                <div className="thin-scroll min-h-0 flex-1 thin-scroll overflow-y-auto px-5 py-5 sm:px-6">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <EmitField label="Impressora">
                     <input value={PRINTER_TYPES[0].label} readOnly aria-readonly="true" />
@@ -1056,12 +1059,14 @@ function Index() {
               </aside>
             </div>
           </section>}
+          <Suspense fallback={<div role="status" aria-busy="true" aria-label="Carregando" className="dashboard-skeleton h-48 rounded-2xl" />}>
           {tab === "clients" && <ClientsPanel scope={role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : []} revision={overviewRevision} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
           {tab === "products" && <ProductsPanel clients={clients} scope={role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : []} revision={overviewRevision} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} initialClient={entryCompany} />}
           {tab === "team" && <TeamPanel scope={accessScope} clients={clients} collaborators={collaborators} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
           {tab === "validades" && <ValidadesPanel scope={overviewScope} revision={overviewRevision} alertDays={alertDays} onAlertDaysChange={updateAlertDays} onSettle={settleLabel} window={validityWindow} onWindowChange={setValidityWindow} clientName={clients.find((item) => item.id === dashboardClient)?.name ?? "Todas as empresas acessíveis"} onOpenLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} />}
           {tab === "acompanhamento" && (role === "admin_master" || role === "nutricionista") && <CarePanel scope={role === "admin_master" ? null : carteira} revision={overviewRevision} initialClient={entryCompany} focusedId={focusedEntityId} />}
           {tab === "history" && <HistoryPanel scope={entryCompany && (accessScope === null || accessScope.includes(entryCompany)) ? [entryCompany] : accessScope} revision={overviewRevision} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
+          </Suspense>
         </main>
       </div>
     </div>
@@ -1153,7 +1158,7 @@ function UserStrip({ userName, role, clientName }: { userName: string; role: App
   return (
     <div className="workspace-user ml-auto flex min-w-0 items-center gap-2 text-xs text-muted-foreground" title={[userName, ROLE_LABEL[role], clientName].filter(Boolean).join(" · ")}>
       <span className="workspace-avatar shrink-0" aria-hidden="true">{(userName || "U").slice(0, 1).toUpperCase()}</span>
-      <div className="min-w-0 text-right">
+      <div className="hidden min-w-0 text-right sm:block">
         <strong className="block truncate font-semibold text-foreground">{userName || "Sua conta"}</strong>
         <span className="block truncate text-[10px]">{ROLE_LABEL[role]}{clientName ? ` · ${clientName}` : ""}</span>
       </div>
