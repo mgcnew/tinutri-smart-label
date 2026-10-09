@@ -66,14 +66,24 @@ export function LabelDetails({ labelId, action, revision, onClose, onSettle, onR
   const [reasonCode, setReasonCode] = useState("");
   const [reasonNote, setReasonNote] = useState("");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoGone, setPhotoGone] = useState(false);
   const photoPath = label?.photo_path ?? null;
 
   useEffect(() => {
     setPhotoUrl(null);
+    setPhotoGone(false);
     if (!photoPath) return;
     let alive = true;
-    void signedPhotoUrl(photoPath).then((url) => { if (alive) setPhotoUrl(url); });
-    return () => { alive = false; };
+    // Sem link: a foto passou do prazo de retenção (90 dias) e foi removida, ou o acesso falhou.
+    void signedPhotoUrl(photoPath).then((url) => {
+      if (alive) {
+        setPhotoUrl(url);
+        setPhotoGone(!url);
+      }
+    });
+    return () => {
+      alive = false;
+    };
   }, [photoPath]);
 
   useEffect(() => {
@@ -130,12 +140,19 @@ export function LabelDetails({ labelId, action, revision, onClose, onSettle, onR
   const settle = async (status: "utilizada" | "consumida" | "descartada") => {
     if (!label || busy) return;
     const reason = status === "descartada" ? formatCloseReason(reasonCode, reasonNote) : null;
-    if (status === "descartada" && !reason) { setNotice("Informe o motivo do descarte."); return; }
+    if (status === "descartada" && !reason) {
+      setNotice("Informe o motivo do descarte.");
+      return;
+    }
     setBusy(true);
     setNotice(null);
     try {
-      if (await onSettle(label, status, reason)) { setAttempt((value) => value + 1); setDiscarding(false); setReasonCode(""); setReasonNote(""); }
-      else setNotice("Não foi possível registrar a baixa. Tente novamente.");
+      if (await onSettle(label, status, reason)) {
+        setAttempt((value) => value + 1);
+        setDiscarding(false);
+        setReasonCode("");
+        setReasonNote("");
+      } else setNotice("Não foi possível registrar a baixa. Tente novamente.");
     } catch {
       setNotice("Não foi possível registrar a baixa. Tente novamente.");
     } finally {
@@ -220,11 +237,25 @@ export function LabelDetails({ labelId, action, revision, onClose, onSettle, onR
                 <div>
                   <p className="mb-2 text-sm font-semibold">Foto do produto</p>
                   {photoUrl ? (
-                    <a href={photoUrl} target="_blank" rel="noreferrer" aria-label="Abrir a foto em tamanho maior">
-                      <img src={photoUrl} alt={`Foto de ${label.product_name} na emissão`} className="max-h-64 w-full rounded-xl border object-cover" loading="lazy" />
+                    <a
+                      href={photoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="Abrir a foto em tamanho maior"
+                    >
+                      <img
+                        src={photoUrl}
+                        alt={`Foto de ${label.product_name} na emissão`}
+                        className="max-h-64 w-full rounded-xl border object-cover"
+                        loading="lazy"
+                      />
                     </a>
                   ) : (
-                    <p role="status" className="text-xs text-muted-foreground">Carregando foto…</p>
+                    <p role="status" className="text-xs text-muted-foreground">
+                      {photoGone
+                        ? "A foto não está mais disponível: fotos são mantidas por 90 dias."
+                        : "Carregando foto…"}
+                    </p>
                   )}
                 </div>
               )}
@@ -237,7 +268,9 @@ export function LabelDetails({ labelId, action, revision, onClose, onSettle, onR
                         key={status}
                         variant="outline"
                         disabled={busy}
-                        onClick={() => (status === "descartada" ? setDiscarding(true) : void settle(status))}
+                        onClick={() =>
+                          status === "descartada" ? setDiscarding(true) : void settle(status)
+                        }
                       >
                         {LIFECYCLE_NAMES[status]}
                       </Button>
@@ -245,8 +278,18 @@ export function LabelDetails({ labelId, action, revision, onClose, onSettle, onR
                   </div>
                   {discarding && (
                     <div>
-                      <DiscardReasonField code={reasonCode} note={reasonNote} onCode={setReasonCode} onNote={setReasonNote} disabled={busy} />
-                      <Button className="mt-3" disabled={busy || !formatCloseReason(reasonCode, reasonNote)} onClick={() => void settle("descartada")}>
+                      <DiscardReasonField
+                        code={reasonCode}
+                        note={reasonNote}
+                        onCode={setReasonCode}
+                        onNote={setReasonNote}
+                        disabled={busy}
+                      />
+                      <Button
+                        className="mt-3"
+                        disabled={busy || !formatCloseReason(reasonCode, reasonNote)}
+                        onClick={() => void settle("descartada")}
+                      >
                         Confirmar descarte
                       </Button>
                     </div>
