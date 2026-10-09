@@ -30,6 +30,8 @@ import { useAlerts } from "@/hooks/use-alerts";
 import { useAlertSound } from "@/hooks/use-alert-sound";
 import { AlertBanner, AlertSoundToggle, PushToggle } from "@/components/AlertCenter";
 import { ThemeToggle } from "@/components/PreferenceRow";
+import { LabelPhotoField, type DraftPhoto } from "@/components/LabelPhotoField";
+import { uploadLabelPhoto } from "@/lib/photos";
 import { allergenText, normalizeAllergens } from "@/lib/allergens";
 import { shelfDaysFor } from "@/lib/shelf-life";
 import { settleLabelRecord } from "@/lib/settlement-actions";
@@ -71,6 +73,8 @@ type QueueItem = {
   opened_at: string;
   expires_at: string;
   allergens: string[];
+  /** Caminho da foto no bucket privado; compartilhado por todas as cópias do item. */
+  photo_path?: string | null;
 };
 
 type LabelRecord = { id: string; client_id: string; product_id: string | null; responsible_id: string | null; client_name: string; product_name: string; responsible_name: string; lot_number: string | null; inspection_label: string | null; opened_on: string; issued_at: string; expires_on: string; quantity: number; public_token?: string | null; label_kind?: string | null; label_status?: string | null; storage_condition?: string | null; sector?: string | null; opened_at?: string | null; expires_at?: string | null; print_status?: string | null; confirmed_at?: string | null; reprint_count?: number | null; allergens?: string[] | null };
@@ -209,6 +213,7 @@ function Index() {
   const [emissionBusy, setEmissionBusy] = useState<string | null>(null);
   const emissionLock = useRef(false);
   const settingsButton = useRef<HTMLButtonElement | null>(null);
+  const [photo, setPhoto] = useState<DraftPhoto | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const queueRestored = useRef(false);
   const [lastFailedPrint, setLastFailedPrint] = useState<QueueItem[] | null>(null);
@@ -539,8 +544,17 @@ function Index() {
     const expiresAt = new Date(`${expiry}T${openedTime || "00:00"}:00`);
     const inspection = product.requires_inspection && product.inspection_type && product.inspection_number ? `${product.inspection_type}: ${product.inspection_number}` : undefined;
     const token = newLabelToken();
+    // A foto sobe antes de a etiqueta existir; se falhar, nada é emitido e o usuário decide entre tentar de novo ou remover a foto.
+    let photoPath: string | null = null;
+    if (photo) {
+      try { photoPath = await uploadLabelPhoto(client.id, photo.blob); }
+      catch { setMessage("Não foi possível enviar a foto. Tente novamente ou remova a foto."); return null; }
+      URL.revokeObjectURL(photo.previewUrl);
+      setPhoto(null);
+    }
     return {
       id: crypto.randomUUID(),
+      photo_path: photoPath,
       copies,
       client_id: client.id,
       product_id: product.id,
@@ -624,7 +638,7 @@ function Index() {
       lot_number: label.lot ?? null, inspection_label: label.inspection ?? null,
       allergens: item.allergens,
       opened_on: item.opened_iso, expires_on: item.expires_iso, quantity: 1,
-      public_token: label.token, label_kind: label.kind,
+      public_token: label.token, label_kind: label.kind, photo_path: item.photo_path ?? null,
       storage_condition: label.storage ?? null, sector: label.sector ?? null,
       opened_at: item.opened_at, expires_at: item.expires_at,
       print_status: "preparada",
@@ -984,6 +998,7 @@ function Index() {
                 </div>
                 {product?.requires_lot && <EmitField label="Número do lote" hint="Obrigatório para este produto"><input value={lot} maxLength={80} onChange={(e) => setLot(e.target.value)} placeholder="Ex.: 4587" /></EmitField>}
                 {product?.requires_inspection && <div className="rounded-2xl border border-primary/20 bg-secondary p-4 text-sm"><ShieldCheck className="mr-2 inline size-5 text-primary" /><strong>{product.inspection_type}/registro:</strong> {product.inspection_number}</div>}
+                <LabelPhotoField photo={photo} onChange={setPhoto} disabled={Boolean(emissionBusy)} />
                 <div className="emit-group-title"><span>3</span><h2>Quantidade e impressão</h2></div>
                 <div><EmitField label="Quantidade de etiquetas" hint="1 a 200"><input type="number" min={1} max={200} step={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} /></EmitField><div className="mt-2 flex gap-2" role="group" aria-label="Quantidades rápidas">{[1,5,10].map(count => <button key={count} type="button" className="emit-count" aria-pressed={quantity === String(count)} onClick={() => setQuantity(String(count))}>{count} etiqueta{count === 1 ? "" : "s"}</button>)}</div></div>
 
@@ -1036,7 +1051,7 @@ function Index() {
                         <li key={it.id} className="flex items-center gap-2 rounded-xl border bg-secondary/40 p-2">
                           <div className="min-w-0 flex-1">
                             <strong className="block truncate text-sm">{it.label.product}</strong>
-                            <p className="truncate text-xs text-muted-foreground">VAL {it.label.expires} · {it.label.responsible}{it.label.lot ? ` · Lote ${it.label.lot}` : ""}</p>
+                            <p className="truncate text-xs text-muted-foreground">VAL {it.label.expires} · {it.label.responsible}{it.label.lot ? ` · Lote ${it.label.lot}` : ""}{it.photo_path ? " · com foto" : ""}</p>
                           </div>
                           <input
                             type="number"

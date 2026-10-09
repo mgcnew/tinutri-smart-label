@@ -193,6 +193,7 @@ export type Database = {
           sector: string | null
           source_label_id: string | null
           storage_condition: string | null
+          photo_path: string | null
         }
         Insert: {
           client_id: string
@@ -227,6 +228,7 @@ export type Database = {
           sector?: string | null
           source_label_id?: string | null
           storage_condition?: string | null
+          photo_path?: string | null
         }
         Update: {
           client_id?: string
@@ -261,6 +263,7 @@ export type Database = {
           sector?: string | null
           source_label_id?: string | null
           storage_condition?: string | null
+          photo_path?: string | null
         }
         Relationships: [
           {

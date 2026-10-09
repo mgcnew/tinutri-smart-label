@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { signedPhotoUrl } from "@/lib/photos";
 import {
   EVENT_NAMES,
   expiryOf,
@@ -64,6 +65,16 @@ export function LabelDetails({ labelId, action, revision, onClose, onSettle, onR
   const [discarding, setDiscarding] = useState(false);
   const [reasonCode, setReasonCode] = useState("");
   const [reasonNote, setReasonNote] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const photoPath = label?.photo_path ?? null;
+
+  useEffect(() => {
+    setPhotoUrl(null);
+    if (!photoPath) return;
+    let alive = true;
+    void signedPhotoUrl(photoPath).then((url) => { if (alive) setPhotoUrl(url); });
+    return () => { alive = false; };
+  }, [photoPath]);
 
   useEffect(() => {
     if (!labelId) return;
@@ -205,6 +216,18 @@ export function LabelDetails({ labelId, action, revision, onClose, onSettle, onR
                   </div>
                 ))}
               </dl>
+              {photoPath && (
+                <div>
+                  <p className="mb-2 text-sm font-semibold">Foto do produto</p>
+                  {photoUrl ? (
+                    <a href={photoUrl} target="_blank" rel="noreferrer" aria-label="Abrir a foto em tamanho maior">
+                      <img src={photoUrl} alt={`Foto de ${label.product_name} na emissão`} className="max-h-64 w-full rounded-xl border object-cover" loading="lazy" />
+                    </a>
+                  ) : (
+                    <p role="status" className="text-xs text-muted-foreground">Carregando foto…</p>
+                  )}
+                </div>
+              )}
               {label.label_status === "ativa" && label.print_status === "confirmada" && (
                 <div>
                   <p className="mb-2 text-sm font-semibold">Registrar destino do produto</p>
