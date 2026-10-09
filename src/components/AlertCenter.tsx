@@ -1,9 +1,11 @@
-import { Bell, BellOff, BellRing, TriangleAlert } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bell, BellOff, BellRing, Smartphone, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { AlertCounts } from "@/lib/alert-plan";
 import { remainingTime, type ExpiryWindow } from "@/lib/dashboard";
 import type { AlertItem } from "@/hooks/use-alerts";
+import { disablePush, enablePush, getPushState, registerServiceWorker, type PushState } from "@/lib/push";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -75,5 +77,57 @@ export function AlertBanner({ counts, items, soonDays, onOpen }: { counts: Alert
         </ul>
       )}
     </section>
+  );
+}
+
+const PUSH_HINT: Partial<Record<PushState, string>> = {
+  unsupported: "Este navegador não recebe notificações push.",
+  unconfigured: "Notificações push ainda não foram configuradas neste ambiente.",
+  "ios-install": "No iPhone, instale o app: toque em Compartilhar e depois em “Adicionar à Tela de Início”. Abra-o por lá para ativar os avisos.",
+  denied: "Você bloqueou as notificações. Libere nas configurações do navegador para este site.",
+};
+
+/** Liga os avisos no celular ou computador, mesmo com o app fechado. */
+export function PushToggle({ userId }: { userId: string | null }) {
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    void registerServiceWorker();
+    void getPushState().then(setState);
+  }, []);
+
+  if (!state || !userId) return null;
+  const hint = PUSH_HINT[state];
+  const change = async (action: () => Promise<PushState>) => {
+    setBusy(true);
+    setError("");
+    try {
+      setState(await action());
+    } catch {
+      setError("Não foi possível alterar as notificações. Tente novamente.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (hint)
+    return (
+      <Button variant="ghost" size="sm" className="text-muted-foreground" title={hint} onClick={() => setError(hint)}>
+        <BellOff />
+        <span className="hidden sm:inline">Avisos no celular</span>
+        {error && <span role="status" className="sr-only">{error}</span>}
+      </Button>
+    );
+  return state === "on" ? (
+    <Button variant="ghost" size="sm" disabled={busy} onClick={() => void change(disablePush)} aria-label="Desligar avisos no celular">
+      <Smartphone />
+      <span className="hidden sm:inline">Avisos no celular: ligados</span>
+    </Button>
+  ) : (
+    <Button variant="outline" size="sm" disabled={busy} onClick={() => void change(() => enablePush(userId))}>
+      <Smartphone />
+      <span className="hidden sm:inline">Ativar avisos no celular</span>
+    </Button>
   );
 }

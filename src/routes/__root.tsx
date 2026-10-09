@@ -76,6 +76,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
+      { name: "theme-color", content: "#007a46" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "TiNutri Smart Label® | Etiquetas de Validade para Alimentos" },
       { name: "description", content: "Emita etiquetas térmicas padronizadas de identificação e validade de alimentos em poucos segundos. Solução prática para restaurantes, padarias, supermercados e" },
@@ -90,6 +91,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/Gg5v2NjEbPXyIT0FQdEJfHuKC4n2/social-images/social-1782232984564-ChatGPT_Image_23_de_jun._de_2026,_13_37_23.webp" },
     ],
     links: [
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/icon-192.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@600;700&family=Manrope:wght@400;500;600;700;800&display=swap" },

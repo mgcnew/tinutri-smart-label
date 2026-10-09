@@ -33,7 +33,7 @@ import { enqueueJob, isAgentOnline, LABELS_PER_JOB, listAgents, waitForJob } fro
 import { joinZpl } from "@/lib/zpl";
 import { useAlerts } from "@/hooks/use-alerts";
 import { useAlertSound } from "@/hooks/use-alert-sound";
-import { AlertBanner, AlertSoundToggle } from "@/components/AlertCenter";
+import { AlertBanner, AlertSoundToggle, PushToggle } from "@/components/AlertCenter";
 import { allergenText, normalizeAllergens } from "@/lib/allergens";
 import { shelfDaysFor } from "@/lib/shelf-life";
 import { settleLabelRecord } from "@/lib/settlement-actions";
@@ -864,7 +864,7 @@ function Index() {
             </Sheet>
           </div>
           <Brand />
-          <div className="ml-auto"><AlertSoundToggle enabled={alertSound.enabled} blocked={alertSound.blocked} onEnable={() => void alertSound.enable()} onDisable={alertSound.disable} /></div>
+          <div className="ml-auto flex items-center gap-1"><PushToggle userId={userId} /><AlertSoundToggle enabled={alertSound.enabled} blocked={alertSound.blocked} onEnable={() => void alertSound.enable()} onDisable={alertSound.disable} /></div>
           <UserStrip userName={userName} role={role} clientName={clients.find((c) => c.id === (profileClientId ?? selectedClient))?.name ?? null} />
         </div>
       </header>
