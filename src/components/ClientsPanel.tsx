@@ -567,7 +567,7 @@ export function ClientsPanel({
         }}
       >
         <DialogContent
-          className="client-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl bg-white p-0"
+          className="client-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0"
           overlayClassName="bg-black/35 backdrop-blur-[2px]"
           onEscapeKeyDown={(event) => {
             if (saving) event.preventDefault();

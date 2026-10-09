@@ -54,7 +54,7 @@ export function ActivitiesPanel({
         title="Atividades"
         description="Consulte quem alterou cada registro e veja os detalhes da ação."
       />
-      <div className="master-filter-grid rounded-2xl border bg-white p-4">
+      <div className="master-filter-grid rounded-2xl border bg-card p-4">
         <RemoteSelect label="Empresa" value={client} onChange={setClient} />
         <Field label="Pesquisar pessoa">
           <input

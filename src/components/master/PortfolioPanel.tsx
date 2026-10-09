@@ -52,7 +52,7 @@ export function PortfolioPanel({
         title="Carteira profissional"
         description="Distribua as empresas e acompanhe a carga de atendimento de cada nutricionista."
       />
-      <div className="rounded-2xl border bg-white p-4">
+      <div className="rounded-2xl border bg-card p-4">
         <Field label="Pesquisar nutricionista">
           <input
             value={search}
@@ -70,7 +70,7 @@ export function PortfolioPanel({
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {list.rows.map((user) => (
-            <article key={user.user_id} className="rounded-2xl border bg-white p-5">
+            <article key={user.user_id} className="rounded-2xl border bg-card p-5">
               <h2 className="break-words font-semibold">{user.name}</h2>
               <p className="mt-1 break-words text-xs text-muted-foreground">{user.email}</p>
               <div className="mt-5 flex items-center justify-between gap-3">

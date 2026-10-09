@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Bell, BellOff, BellRing, Smartphone, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { PreferenceRow } from "@/components/PreferenceRow";
 import type { AlertCounts } from "@/lib/alert-plan";
 import { remainingTime, type ExpiryWindow } from "@/lib/dashboard";
 import type { AlertItem } from "@/hooks/use-alerts";
@@ -9,25 +10,13 @@ import { disablePush, enablePush, getPushState, registerServiceWorker, type Push
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-/** Botão do cabeçalho: liga o som dos alertas e mantém a tela acesa. */
+/** Linha da sidebar: liga o som dos alertas e mantém a tela acesa. */
 export function AlertSoundToggle({ enabled, blocked, onEnable, onDisable }: { enabled: boolean; blocked: boolean; onEnable: () => void; onDisable: () => void }) {
-  if (enabled && blocked)
-    return (
-      <Button variant="outline" size="sm" className="border-destructive text-destructive" onClick={onEnable}>
-        <BellRing />
-        Toque para reativar o som
-      </Button>
-    );
+  if (enabled && blocked) return <PreferenceRow icon={<BellRing />} label="Reativar som dos alertas" status="Bloqueado" tone="alert" onClick={onEnable} />;
   return enabled ? (
-    <Button variant="ghost" size="sm" onClick={onDisable} aria-label="Desligar som dos alertas e tela ligada">
-      <Bell />
-      Som ligado
-    </Button>
+    <PreferenceRow icon={<Bell />} label="Som dos alertas" status="Ligado" pressed onClick={onDisable} />
   ) : (
-    <Button variant="outline" size="sm" onClick={onEnable}>
-      <BellOff />
-      Ativar som
-    </Button>
+    <PreferenceRow icon={<BellOff />} label="Som dos alertas" status="Desligado" pressed={false} onClick={onEnable} />
   );
 }
 
@@ -113,21 +102,19 @@ export function PushToggle({ userId }: { userId: string | null }) {
   };
   if (hint)
     return (
-      <Button variant="ghost" size="sm" className="text-muted-foreground" title={hint} onClick={() => setError(hint)}>
-        <BellOff />
-        <span className="hidden sm:inline">Avisos no celular</span>
-        {error && <span role="status" className="sr-only">{error}</span>}
-      </Button>
+      <div>
+        <PreferenceRow icon={<BellOff />} label="Avisos no celular" status="Indisponível" onClick={() => setError(error ? "" : hint)} />
+        {error && <p role="status" className="px-3 pb-2 text-xs leading-relaxed text-muted-foreground">{error}</p>}
+      </div>
     );
-  return state === "on" ? (
-    <Button variant="ghost" size="sm" disabled={busy} onClick={() => void change(disablePush)} aria-label="Desligar avisos no celular">
-      <Smartphone />
-      <span className="hidden sm:inline">Avisos no celular: ligados</span>
-    </Button>
-  ) : (
-    <Button variant="outline" size="sm" disabled={busy} onClick={() => void change(() => enablePush(userId))}>
-      <Smartphone />
-      <span className="hidden sm:inline">Ativar avisos no celular</span>
-    </Button>
+  return (
+    <div>
+      {state === "on" ? (
+        <PreferenceRow icon={<Smartphone />} label="Avisos no celular" status="Ligado" pressed disabled={busy} onClick={() => void change(disablePush)} />
+      ) : (
+        <PreferenceRow icon={<Smartphone />} label="Avisos no celular" status="Desligado" pressed={false} disabled={busy} onClick={() => void change(() => enablePush(userId))} />
+      )}
+      {error && <p role="alert" className="px-3 pb-2 text-xs text-destructive">{error}</p>}
+    </div>
   );
 }

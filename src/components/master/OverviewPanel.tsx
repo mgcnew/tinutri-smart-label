@@ -103,7 +103,7 @@ export function OverviewPanel({
               ].map((item) => (
                 <button
                   key={item.label}
-                  className="master-metric rounded-2xl border bg-white p-5 text-left"
+                  className="master-metric rounded-2xl border bg-card p-5 text-left"
                   onClick={item.action}
                 >
                   <item.icon className="size-5 text-primary" />
@@ -114,7 +114,7 @@ export function OverviewPanel({
                 </button>
               ))}
             </div>
-            <section className="rounded-2xl border bg-white p-5">
+            <section className="rounded-2xl border bg-card p-5">
               <h2 className="font-semibold">Prioridades de validade</h2>
               <p className="mt-1 text-xs text-muted-foreground">
                 Etiquetas ativas com impressão confirmada. Toque para abrir a lista correspondente.
@@ -141,7 +141,7 @@ export function OverviewPanel({
               </div>
             </section>
             <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-              <section className="rounded-2xl border bg-white p-5">
+              <section className="rounded-2xl border bg-card p-5">
                 <h2 className="font-semibold">Movimento do período</h2>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Registros de emissão e baixas por descarte nos últimos {days} dias.
@@ -161,7 +161,7 @@ export function OverviewPanel({
                   relatório.
                 </p>
               </section>
-              <section className="rounded-2xl border bg-white p-5">
+              <section className="rounded-2xl border bg-card p-5">
                 <h2 className="font-semibold">Ações de gestão</h2>
                 <div className="mt-4 grid gap-2">
                   <Button

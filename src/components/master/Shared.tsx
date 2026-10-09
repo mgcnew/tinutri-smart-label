@@ -35,7 +35,7 @@ export function MasterModal({
       }}
     >
       <DialogContent
-        className={`client-dialog master-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] ${wide ? "max-w-3xl" : "max-w-xl"} flex-col gap-0 overflow-hidden rounded-2xl bg-white p-0`}
+        className={`client-dialog master-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] ${wide ? "max-w-3xl" : "max-w-xl"} flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0`}
         overlayClassName="bg-black/35 backdrop-blur-[2px]"
         onEscapeKeyDown={(e) => {
           if (busy) e.preventDefault();

@@ -34,6 +34,7 @@ import { joinZpl } from "@/lib/zpl";
 import { useAlerts } from "@/hooks/use-alerts";
 import { useAlertSound } from "@/hooks/use-alert-sound";
 import { AlertBanner, AlertSoundToggle, PushToggle } from "@/components/AlertCenter";
+import { ThemeToggle } from "@/components/PreferenceRow";
 import { allergenText, normalizeAllergens } from "@/lib/allergens";
 import { shelfDaysFor } from "@/lib/shelf-life";
 import { settleLabelRecord } from "@/lib/settlement-actions";
@@ -843,6 +844,11 @@ function Index() {
     setTab("emit");
   };
 
+  const preferences = <>
+    <PushToggle userId={userId} />
+    <AlertSoundToggle enabled={alertSound.enabled} blocked={alertSound.blocked} onEnable={() => void alertSound.enable()} onDisable={alertSound.disable} />
+    <ThemeToggle />
+  </>;
   return (
     <div className="workspace-shell min-h-screen bg-background">
       <AuditActionDetails action={detailAction?.source === "activity" ? detailAction : null} onClose={() => setDetailAction(null)} onOpenEntity={canOpenAuditEntity && detailAction ? () => {
@@ -859,12 +865,11 @@ function Index() {
               <SheetContent side="left" className="flex w-[86%] max-w-xs flex-col gap-0 p-5">
                 <SheetHeader className="border-b pb-5 text-left"><SheetTitle><Brand /></SheetTitle></SheetHeader>
                 <nav aria-label="Menu principal" className="mt-6 min-h-0 flex-1 space-y-2 overflow-y-auto"><Nav role={role} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount }} closeOnSelect /></nav>
-                <WorkspaceActions role={role} closeOnSelect />
+                <WorkspaceActions role={role} preferences={preferences} closeOnSelect />
               </SheetContent>
             </Sheet>
           </div>
           <Brand />
-          <div className="ml-auto flex items-center gap-1"><PushToggle userId={userId} /><AlertSoundToggle enabled={alertSound.enabled} blocked={alertSound.blocked} onEnable={() => void alertSound.enable()} onDisable={alertSound.disable} /></div>
           <UserStrip userName={userName} role={role} clientName={clients.find((c) => c.id === (profileClientId ?? selectedClient))?.name ?? null} />
         </div>
       </header>
@@ -875,7 +880,7 @@ function Index() {
             <nav aria-label="Menu principal" className="min-h-0 flex-1 space-y-2 overflow-y-auto">
               <Nav role={role} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount }} />
             </nav>
-            <WorkspaceActions role={role} />
+            <WorkspaceActions role={role} preferences={preferences} />
           </div>
         </aside>
         <main className="workspace-main min-w-0 flex-1">
@@ -891,7 +896,7 @@ function Index() {
               <Button ref={settingsButton} variant="outline" className="min-h-11" onClick={() => { setMessage(""); setShowPrinterSettings(true); }}><Settings2 />Configurações</Button>
             </div>
             <Dialog open={showPrinterSettings} onOpenChange={setShowPrinterSettings}>
-              <DialogContent className="client-dialog printer-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl bg-white p-0" overlayClassName="bg-black/35 backdrop-blur-[2px]" onCloseAutoFocus={(event) => { event.preventDefault(); settingsButton.current?.focus(); }}>
+              <DialogContent className="client-dialog printer-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0" overlayClassName="bg-black/35 backdrop-blur-[2px]" onCloseAutoFocus={(event) => { event.preventDefault(); settingsButton.current?.focus(); }}>
                 <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 text-left sm:px-6"><DialogTitle>Configurações de impressão</DialogTitle><DialogDescription className="mt-2 text-xs leading-relaxed">As alterações são salvas automaticamente neste navegador.</DialogDescription></DialogHeader>
                 <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -1116,7 +1121,7 @@ const ROLE_LABEL: Record<AppRole, string> = {
   operator: "Colaborador",
 };
 
-function WorkspaceActions({ role, closeOnSelect = false }: { role: AppRole; closeOnSelect?: boolean }) {
+function WorkspaceActions({ role, preferences, closeOnSelect = false }: { role: AppRole; preferences: React.ReactNode; closeOnSelect?: boolean }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const signOut = async () => {
@@ -1134,6 +1139,9 @@ function WorkspaceActions({ role, closeOnSelect = false }: { role: AppRole; clos
   };
   const master = <Button asChild variant="ghost" className="workspace-nav-item h-11 w-full justify-start"><Link to="/admin"><Building2 />Área Master</Link></Button>;
   return <div className="workspace-sidebar-actions mt-4 space-y-1 border-t pt-4">
+    <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Preferências</p>
+    {preferences}
+    <div className="my-2 border-t" />
     {role === "admin_master" && (closeOnSelect ? <SheetClose asChild>{master}</SheetClose> : master)}
     <Button variant="ghost" className="workspace-nav-item h-11 w-full justify-start" disabled={pending} onClick={signOut}><LogOut />{pending ? "Saindo…" : "Sair"}</Button>
     {error && <p role="alert" className="px-3 pt-2 text-xs text-destructive">{error}</p>}

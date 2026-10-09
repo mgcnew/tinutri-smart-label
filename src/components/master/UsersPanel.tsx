@@ -220,7 +220,7 @@ export function UsersPanel({
           </Button>
         }
       />
-      <div className="master-filter-grid rounded-2xl border bg-white p-4">
+      <div className="master-filter-grid rounded-2xl border bg-card p-4">
         <Field label="Pesquisar usuários">
           <input
             type="search"

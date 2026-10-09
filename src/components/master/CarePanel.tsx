@@ -236,7 +236,7 @@ export function CarePanel({
           return (
             <button
               key={String(value)}
-              className="master-metric rounded-xl border bg-white p-4 text-left"
+              className="master-metric rounded-xl border bg-card p-4 text-left"
               aria-pressed={filter === value}
               onClick={() => setFilter(String(value))}
             >

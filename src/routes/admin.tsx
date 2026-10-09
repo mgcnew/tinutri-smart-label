@@ -206,7 +206,7 @@ function AdminMaster() {
   if (gate !== "authorized")
     return (
       <main className="grid min-h-[80svh] place-items-center p-5">
-        <section className="w-full max-w-md rounded-2xl border bg-white p-6">
+        <section className="w-full max-w-md rounded-2xl border bg-card p-6">
           {gate === "loading" ? (
             <p role="status">Verificando acesso à Área Master…</p>
           ) : gate === "error" ? (

@@ -24,7 +24,7 @@ export function RecentActivities({
   }, []);
   const list = usePaginatedQuery("recent", load, revision);
   return (
-    <section className="rounded-2xl border bg-white p-5">
+    <section className="rounded-2xl border bg-card p-5">
       <h2 className="font-semibold">Últimas ações de gestão</h2>
       <p className="mt-1 text-xs text-muted-foreground">
         Abra uma ação para consultar os campos alterados e o registro de origem.

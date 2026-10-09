@@ -76,7 +76,7 @@ export function LossesDialog({ open, onClose, scopeKey }: { open: boolean; onClo
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
-      <DialogContent className="client-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] max-w-xl flex-col gap-0 overflow-hidden rounded-2xl bg-white p-0">
+      <DialogContent className="client-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] max-w-xl flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0">
         <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 text-left">
           <DialogTitle>Perdas e descartes</DialogTitle>
           <DialogDescription className="mt-2 text-xs">Etiquetas baixadas como descartadas no período.</DialogDescription>
