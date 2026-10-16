@@ -70,6 +70,8 @@ export type Database = {
           legal_name: string | null
           name: string
           phone: string | null
+          subscription_started_on: string | null
+          subscription_status: string
           plan: string
           public_code: string
           responsible_name: string | null
@@ -88,6 +90,8 @@ export type Database = {
           legal_name?: string | null
           name: string
           phone?: string | null
+          subscription_started_on?: string | null
+          subscription_status?: string
           plan?: string
           public_code?: string
           responsible_name?: string | null
@@ -106,6 +110,8 @@ export type Database = {
           legal_name?: string | null
           name?: string
           phone?: string | null
+          subscription_started_on?: string | null
+          subscription_status?: string
           plan?: string
           public_code?: string
           responsible_name?: string | null

@@ -32,6 +32,8 @@ type Props = {
     reason?: string | null,
   ) => Promise<boolean>;
   onReprint: (label: OperationalLabel) => Promise<void>;
+  /** Descartar depende de permissão da pessoa; sem ela, só utilizada e consumida aparecem. */
+  canDiscard?: boolean;
 };
 
 const PRINT_NAMES: Record<string, string> = {
@@ -53,7 +55,7 @@ const discardLabel = (value: string | null) => {
   return code ? `${discardReasonName(code)}${note ? ` — ${note}` : ""}` : "Não informado";
 };
 
-export function LabelDetails({ labelId, action, revision, onClose, onSettle, onReprint }: Props) {
+export function LabelDetails({ labelId, action, revision, onClose, onSettle, onReprint, canDiscard = true }: Props) {
   const [label, setLabel] = useState<OperationalLabel | null>(null);
   const [events, setEvents] = useState<LabelEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -263,7 +265,7 @@ export function LabelDetails({ labelId, action, revision, onClose, onSettle, onR
                 <div>
                   <p className="mb-2 text-sm font-semibold">Registrar destino do produto</p>
                   <div className="flex flex-wrap gap-2">
-                    {(["utilizada", "consumida", "descartada"] as const).map((status) => (
+                    {(canDiscard ? (["utilizada", "consumida", "descartada"] as const) : (["utilizada", "consumida"] as const)).map((status) => (
                       <Button
                         key={status}
                         variant="outline"

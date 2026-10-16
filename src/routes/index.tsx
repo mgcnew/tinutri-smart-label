@@ -1,11 +1,11 @@
+import { LabelWorkspaceNav } from "@/components/LabelWorkspaceNav";
 import { SystemSelect } from "@/components/ui/system-select";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { addDays, format, isValid } from "date-fns";
-import { AlertTriangle, Building2, CalendarClock, CheckCircle2, ClipboardList, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, Smartphone, Trash2, Users, X } from "lucide-react";
+import { AlertTriangle, Building2, CalendarClock, CheckCircle2, ClipboardList, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, UserCog, Trash2, Users, X } from "lucide-react";
 import { cloneElement, lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmissionProductPicker } from "@/components/EmissionProductPicker";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { OperationalDashboard } from "@/components/OperationalDashboard";
@@ -14,22 +14,24 @@ import { LabelDetails } from "@/components/LabelDetails";
 import { useFocusedEntity } from "@/hooks/use-focused-entity";
 import { useOperationalOverview } from "@/hooks/use-operational-overview";
 import { type ExpiryWindow, type RecentAction } from "@/lib/dashboard";
-import { AuthLogin } from "@/components/AuthLogin";
+import { SystemLanding } from "@/components/landing/SystemLanding";
 import { supabase } from "@/integrations/supabase/client";
-import { workspaceSearch, type WorkspaceTab } from "@/lib/workspace-search";
+import { workspaceSearch, isLabelTab, masterCompaniesUrl, type WorkspaceTab } from "@/lib/workspace-search";
 import { LabelPreview } from "@/components/LabelPreview";
 import { CLIENT_CODE_KEY } from "./e.$code";
 import { claimFirstAdmin } from "@/lib/admin.functions";
 import { buildPrintDocument, kindLabel, LABEL_KINDS, newLabelToken, qrFor, STORAGE_PRESETS, type LabelKind, type PrintableLabel } from "@/lib/label";
 import tinutriLogo from "@/assets/tinutri-logo-ui.webp";
-import { NetworkPrinterSetup } from "@/components/NetworkPrinterSetup";
 import { BUILTIN_LAYOUTS, renderLabelZpl } from "@/lib/label-render";
 import { enqueueJob, isAgentOnline, LABELS_PER_JOB, listAgents, waitForJob } from "@/lib/print-queue";
 import { joinZpl } from "@/lib/zpl";
 import { useAlerts } from "@/hooks/use-alerts";
 import { useAlertSound } from "@/hooks/use-alert-sound";
-import { AlertBanner, AlertSoundToggle, PushToggle } from "@/components/AlertCenter";
-import { ThemeToggle } from "@/components/PreferenceRow";
+import { AlertBanner } from "@/components/AlertCenter";
+import type { SettingsTab } from "@/components/SettingsPanel";
+import { usePermissions, type AppRole, type Permissions } from "@/lib/permissions";
+import { EmissionPrinterPicker } from "@/components/EmissionPrinterPicker";
+import { DEFAULT_SETTINGS, loadSettings, saveSettings, sizeMm, type PrinterSettings } from "@/lib/printer-settings";
 import { LabelPhotoField, type DraftPhoto } from "@/components/LabelPhotoField";
 import { uploadLabelPhoto } from "@/lib/photos";
 import { allergenText, normalizeAllergens } from "@/lib/allergens";
@@ -41,6 +43,8 @@ const CarePanel = lazy(() => import("@/components/master/CarePanel").then((m) =>
 const ClientsPanel = lazy(() => import("@/components/ClientsPanel").then((m) => ({ default: m.ClientsPanel })));
 const ProductsPanel = lazy(() => import("@/components/ProductsPanel").then((m) => ({ default: m.ProductsPanel })));
 const HistoryPanel = lazy(() => import("@/components/HistoryPanel").then((m) => ({ default: m.HistoryPanel })));
+const TeamAccessPanel = lazy(() => import("@/components/TeamAccessPanel").then((m) => ({ default: m.TeamAccessPanel })));
+const SettingsPanel = lazy(() => import("@/components/SettingsPanel").then((m) => ({ default: m.SettingsPanel })));
 const ValidadesPanel = lazy(() => import("@/components/ValidadesPanel").then((m) => ({ default: m.ValidadesPanel })));
 
 
@@ -81,7 +85,6 @@ type LabelRecord = { id: string; client_id: string; product_id: string | null; r
 type ActivityRecorder = (action: string, clientId: string, entityType: string, entityId: string, name: string, before: Record<string, unknown>, after: Record<string, unknown>) => Promise<void>;
 
 type AppTab = WorkspaceTab;
-type AppRole = "admin_master" | "nutricionista" | "admin_cliente" | "gerente" | "operator";
 
 const ALERT_DAYS_KEY = "tinutri.expiry-alert-days";
 function loadAlertDays(): number {
@@ -91,45 +94,6 @@ function loadAlertDays(): number {
 }
 
 const PRINTER_NOT_FOUND_MESSAGE = "Impressora não encontrada. Verifique a conexão Bluetooth, Wi-Fi ou a configuração da impressora.";
-
-type PrinterType = "elgin";
-type ConnectionMode = "browser" | "wifi" | "bluetooth" | "usb";
-type LabelSize = "60x40" | "50x30";
-type PrinterSettings = {
-  type: PrinterType;
-  connection: ConnectionMode;
-  ip: string;
-  /** Impressora de rede cadastrada (modo Wi-Fi / IP): as etiquetas vão pela fila até o agente local. */
-  printerId: string;
-  size: LabelSize;
-  showTime: boolean;
-};
-
-const PRINTER_SETTINGS_KEY = "tinutri.printer-settings";
-const DEFAULT_SETTINGS: PrinterSettings = { type: "elgin", connection: "browser", ip: "", printerId: "", size: "60x40", showTime: true };
-
-const PRINTER_TYPES: { id: PrinterType; label: string }[] = [
-  { id: "elgin", label: "Elgin L42 Pro" },
-];
-const CONNECTION_MODES: { id: ConnectionMode; label: string }[] = [
-  { id: "browser", label: "Impressão pelo navegador" },
-  { id: "wifi", label: "Wi-Fi / IP" },
-  { id: "bluetooth", label: "Bluetooth" },
-  { id: "usb", label: "USB" },
-];
-
-function loadSettings(): PrinterSettings {
-  if (typeof window === "undefined") return DEFAULT_SETTINGS;
-  try {
-    const raw = window.localStorage.getItem(PRINTER_SETTINGS_KEY);
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw), type: "elgin" };
-  } catch { /* Preferências locais são opcionais; os valores padrão continuam disponíveis. */ }
-  return DEFAULT_SETTINGS;
-}
-
-function sizeMm(size: LabelSize) {
-  return size === "50x30" ? { w: 50, h: 30 } : { w: 60, h: 40 };
-}
 
 /** Imprime uma etiqueta física por item da lista, cada uma em sua própria página. */
 function printThermalBatch(labels: PrintableLabel[], settings: PrinterSettings): boolean {
@@ -175,6 +139,8 @@ function Index() {
   const [loading, setLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
+  const permissions = usePermissions(role, userId);
+  const availableTabs = role ? tabsFor(role, permissions) : [];
   const [profileClientId, setProfileClientId] = useState<string | null>(null);
   const [carteira, setCarteira] = useState<string[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -189,6 +155,7 @@ function Index() {
   const [focusedEntityId, setFocusedEntityId] = useState<string | null>(null);
   const [activityWarning, setActivityWarning] = useState<string | null>(null);
   const [tab, setTab] = useState<AppTab>("dashboard");
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("aparencia");
   const accessScope = role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : [];
   const overviewScope = dashboardClient && (accessScope === null || accessScope.includes(dashboardClient)) ? [dashboardClient] : accessScope;
   const overview = useOperationalOverview(Boolean(userId && role && !loading && tab === "dashboard"), overviewScope, overviewRevision);
@@ -209,10 +176,8 @@ function Index() {
   const [label, setLabel] = useState<PrintableLabel | null>(null);
   const [labelDraft, setLabelDraft] = useState<{ product: string; responsible: string; opened: string; expires: string; lot: string } | null>(null);
   const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_SETTINGS);
-  const [showPrinterSettings, setShowPrinterSettings] = useState(false);
   const [emissionBusy, setEmissionBusy] = useState<string | null>(null);
   const emissionLock = useRef(false);
-  const settingsButton = useRef<HTMLButtonElement | null>(null);
   const [photo, setPhoto] = useState<DraftPhoto | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const queueRestored = useRef(false);
@@ -265,12 +230,11 @@ function Index() {
   const updateSettings = (patch: Partial<PrinterSettings>) => {
     setPrinterSettings((prev) => {
       const next = { ...prev, ...patch };
-      try { window.localStorage.setItem(PRINTER_SETTINGS_KEY, JSON.stringify(next)); } catch { /* Preferências locais são opcionais; os valores padrão continuam disponíveis. */ }
+      saveSettings(next);
       return next;
     });
   };
 
-  const selectNetworkPrinter = useCallback((printerId: string) => updateSettings({ printerId }), []);
 
   const refresh = async () => {
     setLoadingError(null);
@@ -435,7 +399,8 @@ function Index() {
     const requested = workspaceSearch(JSON.parse(entryKey));
     appliedEntry.current = entryKey;
     setEntryError("");
-    if (!requested.painel || !ROLE_TABS[role].includes(requested.painel)) return;
+    if (role === "admin_master" && requested.painel === "clients") {window.location.assign(masterCompaniesUrl(requested.registro ?? requested.empresa));return;}
+    if (!requested.painel || !tabsFor(role, permissions).includes(requested.painel)) return;
     const allowed = role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : [];
     if (requested.empresa && allowed !== null && !allowed.includes(requested.empresa)) {
       setEntryError("Você não tem acesso a esta empresa.");
@@ -453,7 +418,7 @@ function Index() {
         setClients(previous => previous.some(item => item.id === data.id) ? previous : [...previous, data as Client]);
       });
     }
-  }, [loading, role, userId, entryKey, carteira, profileClientId]);
+  }, [loading, role, userId, entryKey, carteira, profileClientId, permissions]);
 
   if (loading) return <main className="grid min-h-screen place-items-center bg-background"><p className="font-semibold text-muted-foreground">Preparando sua estação…</p></main>;
 
@@ -479,7 +444,7 @@ function Index() {
     </main>
   );
 
-  if (!userId) return <AuthLogin />;
+  if (!userId) return <SystemLanding />;
 
   // Empresa suspensa bloqueia uso operacional (dados preservados)
   {
@@ -512,8 +477,13 @@ function Index() {
     </main>
   );
 
+  /** Trocar a empresa invalida produto, responsável e rascunho da etiqueta, em qualquer tela que a escolha. */
+  const selectClient = (id: string) => {
+    setSelectedClient(id); setSelectedProduct(""); setSelectedResponsible(""); setLabelDraft(null); setLot(""); setShelfDays("");
+  };
   const navigateTab = (nextTab: AppTab) => {
     setFocusedEntityId(null);
+    if (nextTab === "settings") setMessage("");
     if (nextTab === "validades") setValidityWindow("all");
     setTab(nextTab);
   };
@@ -860,19 +830,15 @@ function Index() {
     setTab("emit");
   };
 
-  const preferences = <>
-    <PushToggle userId={userId} />
-    <AlertSoundToggle enabled={alertSound.enabled} blocked={alertSound.blocked} onEnable={() => void alertSound.enable()} onDisable={alertSound.disable} />
-    <ThemeToggle />
-  </>;
   return (
     <div className="workspace-shell min-h-screen bg-background">
       <AuditActionDetails action={detailAction?.source === "activity" ? detailAction : null} onClose={() => setDetailAction(null)} onOpenEntity={canOpenAuditEntity && detailAction ? () => {
+        if (detailAction.entity_type === "client" && role === "admin_master") {window.location.assign(masterCompaniesUrl(detailAction.entity_id!));return;}
         setFocusedEntityId(detailAction.entity_id!);
         setTab(detailAction.entity_type === "product" ? "products" : detailAction.entity_type === "collaborator" ? "team" : detailAction.entity_type === "care" ? "acompanhamento" : "clients");
         setDetailAction(null);
       } : undefined} />
-      <LabelDetails labelId={detailLabelId} action={detailAction?.source === "activity" ? null : detailAction} revision={overviewRevision} onClose={() => { setDetailLabelId(null); setDetailAction(null); }} onSettle={settleLabel} onReprint={reprintLabel} />
+      <LabelDetails canDiscard={permissions.descartar} labelId={detailLabelId} action={detailAction?.source === "activity" ? null : detailAction} revision={overviewRevision} onClose={() => { setDetailLabelId(null); setDetailAction(null); }} onSettle={settleLabel} onReprint={reprintLabel} />
       <header className="workspace-header sticky top-0 z-30 border-b bg-card px-4 sm:px-6">
         <div className="workspace-topbar flex min-w-0 items-center gap-3">
           <div className="lg:hidden">
@@ -881,8 +847,8 @@ function Index() {
               <SheetContent side="left" className="flex w-[86%] max-w-xs flex-col gap-0 p-5">
                 <SheetHeader className="border-b pb-4 text-left"><SheetTitle><Brand /></SheetTitle></SheetHeader>
                 {role && <div className="mt-4 flex items-center gap-3 rounded-xl bg-secondary px-3 py-2.5"><span className="workspace-avatar shrink-0" aria-hidden="true">{(userName || "U").slice(0, 1).toUpperCase()}</span><div className="min-w-0"><strong className="block truncate text-sm font-semibold">{userName || "Sua conta"}</strong><span className="block truncate text-xs text-muted-foreground">{ROLE_LABEL[role]}{profileClientId ? ` · ${clients.find((c) => c.id === profileClientId)?.name ?? ""}` : ""}</span></div></div>}
-                <nav aria-label="Menu principal" className="thin-scroll mt-6 min-h-0 flex-1 space-y-2 thin-scroll overflow-y-auto"><Nav role={role} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount }} closeOnSelect /></nav>
-                <WorkspaceActions role={role} preferences={preferences} closeOnSelect />
+                <nav aria-label="Menu principal" className="thin-scroll mt-6 min-h-0 flex-1 space-y-2 thin-scroll overflow-y-auto"><Nav tabs={availableTabs} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount }} closeOnSelect /></nav>
+                <WorkspaceActions role={role} closeOnSelect />
               </SheetContent>
             </Sheet>
           </div>
@@ -893,88 +859,26 @@ function Index() {
       <div className="workspace-layout flex">
         <aside className="workspace-sidebar hidden w-60 shrink-0 lg:block">
           <div className="workspace-sidebar-content flex flex-col">
-            <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Navegação</p>
+            <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Navegação</p>
             <nav aria-label="Menu principal" className="thin-scroll min-h-0 flex-1 space-y-2 thin-scroll overflow-y-auto">
-              <Nav role={role} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount }} />
+              <Nav tabs={availableTabs} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount }} />
             </nav>
-            <WorkspaceActions role={role} preferences={preferences} />
+            <WorkspaceActions role={role} />
           </div>
         </aside>
         <main className="workspace-main min-w-0 flex-1">
-          <AlertBanner counts={alertCounts} items={alertItems} soonDays={alertDays} onOpen={(window) => { setValidityWindow(window); setTab("validades"); }} />
+          {tab !== "dashboard" && tab !== "validades" && <AlertBanner counts={alertCounts} items={alertItems} soonDays={alertDays} onOpen={(window) => { setValidityWindow(window); setTab("validades"); }} />}
           {entryError && <p role="alert" className="clients-error mb-5">{entryError}</p>}
           {entryCompany && <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3 text-sm"><span>Empresa selecionada: <strong>{clients.find(item => item.id === entryCompany)?.name ?? "Carregando…"}</strong></span><Button variant="ghost" size="sm" onClick={() => { setEntryCompany(""); setDashboardClient(""); }}>Limpar seleção</Button></div>}
           {activityWarning && <div role="alert" className="mb-5 flex items-center gap-3 rounded-xl border border-accent bg-card p-4 text-sm"><p className="flex-1">{activityWarning}</p><Button variant="ghost" size="icon" aria-label="Fechar aviso" onClick={() => setActivityWarning(null)}><X /></Button></div>}
-          {tab === "dashboard" && <OperationalDashboard overview={overview} clients={clients} userName={userName} role={role} clientId={dashboardClient} onClientChange={setDashboardClient} onNavigate={navigateTab} onWindow={(window) => { setValidityWindow(window); setTab("validades"); }} onLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} onAction={(action) => { setDetailAction(action); setDetailLabelId(action.source === "activity" ? null : action.label_id); }} />}
+          {tab === "dashboard" && <OperationalDashboard overview={overview} clients={clients} userName={userName} canViewHistory={permissions.ver_historico} clientId={dashboardClient} onClientChange={setDashboardClient} onNavigate={navigateTab} onWindow={(window) => { setValidityWindow(window); setTab("validades"); }} onLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} onAction={(action) => { setDetailAction(action); setDetailLabelId(action.source === "activity" ? null : action.label_id); }} />}
+          {isLabelTab(tab) && <LabelWorkspaceNav tab={tab} allowed={availableTabs} onNavigate={navigateTab} />}
           {tab === "emit" && <section className="emission-page space-y-6">
-            <header className="dashboard-heading"><div><p className="text-xs font-semibold uppercase tracking-[.14em] text-primary">Estação de etiquetagem</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Emitir etiquetas</h1><p className="mt-2 text-sm text-muted-foreground">Prepare uma etiqueta ou monte uma fila para imprimir em lote.</p></div></header>
-            <div className="emit-printer flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
-              <div className="flex min-w-0 items-center gap-3"><Printer className="size-5 shrink-0 text-primary" /><div className="min-w-0"><p className="text-xs text-muted-foreground">Impressora e etiqueta</p><p className="mt-1 break-words text-sm font-medium">{PRINTER_TYPES.find(t => t.id === printerSettings.type)?.label} · {printerSettings.size.replace("x", " × ")} mm <span className="text-xs text-muted-foreground">· {CONNECTION_MODES.find(c => c.id === printerSettings.connection)?.label}</span></p></div></div>
-              <Button ref={settingsButton} variant="outline" className="min-h-11" onClick={() => { setMessage(""); setShowPrinterSettings(true); }}><Settings2 />Configurações</Button>
-            </div>
-            <Dialog open={showPrinterSettings} onOpenChange={setShowPrinterSettings}>
-              <DialogContent className="client-dialog printer-dialog flex max-h-[90svh] w-[calc(100%_-_2rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0" overlayClassName="bg-black/35" onCloseAutoFocus={(event) => { event.preventDefault(); settingsButton.current?.focus(); }}>
-                <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 text-left sm:px-6"><DialogTitle>Configurações de impressão</DialogTitle><DialogDescription className="mt-2 text-xs leading-relaxed">As alterações são salvas automaticamente neste navegador.</DialogDescription></DialogHeader>
-                <div className="thin-scroll min-h-0 flex-1 thin-scroll overflow-y-auto px-5 py-5 sm:px-6">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <EmitField label="Impressora">
-                    <input value={PRINTER_TYPES[0].label} readOnly aria-readonly="true" />
-                  </EmitField>
-                  <EmitField label="Modo de conexão">
-                    <SystemSelect value={printerSettings.connection} onChange={(e) => updateSettings({ connection: e.target.value as ConnectionMode })}>
-                      {CONNECTION_MODES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                    </SystemSelect>
-                  </EmitField>
-                  {printerSettings.connection === "wifi" && (
-                    <NetworkPrinterSetup
-                      clientId={client?.id ?? null}
-                      clientName={client?.name}
-                      canManage={role !== null && role !== "operator"}
-                      printerId={printerSettings.printerId}
-                      onSelect={selectNetworkPrinter}
-                    />
-                  )}
-                  <EmitField label="Tamanho da etiqueta">
-                    <SystemSelect value={printerSettings.size} onChange={(e) => updateSettings({ size: e.target.value as LabelSize })}>
-                      <option value="60x40">60 mm × 40 mm (padrão)</option>
-                      <option value="50x30">50 mm × 30 mm (opcional)</option>
-                    </SystemSelect>
-                  </EmitField>
-                  <EmitField label="Avisar “próximo de vencer” com quantos dias de antecedência" hint="1 a 90 dias">
-                    <input type="number" min={1} max={90} value={alertDays} onChange={(e) => updateAlertDays(Number(e.target.value))} />
-                  </EmitField>
-                  <p className="rounded-xl border bg-secondary/40 p-3 text-xs text-muted-foreground sm:col-span-2">
-                    A etiqueta imprime data e hora de manipulação/abertura e de validade, além do QR Code individual de rastreio.
-                  </p>
-
-                  <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
-                    <Button variant="outline" disabled={Boolean(emissionBusy) || Boolean(pendingPrint)} onClick={() => { setMessage(""); void performEmission("test", testPrint); }}><Printer /> Imprimir 1 etiqueta de teste</Button>
-                  </div>
-                  <details className="sm:col-span-2 rounded-xl border bg-muted/30 p-4 text-xs leading-6"><summary className="cursor-pointer font-semibold">Orientações para Elgin e impressão pelo computador</summary>
-                    <strong className="block text-sm">Elgin L42 Pro Full (USB no computador)</strong>
-                    <p className="mt-1 text-muted-foreground">
-                      Na janela de impressão que abrir, escolha a <strong>Elgin L42</strong>, deixe as margens em zero e a escala em 100% (sem “ajustar à página”).
-                      A etiqueta já sai no tamanho exato de {printerSettings.size.replace("x", " × ")} mm.
-                    </p>
-                    <p className="mt-2 text-muted-foreground">
-                      No driver ou no utilitário da Elgin, no computador, selecione <strong>Térmica direta (sem ribbon)</strong> e o papel {printerSettings.size.replace("x", " × ")} mm.
-                      Essa configuração é da impressora: o site não consegue alterá-la sozinho.
-                    </p>
-                    <p className="mt-2 flex gap-2 text-muted-foreground"><Smartphone className="mt-0.5 size-4 shrink-0" />
-                      No iPhone você cria e consulta etiquetas normalmente. Imprimir direto na Elgin pelo celular exige uma integração compatível, que ainda não está disponível aqui — prepare no celular e imprima pelo computador ligado à impressora.
-                    </p>
-                  </details>
-                </div>
-
-                  {message && <p role={emissionError ? "alert" : "status"} className={`${emissionError ? "clients-error" : "clients-notice"} mt-4`}>{message}</p>}
-                </div>
-                <div className="client-dialog-footer shrink-0 border-t px-5 py-4 text-right sm:px-6"><Button className="dashboard-primary" onClick={() => setShowPrinterSettings(false)}>Concluir</Button></div>
-              </DialogContent>
-            </Dialog>
+            <EmissionPrinterPicker clientId={selectedClient} connection={printerSettings.connection} printerId={printerSettings.printerId} onSelect={(printerId) => updateSettings({ printerId })} />
             <div className="emit-layout grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
               <div className="emit-form min-w-0 rounded-2xl border bg-card p-5 sm:p-6">
                 <fieldset disabled={Boolean(emissionBusy)} className="min-w-0 space-y-4"><div className="emit-group-title"><span>1</span><h2>Dados da etiqueta</h2></div>
-                <div className="grid gap-4 sm:grid-cols-2"><EmitField label="Cliente"><SystemSelect value={selectedClient} disabled={role === "operator" || role === "admin_cliente"} onChange={(e) => { setSelectedClient(e.target.value); setSelectedProduct(""); setSelectedResponsible(""); setLabelDraft(null); setLot(""); setShelfDays(""); }}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</SystemSelect></EmitField>
+                <div className="grid gap-4 sm:grid-cols-2"><EmitField label="Cliente"><SystemSelect value={selectedClient} disabled={role === "operator" || role === "admin_cliente"} onChange={(e) => selectClient(e.target.value)}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</SystemSelect></EmitField>
                 <EmissionProductPicker key={selectedClient} clientId={selectedClient} value={selectedProduct} disabled={!selectedClient} revision={overviewRevision} onRecord={handleProductRecord} onChange={(selected) => { setSelectedProduct(selected?.id ?? ""); setProducts(selected ? [selected] : []); setLot(""); setLabelDraft(null); setShelfDays(selected ? String(shelfDaysFor(selected, storage)) : ""); }} />
                 <EmitField label="Responsável"><SystemSelect value={selectedResponsible} disabled={!selectedClient} onChange={(e) => { setSelectedResponsible(e.target.value); try { window.localStorage.setItem(`tinutri.last-responsible.${selectedClient}`, e.target.value); } catch { /* Preferência local opcional. */ } }}><option value="">Selecione o responsável</option>{visibleCollaborators.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</SystemSelect></EmitField>
                 <EmitField label="Tipo da etiqueta"><SystemSelect value={kind} onChange={(e) => setKind(e.target.value as LabelKind)}>{LABEL_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</SystemSelect></EmitField></div>
@@ -1075,12 +979,24 @@ function Index() {
             </div>
           </section>}
           <Suspense fallback={<div role="status" aria-busy="true" aria-label="Carregando" className="dashboard-skeleton h-48 rounded-2xl" />}>
-          {tab === "clients" && <ClientsPanel scope={role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : []} revision={overviewRevision} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
+          {tab === "access" && role && <TeamAccessPanel clientId={profileClientId ?? (selectedClient || null)} role={role} permissions={permissions} />}
+          {tab === "settings" && <SettingsPanel
+            tab={settingsTab} onTabChange={setSettingsTab} userId={userId} userName={userName} roleLabel={ROLE_LABEL[role]}
+            companyName={clients.find((c) => c.id === (profileClientId ?? selectedClient))?.name ?? null}
+            alertSound={alertSound} alertDays={alertDays} onAlertDaysChange={updateAlertDays}
+            printerSettings={printerSettings} onPrinterChange={updateSettings}
+            clients={activeClients} clientId={selectedClient} onClientChange={selectClient}
+            canManagePrinters={permissions.gerir_impressoras}
+            onTestPrint={() => { setMessage(""); void performEmission("test", testPrint); }}
+            testDisabled={Boolean(emissionBusy) || Boolean(pendingPrint)}
+            feedback={message ? { text: message, error: emissionError } : null}
+          />}
+          {tab === "clients" && role === "nutricionista" && <ClientsPanel scope={carteira} revision={overviewRevision} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
           {tab === "products" && <ProductsPanel clients={clients} scope={role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : []} revision={overviewRevision} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} initialClient={entryCompany} />}
           {tab === "team" && <TeamPanel scope={accessScope} clients={clients} collaborators={collaborators} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
-          {tab === "validades" && <ValidadesPanel scope={overviewScope} revision={overviewRevision} alertDays={alertDays} onAlertDaysChange={updateAlertDays} onSettle={settleLabel} window={validityWindow} onWindowChange={setValidityWindow} clientName={clients.find((item) => item.id === dashboardClient)?.name ?? "Todas as empresas acessíveis"} onOpenLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} />}
+          {tab === "validades" && <ValidadesPanel embedded canDiscard={permissions.descartar} scope={overviewScope} revision={overviewRevision} alertDays={alertDays} onOpenAlertSettings={() => { setSettingsTab("alertas"); navigateTab("settings"); }} onSettle={settleLabel} window={validityWindow} onWindowChange={setValidityWindow} clientName={clients.find((item) => item.id === dashboardClient)?.name ?? "Todas as empresas acessíveis"} onOpenLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} />}
           {tab === "acompanhamento" && (role === "admin_master" || role === "nutricionista") && <CarePanel scope={role === "admin_master" ? null : carteira} revision={overviewRevision} initialClient={entryCompany} focusedId={focusedEntityId} />}
-          {tab === "history" && <HistoryPanel scope={entryCompany && (accessScope === null || accessScope.includes(entryCompany)) ? [entryCompany] : accessScope} revision={overviewRevision} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
+          {tab === "history" && <HistoryPanel embedded scope={entryCompany && (accessScope === null || accessScope.includes(entryCompany)) ? [entryCompany] : accessScope} revision={overviewRevision} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
           </Suspense>
         </main>
       </div>
@@ -1111,24 +1027,32 @@ const navItems = [
   { id: "clients", label: "Clientes", icon: Building2 },
   { id: "products", label: "Produtos", icon: PackagePlus },
   { id: "team", label: "Colaboradores", icon: Users },
-  { id: "emit", label: "Emitir Etiquetas", icon: Printer },
-  { id: "validades", label: "Validades (PVPS)", icon: CalendarClock },
+  { id: "validades", label: "Etiquetas", icon: Printer },
   { id: "acompanhamento", label: "Acompanhamento", icon: ClipboardList },
-  { id: "history", label: "Histórico", icon: History },
+  { id: "access", label: "Equipe e acessos", icon: UserCog },
+  { id: "settings", label: "Configurações", icon: Settings2 },
 ] as const;
 
-const ROLE_TABS: Record<AppRole, AppTab[]> = {
-  admin_master: ["dashboard", "clients", "products", "team", "emit", "validades", "history", "acompanhamento"],
-  nutricionista: ["dashboard", "clients", "products", "team", "emit", "validades", "history", "acompanhamento"],
-  admin_cliente: ["dashboard", "products", "team", "emit", "validades", "history"],
-  gerente: ["dashboard", "products", "team", "emit", "validades", "history"],
-  operator: ["dashboard", "emit", "validades", "history"],
-};
+/** Telas liberadas: o perfil define o ponto de partida e as permissões da pessoa liberam ou retiram as de gestão. */
+function tabsFor(role: AppRole, permissions: Permissions): AppTab[] {
+  const staff = role === "admin_master" || role === "nutricionista";
+  const tabs: AppTab[] = ["dashboard"];
+  if (role === "nutricionista") tabs.push("clients");
+  if (permissions.gerir_produtos) tabs.push("products");
+  if (permissions.gerir_colaboradores) tabs.push("team");
+  tabs.push("emit", "validades");
+  if (staff) tabs.push("acompanhamento");
+  if (permissions.ver_historico) tabs.push("history");
+  if (!staff && permissions.gerir_acessos) tabs.push("access");
+  tabs.push("settings");
+  return tabs;
+}
 
-function Nav({ role, tab, setTab, badges = {}, closeOnSelect = false }: { role: AppRole; tab: AppTab; setTab: (id: AppTab) => void; badges?: Partial<Record<AppTab, number>>; closeOnSelect?: boolean }) {
-  const allowed = new Set<AppTab>(ROLE_TABS[role]);
+function Nav({ tabs, tab, setTab, badges = {}, closeOnSelect = false }: { tabs: AppTab[]; tab: AppTab; setTab: (id: AppTab) => void; badges?: Partial<Record<AppTab, number>>; closeOnSelect?: boolean }) {
+  const allowed = new Set<AppTab>(tabs);
   return navItems.filter((item) => allowed.has(item.id)).map((item) => {
-    const control = <Button key={item.id} variant={tab === item.id ? "secondary" : "ghost"} className="workspace-nav-item h-11 w-full justify-start" aria-current={tab === item.id ? "page" : undefined} onClick={() => setTab(item.id)}><item.icon />{item.label}{(badges[item.id] ?? 0) > 0 && <span className="ml-auto rounded-full bg-destructive px-2 py-0.5 text-xs font-bold text-destructive-foreground" aria-label={`${badges[item.id]} vencidas ou vencendo hoje`}>{badges[item.id]! > 99 ? "99+" : badges[item.id]}</span>}</Button>;
+    const selected = tab === item.id || (item.id === "validades" && isLabelTab(tab));
+    const control = <Button key={item.id} variant={selected ? "secondary" : "ghost"} className="workspace-nav-item h-11 w-full justify-start" aria-current={selected ? "page" : undefined} onClick={() => setTab(item.id)}><item.icon />{item.label}{(badges[item.id] ?? 0) > 0 && <span className="ml-auto rounded-full bg-destructive px-2 py-0.5 text-xs font-bold text-destructive-foreground" aria-label={`${badges[item.id]} vencidas ou vencendo hoje`}>{badges[item.id]! > 99 ? "99+" : badges[item.id]}</span>}</Button>;
     return closeOnSelect ? <SheetClose asChild key={item.id}>{control}</SheetClose> : control;
   });
 }
@@ -1141,7 +1065,7 @@ const ROLE_LABEL: Record<AppRole, string> = {
   operator: "Colaborador",
 };
 
-function WorkspaceActions({ role, preferences, closeOnSelect = false }: { role: AppRole; preferences: React.ReactNode; closeOnSelect?: boolean }) {
+function WorkspaceActions({ role, closeOnSelect = false }: { role: AppRole; closeOnSelect?: boolean }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const signOut = async () => {
@@ -1159,9 +1083,6 @@ function WorkspaceActions({ role, preferences, closeOnSelect = false }: { role: 
   };
   const master = <Button asChild variant="ghost" className="workspace-nav-item h-11 w-full justify-start"><Link to="/admin"><Building2 />Área Master</Link></Button>;
   return <div className="workspace-sidebar-actions mt-4 space-y-1 border-t pt-4">
-    <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Preferências</p>
-    {preferences}
-    <div className="my-2 border-t" />
     {role === "admin_master" && (closeOnSelect ? <SheetClose asChild>{master}</SheetClose> : master)}
     <Button variant="ghost" className="workspace-nav-item h-11 w-full justify-start" disabled={pending} onClick={signOut}><LogOut />{pending ? "Saindo…" : "Sair"}</Button>
     {error && <p role="alert" className="px-3 pt-2 text-xs text-destructive">{error}</p>}
@@ -1175,7 +1096,7 @@ function UserStrip({ userName, role, clientName }: { userName: string; role: App
       <span className="workspace-avatar shrink-0" aria-hidden="true">{(userName || "U").slice(0, 1).toUpperCase()}</span>
       <div className="hidden min-w-0 text-right sm:block">
         <strong className="block truncate font-semibold text-foreground">{userName || "Sua conta"}</strong>
-        <span className="block truncate text-[10px]">{ROLE_LABEL[role]}{clientName ? ` · ${clientName}` : ""}</span>
+        <span className="block truncate text-xs">{ROLE_LABEL[role]}{clientName ? ` · ${clientName}` : ""}</span>
       </div>
     </div>
   );

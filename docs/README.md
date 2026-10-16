@@ -30,6 +30,9 @@ A consulta sob demanda das quatro listas está em [Paginação das listas](14-pa
 | [Saída do Lovable e migração](06-migracao-supabase.md) | Dependências, dados a preservar, autenticação, infraestrutura e roteiro para futura decisão |
 | [Verificação e limites](07-verificacao.md) | Comandos executados, resultados, cobertura e o que exige validação posterior |
 
+
+A preparação comercial do SaaS está em [Assinaturas e contratos](19-assinaturas-contratos.md), com preços por período, gestão de adesão, minutas e SQL de ativação.
+
 ## Visão executiva
 
 O produto é uma aplicação para identificação de alimentos por etiquetas térmicas, com bases separadas por estabelecimento. O fluxo central é selecionar produto e responsável, calcular a validade, preparar e imprimir a etiqueta e acompanhar sua situação.
@@ -54,3 +57,7 @@ Não foram exportados dados de clientes, usuários, senhas ou chaves. Os valores
 ## Escopo preservado
 
 O README original e o plano em `.lovable/plan` foram usados como referências históricas. Onde divergem da implementação, esta documentação descreve o código atual e registra a diferença. Nenhuma conformidade sanitária ou jurídica é certificada por esta análise técnica.
+
+O fluxo de geração do documento completo e as referências pesquisadas estão em [Gerador de contratos](20-gerador-contratos.md).
+
+A consolidação do menu operacional, avisos e fluxos de etiquetas está em [Estação principal: navegação](21-estacao-navegacao.md).

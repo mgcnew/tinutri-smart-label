@@ -1,3 +1,4 @@
+import { BILLING_PLANS, billingPlan, money, SUBSCRIPTION_STATUS } from "@/lib/billing";
 import { SystemSelect } from "@/components/ui/system-select";
 import {
   cloneElement,
@@ -54,12 +55,15 @@ type Client = {
   phone: string | null;
   address: string | null;
   plan: string;
+  subscription_started_on?: string | null;
+  subscription_status?: string;
   public_code: string;
   created_at?: string;
   nutritionists?: string[];
 };
 type Props = {
   master?: boolean;
+  embedded?: boolean;
   initialFilter?: Status | "all" | "sem_responsavel";
   onInspect?: (client: Company) => void;
   onFocusHandled?: () => void;
@@ -116,14 +120,17 @@ const EMPTY = {
   email: "",
   phone: "",
   address: "",
-  plan: "essencial",
+  plan: "mensal",
+  subscription_started_on: "",
+  subscription_status: "pendente",
   status: "ativa" as Status,
 };
 const STATUS_LABEL = { ativa: "Ativo", inativa: "Inativo", suspensa: "Suspenso" };
 const PLAN_LABEL: Record<string, string> = {
-  essencial: "Essencial",
-  profissional: "Profissional",
-  premium: "Premium",
+  ...Object.fromEntries(Object.entries(BILLING_PLANS).map(([key, p]) => [key, p.name])),
+  essencial: "Essencial (legado)",
+  profissional: "Profissional (legado)",
+  premium: "Premium (legado)",
 };
 const statusOf = (client: Client): Status =>
   client.status === "suspensa" ? "suspensa" : client.active ? "ativa" : "inativa";
@@ -134,6 +141,7 @@ export function ClientsPanel({
   recordActivity,
   focusedId,
   master = false,
+  embedded = false,
   initialFilter = "all",
   onInspect,
   onFocusHandled,
@@ -237,7 +245,9 @@ export function ClientsPanel({
       email: client.email ?? "",
       phone: client.phone ?? "",
       address: client.address ?? "",
-      plan: client.plan || "essencial",
+      plan: client.plan || "mensal",
+      subscription_started_on: client.subscription_started_on ?? "",
+      subscription_status: client.subscription_status ?? "pendente",
       status: statusOf(client),
     });
     setEditingId(client.id);
@@ -269,6 +279,10 @@ export function ClientsPanel({
       setError("Preencha nome, cidade e estado.");
       return;
     }
+    if (form.subscription_status === "ativa" && !form.subscription_started_on) {
+      setError("Informe a data de adesão para uma assinatura ativa.");
+      return;
+    }
     setSaving(true);
     const payload = {
       name: form.name.trim(),
@@ -281,6 +295,12 @@ export function ClientsPanel({
       phone: form.phone.trim() || null,
       address: form.address.trim() || null,
       plan: form.plan,
+      ...(master
+        ? {
+            subscription_started_on: form.subscription_started_on || null,
+            subscription_status: form.subscription_status,
+          }
+        : {}),
       active: form.status === "ativa",
       status: form.status,
     };
@@ -294,7 +314,11 @@ export function ClientsPanel({
             .maybeSingle()
         : await supabase.from("clients").insert(payload).select("id").single();
       if (saveError || !saved)
-        throw new Error("Não foi possível salvar. Confira os dados e tente novamente.");
+        throw new Error(
+          saveError?.code === "PGRST204"
+            ? "Os campos de assinatura aguardam a aplicação do SQL 19 neste ambiente."
+            : "Não foi possível salvar. Confira os dados e tente novamente.",
+        );
       await recordActivity(
         editingId ? "cliente_atualizado" : "cliente_criado",
         saved.id,
@@ -347,21 +371,26 @@ export function ClientsPanel({
 
   return (
     <section className="clients-page space-y-6">
-      <header className="dashboard-heading flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[.14em] text-primary">
-            Administração
-          </p>
-          <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight">
-            {master ? "Empresas" : "Clientes"}
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Gerencie empresas, contatos e condições de acesso.
-          </p>
-        </div>
+      <header
+        className={
+          embedded
+            ? "flex justify-end"
+            : "dashboard-heading flex flex-wrap items-start justify-between gap-4"
+        }
+      >
+        {!embedded && (
+          <div>
+            <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight">
+              {master ? "Empresas" : "Clientes"}
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Gerencie empresas, contatos e condições de acesso.
+            </p>
+          </div>
+        )}
         <Button ref={newButton} className="dashboard-primary h-11" onClick={startNew}>
           <Plus />
-          Novo cliente
+          {master ? "Nova empresa" : "Novo cliente"}
         </Button>
       </header>
       <div className="clients-toolbar rounded-2xl border bg-card p-4">
@@ -507,13 +536,13 @@ export function ClientsPanel({
                   Nutricionista: {client.nutritionists?.join(", ") || "Sem responsável vinculado"}
                 </p>
               )}
-              {client.public_code && (
+              {!master && client.public_code && (
                 <ClientQrCard clientName={client.name} publicCode={client.public_code} />
               )}
               <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t pt-4">
                 {onInspect && (
                   <Button variant="outline" onClick={() => onInspect(client as Company)}>
-                    Ficha da empresa
+                    Abrir empresa
                   </Button>
                 )}
                 <Button
@@ -523,9 +552,9 @@ export function ClientsPanel({
                   aria-label={`Editar ${client.name}`}
                 >
                   <Pencil />
-                  Editar cliente
+                  {master ? "Editar cadastro" : "Editar cliente"}
                 </Button>
-                {statusOf(client) !== "inativa" && (
+                {!master && statusOf(client) !== "inativa" && (
                   <Button
                     variant="ghost"
                     className="min-h-11 text-muted-foreground"
@@ -679,21 +708,57 @@ export function ClientsPanel({
                     />
                   </FormField>
                 </FormSection>
-                <FormSection title="Gestão" description="Plano e situação do cadastro.">
+                <FormSection
+                  title="Assinatura e acesso"
+                  description="O período define o valor da assinatura. A situação de acesso é independente do pagamento."
+                >
                   <FormField label="Plano">
                     <SystemSelect
                       value={form.plan}
                       onChange={(event) => update("plan", event.target.value)}
                     >
-                      {Object.entries(PLAN_LABEL).map(([value, name]) => (
-                        <option key={value} value={value}>
-                          {name}
-                        </option>
-                      ))}
+                      {Object.entries(PLAN_LABEL)
+                        .filter(([value]) => Boolean(billingPlan(value)) || value === form.plan)
+                        .map(([value, name]) => (
+                          <option key={value} value={value}>
+                            {name}
+                          </option>
+                        ))}
                       {!(form.plan in PLAN_LABEL) && <option value={form.plan}>{form.plan}</option>}
                     </SystemSelect>
                   </FormField>
-                  <FormField label="Situação">
+                  {master && (
+                    <>
+                      <FormField label="Data de adesão">
+                        <input
+                          type="date"
+                          required={form.subscription_status === "ativa"}
+                          value={form.subscription_started_on}
+                          onChange={(e) => update("subscription_started_on", e.target.value)}
+                        />
+                      </FormField>
+                      <FormField label="Situação da assinatura">
+                        <SystemSelect
+                          value={form.subscription_status}
+                          onChange={(e) => update("subscription_status", e.target.value)}
+                        >
+                          {Object.entries(SUBSCRIPTION_STATUS).map(([key, label]) => (
+                            <option key={key} value={key}>
+                              {label}
+                            </option>
+                          ))}
+                        </SystemSelect>
+                      </FormField>
+                    </>
+                  )}
+                  {billingPlan(form.plan) && (
+                    <p className="sm:col-span-2 rounded-xl bg-secondary p-3 text-sm">
+                      {money(billingPlan(form.plan).monthlyCents)}/mês ·{" "}
+                      {money(billingPlan(form.plan).monthlyCents * billingPlan(form.plan).months)}{" "}
+                      por ciclo. Cobrança ainda não conectada.
+                    </p>
+                  )}
+                  <FormField label="Situação de acesso">
                     <SystemSelect
                       value={form.status}
                       onChange={(event) => update("status", event.target.value as Status)}

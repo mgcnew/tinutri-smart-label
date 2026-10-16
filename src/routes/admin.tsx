@@ -1,7 +1,11 @@
+import { masterSearch } from "@/lib/workspace-search";
+import { SubscriptionsPanel } from "@/components/master/SubscriptionsPanel";
+import { ContractsPanel } from "@/components/master/ContractsPanel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   LayoutDashboard,
+  FileText,
   Building2,
   Users,
   BriefcaseBusiness,
@@ -25,16 +29,19 @@ import { CarePanel } from "@/components/master/CarePanel";
 import { ActivitiesPanel } from "@/components/master/ActivitiesPanel";
 import { CompanyModal } from "@/components/master/CompanyModal";
 import { ReportModal } from "@/components/master/ReportModal";
+import { Heading } from "@/components/master/Shared";
 import type { Company } from "@/lib/management";
 import type { RecentAction } from "@/lib/dashboard";
 import logo from "@/assets/tinutri-logo-ui.webp";
 export const Route = createFileRoute("/admin")({
+  validateSearch: masterSearch,
   head: () => ({ meta: [{ title: "Área Master · TiNutri Smart Label®" }] }),
   component: AdminMaster,
 });
 const sections = [
   { id: "visao", name: "Visão geral", icon: LayoutDashboard },
   { id: "empresas", name: "Empresas", icon: Building2 },
+  { id: "contratos", name: "Contratos", icon: FileText },
   { id: "usuarios", name: "Usuários", icon: Users },
   { id: "carteira", name: "Carteira", icon: BriefcaseBusiness },
   { id: "acompanhamento", name: "Acompanhamento", icon: ClipboardList },
@@ -42,9 +49,12 @@ const sections = [
 ] as const;
 type Section = (typeof sections)[number]["id"];
 function AdminMaster() {
+  const entry = Route.useSearch();
   const [gate, setGate] = useState<"loading" | "authorized" | "denied" | "error">("loading");
   const [user, setUser] = useState({ id: "", name: "" });
-  const [tab, setTab] = useState<Section>("visao");
+  const [tab, setTab] = useState<Section>(entry.secao ?? "visao");
+  const [companyView, setCompanyView] = useState<"cadastro" | "assinaturas">("cadastro");
+  const [subscriptionsVisited, setSubscriptionsVisited] = useState(false);
   const [revision, setRevision] = useState(0);
   const [drawer, setDrawer] = useState(false);
   const [report, setReport] = useState(false);
@@ -53,7 +63,7 @@ function AdminMaster() {
   const [companyFilter, setCompanyFilter] = useState<
     "all" | "ativa" | "sem_responsavel" | "suspensa"
   >("all");
-  const [focusedCompany, setFocusedCompany] = useState<string | null>(null);
+  const [focusedCompany, setFocusedCompany] = useState<string | null>(entry.empresa ?? null);
   const [focusedUser, setFocusedUser] = useState<string | null>(null);
   const [focusedCare, setFocusedCare] = useState<string | null>(null);
   const [careFilter, setCareFilter] = useState("all");
@@ -61,6 +71,15 @@ function AdminMaster() {
   const [warning, setWarning] = useState("");
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    if (entry.secao) setTab(entry.secao);
+    if (entry.empresa) {
+      setTab("empresas");
+      setCompanyView("cadastro");
+      setCompanyFilter("all");
+      setFocusedCompany(entry.empresa);
+    }
+  }, [entry.secao, entry.empresa]);
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
@@ -169,7 +188,10 @@ function AdminMaster() {
     }
   };
   const menu = (
-    <nav aria-label="Seções da Área Master" className="min-h-0 flex-1 space-y-2 thin-scroll overflow-y-auto">
+    <nav
+      aria-label="Seções da Área Master"
+      className="min-h-0 flex-1 space-y-2 thin-scroll overflow-y-auto"
+    >
       {sections.map((item) => (
         <Button
           key={item.id}
@@ -255,7 +277,7 @@ function AdminMaster() {
             <span className="workspace-avatar shrink-0">{user.name.slice(0, 1).toUpperCase()}</span>
             <div className="min-w-0">
               <p className="truncate text-xs font-medium">{user.name}</p>
-              <p className="text-[10px] text-muted-foreground">Admin Master</p>
+              <p className="text-xs text-muted-foreground">Admin Master</p>
             </div>
           </div>
         </div>
@@ -263,7 +285,7 @@ function AdminMaster() {
       <div className="workspace-layout flex">
         <aside className="workspace-sidebar hidden w-60 shrink-0 lg:block">
           <div className="workspace-sidebar-content flex flex-col">
-            <p className="mb-4 px-3 text-[11px] font-semibold uppercase tracking-[.12em] text-muted-foreground">
+            <p className="mb-4 px-3 text-xs font-semibold uppercase tracking-[.12em] text-muted-foreground">
               Gestão e acompanhamento
             </p>
             {menu}
@@ -288,6 +310,7 @@ function AdminMaster() {
               revision={revision}
               onAction={setAudit}
               onCompanies={(filter) => {
+                setCompanyView("cadastro");
                 setCompanyFilter(filter);
                 setTab("empresas");
               }}
@@ -302,18 +325,109 @@ function AdminMaster() {
             />
           )}{" "}
           {tab === "empresas" && (
-            <ClientsPanel
-              master
-              initialFilter={companyFilter}
-              scope={null}
-              revision={revision}
-              refresh={async () => changed()}
-              focusedId={focusedCompany}
-              onFocusHandled={focusHandled}
-              onInspect={inspect}
-              recordActivity={activity}
-            />
-          )}{" "}
+            <section className="space-y-6">
+              <Heading
+                title="Empresas"
+                description="Cadastros, acessos e assinaturas dos seus clientes em um só lugar."
+              />
+              <div
+                role="tablist"
+                aria-label="Gestão de empresas"
+                onKeyDown={(event) => {
+                  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                  event.preventDefault();
+                  const next =
+                    event.key === "Home"
+                      ? "cadastro"
+                      : event.key === "End"
+                        ? "assinaturas"
+                        : companyView === "cadastro"
+                          ? "assinaturas"
+                          : "cadastro";
+                  document.getElementById(`company-tab-${next}`)?.click();
+                  document.getElementById(`company-tab-${next}`)?.focus();
+                }}
+                className="flex flex-wrap gap-2 border-b pb-3"
+              >
+                {(
+                  [
+                    ["cadastro", "Cadastro e acessos"],
+                    ["assinaturas", "Assinaturas"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <Button
+                    key={id}
+                    id={`company-tab-${id}`}
+                    role="tab"
+                    tabIndex={companyView === id ? 0 : -1}
+                    aria-selected={companyView === id}
+                    aria-controls={`company-panel-${id}`}
+                    variant={companyView === id ? "default" : "ghost"}
+                    onClick={() => {
+                      setCompanyView(id);
+                      if (id === "assinaturas") setSubscriptionsVisited(true);
+                    }}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+              <div
+                role="tabpanel"
+                id="company-panel-cadastro"
+                aria-labelledby="company-tab-cadastro"
+                hidden={companyView !== "cadastro"}
+              >
+                <ClientsPanel
+                  embedded
+                  master
+                  initialFilter={companyFilter}
+                  scope={null}
+                  revision={revision}
+                  refresh={async () => changed()}
+                  focusedId={focusedCompany}
+                  onFocusHandled={focusHandled}
+                  onInspect={inspect}
+                  recordActivity={activity}
+                />
+              </div>
+              <div
+                role="tabpanel"
+                id="company-panel-assinaturas"
+                aria-labelledby="company-tab-assinaturas"
+                hidden={companyView !== "assinaturas"}
+              >
+                {subscriptionsVisited && (
+                  <SubscriptionsPanel
+                    revision={revision}
+                    onSaved={async (before, after) => {
+                      await activity(
+                        "assinatura_atualizada",
+                        before.id,
+                        "client",
+                        before.id,
+                        before.name,
+                        {
+                          plan: before.plan,
+                          subscription_started_on: before.subscription_started_on,
+                          subscription_status: before.subscription_status,
+                        },
+                        after,
+                      );
+                      changed();
+                    }}
+                    onContracts={(id) => {
+                      setContext(id);
+                      setTab("contratos");
+                    }}
+                  />
+                )}
+              </div>
+            </section>
+          )}
+          {tab === "contratos" && (
+            <ContractsPanel key={context} initialClient={context} revision={revision} />
+          )}
           {tab === "usuarios" && (
             <UsersPanel
               focusedId={focusedUser}
@@ -362,6 +476,7 @@ function AdminMaster() {
           onChanged={changed}
           onActivity={activity}
           onEdit={() => {
+            setCompanyView("cadastro");
             setFocusedCompany(company.id);
             setCompanyFilter("all");
             setTab("empresas");

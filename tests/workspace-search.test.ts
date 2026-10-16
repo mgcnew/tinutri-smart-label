@@ -34,3 +34,29 @@ test("identificadores são normalizados antes da validação de carteira", () =>
     "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   );
 });
+
+test("etapas de etiquetas compartilham seção sem alterar os destinos antigos", async () => {
+  const { isLabelTab } = await import("../src/lib/workspace-search.ts");
+  for (const painel of ["emit", "validades", "history"] as const) {
+    assert.equal(workspaceSearch({ painel }).painel, painel);
+    assert.equal(isLabelTab(painel), true);
+  }
+  assert.equal(isLabelTab("products"), false);
+});
+test("atalho de empresas Master aceita apenas seções e UUIDs internos", async () => {
+  const { masterSearch, masterCompaniesUrl } = await import("../src/lib/workspace-search.ts");
+  const empresa = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA";
+  assert.deepEqual(masterSearch({ secao: "empresas", empresa }), {
+    secao: "empresas",
+    empresa: empresa.toLowerCase(),
+  });
+  assert.deepEqual(masterSearch({ secao: "https://example.test", empresa: "../usuarios" }), {
+    secao: undefined,
+    empresa: undefined,
+  });
+  assert.equal(
+    masterCompaniesUrl(empresa),
+    `/admin?secao=empresas&empresa=${empresa.toLowerCase()}`,
+  );
+  assert.equal(masterCompaniesUrl("../usuarios"), "/admin?secao=empresas");
+});

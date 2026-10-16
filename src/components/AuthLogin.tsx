@@ -2,9 +2,11 @@ import { ArrowRight, Eye, EyeOff, LoaderCircle, LockKeyhole } from "lucide-react
 import { useState, type FormEvent } from "react";
 
 import tinutriLogo from "@/assets/tinutri-logo-ui.webp";
+import { DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 
-export function AuthLogin() {
+/** `modal`: renderiza só o cartão, para uso dentro de um Dialog (o título vira DialogTitle). */
+export function AuthLogin({ modal = false }: { modal?: boolean }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -68,8 +70,9 @@ export function AuthLogin() {
     }
   };
 
+  const Wrapper = modal ? "div" : "main";
   return (
-    <main className="auth-page">
+    <Wrapper className={modal ? "auth-dialog-body" : "auth-page"}>
       <section className="auth-card" aria-labelledby="login-title">
         <header className="auth-brand">
           <img
@@ -86,7 +89,13 @@ export function AuthLogin() {
         </header>
 
         <div className="auth-heading">
-          <h1 id="login-title">Bem-vindo de volta</h1>
+          {modal ? (
+            <DialogTitle asChild>
+              <h2 id="login-title">Bem-vindo de volta</h2>
+            </DialogTitle>
+          ) : (
+            <h1 id="login-title">Bem-vindo de volta</h1>
+          )}
           <p>Acesse sua conta para gerenciar suas etiquetas.</p>
         </div>
 
@@ -174,6 +183,6 @@ export function AuthLogin() {
           TiNutri.
         </p>
       </section>
-    </main>
+    </Wrapper>
   );
 }

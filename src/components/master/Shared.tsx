@@ -126,9 +126,6 @@ export function Heading({
   return (
     <header className="dashboard-heading flex flex-wrap items-start justify-between gap-4">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[.14em] text-primary">
-          Gestão TiNutri
-        </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">{title}</h1>
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">{description}</p>
       </div>

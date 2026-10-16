@@ -47,11 +47,19 @@ import { scopeKey, scopeIds, searchPattern, expiryRange, windowRange } from "@/l
 
 type Settlement = "utilizada" | "consumida" | "descartada";
 type Props = {
+  embedded?: boolean;
   scope: string[] | null;
   revision: number;
   alertDays: number;
-  onAlertDaysChange: (days: number) => void;
-  onSettle: (record: OperationalLabel, status: Settlement, reason?: string | null) => Promise<boolean>;
+  /** A antecedência é ajustada em Configurações > Alertas: um só lugar para essa preferência. */
+  onOpenAlertSettings: () => void;
+  /** Descartar depende de permissão da pessoa. */
+  canDiscard?: boolean;
+  onSettle: (
+    record: OperationalLabel,
+    status: Settlement,
+    reason?: string | null,
+  ) => Promise<boolean>;
   window: ExpiryWindow;
   onWindowChange: (window: ExpiryWindow) => void;
   clientName: string;
@@ -66,10 +74,12 @@ const dateText = (date: Date) =>
   isValid(date) ? format(date, "dd/MM/yyyy 'às' HH:mm") : "Data não informada";
 
 export function ValidadesPanel({
+  embedded = false,
   scope,
   revision,
   alertDays,
-  onAlertDaysChange,
+  onOpenAlertSettings,
+  canDiscard = true,
   onSettle,
   window,
   onWindowChange,
@@ -274,16 +284,21 @@ export function ValidadesPanel({
   };
   return (
     <section className="validities-page space-y-6">
-      <header className="dashboard-heading flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[.14em] text-primary">
-            Controle de validades · PVPS
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Validades</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Priorize o que vence primeiro e registre o destino das etiquetas.
-          </p>
-        </div>
+      <header
+        className={
+          embedded
+            ? "flex flex-wrap justify-end gap-4"
+            : "dashboard-heading flex flex-wrap items-start justify-between gap-4"
+        }
+      >
+        {!embedded && (
+          <div>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">Validades</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Priorize o que vence primeiro e registre o destino das etiquetas.
+            </p>
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" className="min-h-11" onClick={() => setShowLosses(true)}>
             Perdas e descartes
@@ -357,20 +372,19 @@ export function ValidadesPanel({
           </FilterField>
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-          <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-            <label htmlFor={`${id}-days`}>Avisar com antecedência de</label>
-            <input
-              id={`${id}-days`}
-              className="validities-days"
-              aria-label="Antecedência do aviso (dias)"
-              type="number"
-              min={1}
-              max={90}
-              value={alertDays}
-              onChange={(event) => onAlertDaysChange(Number(event.target.value))}
-            />
-            <span>dias</span>
-          </div>
+          <p className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+            <span>
+              Aviso de “próximo de vencer”: {alertDays} dia{alertDays === 1 ? "" : "s"} de
+              antecedência.
+            </span>
+            <button
+              type="button"
+              className="min-h-11 font-semibold text-primary underline-offset-2 hover:underline"
+              onClick={onOpenAlertSettings}
+            >
+              Alterar
+            </button>
+          </p>
           <Button
             variant="ghost"
             className="min-h-11 text-xs"
@@ -425,7 +439,7 @@ export function ValidadesPanel({
               </button>
             ))}
           </div>
-          <p className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed text-muted-foreground">
+          <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
             <CheckCircle2 className="size-3.5 shrink-0 text-primary" />
             Somente etiquetas ativas com impressão confirmada. Toque em um grupo para filtrar a
             lista.
@@ -531,7 +545,7 @@ export function ValidadesPanel({
                           <p className="text-muted-foreground">{item.storage_condition}</p>
                         )}
                       </div>
-                      <p className="mt-2 text-[11px] text-muted-foreground">
+                      <p className="mt-2 text-xs text-muted-foreground">
                         Emitida em {dateText(new Date(item.issued_at))}
                         {(item.reprint_count ?? 0) > 0
                           ? ` · ${item.reprint_count} reimpressão(ões)`
@@ -626,30 +640,38 @@ export function ValidadesPanel({
             )}
             <fieldset disabled={saving} className="space-y-2">
               <legend className="mb-3 text-xs font-medium">Destino da etiqueta</legend>
-              {SETTLEMENTS.map((choice) => (
-                <label
-                  key={choice.value}
-                  className={`validity-choice ${choice.value === "descartada" ? "validity-choice-discard" : ""}`}
-                  data-selected={status === choice.value}
-                >
-                  <input
-                    type="radio"
-                    name={`${id}-settlement`}
-                    value={choice.value}
-                    checked={status === choice.value}
-                    onChange={() => setStatus(choice.value)}
-                  />
-                  <span className="min-w-0">
-                    <strong className="block text-sm font-medium">{choice.name}</strong>
-                    <span className="mt-1 block text-xs text-muted-foreground">
-                      {choice.description}
+              {SETTLEMENTS.filter((choice) => canDiscard || choice.value !== "descartada").map(
+                (choice) => (
+                  <label
+                    key={choice.value}
+                    className={`validity-choice ${choice.value === "descartada" ? "validity-choice-discard" : ""}`}
+                    data-selected={status === choice.value}
+                  >
+                    <input
+                      type="radio"
+                      name={`${id}-settlement`}
+                      value={choice.value}
+                      checked={status === choice.value}
+                      onChange={() => setStatus(choice.value)}
+                    />
+                    <span className="min-w-0">
+                      <strong className="block text-sm font-medium">{choice.name}</strong>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {choice.description}
+                      </span>
                     </span>
-                  </span>
-                </label>
-              ))}
+                  </label>
+                ),
+              )}
             </fieldset>
             {status === "descartada" && (
-              <DiscardReasonField code={reasonCode} note={reasonNote} onCode={setReasonCode} onNote={setReasonNote} disabled={saving} />
+              <DiscardReasonField
+                code={reasonCode}
+                note={reasonNote}
+                onCode={setReasonCode}
+                onNote={setReasonNote}
+                disabled={saving}
+              />
             )}
             {error && (
               <p role="alert" className="clients-error mt-4">
@@ -664,7 +686,11 @@ export function ValidadesPanel({
               </Button>
               <Button
                 className="dashboard-primary"
-                disabled={!status || saving || (status === "descartada" && !formatCloseReason(reasonCode, reasonNote))}
+                disabled={
+                  !status ||
+                  saving ||
+                  (status === "descartada" && !formatCloseReason(reasonCode, reasonNote))
+                }
                 onClick={() => void settle()}
               >
                 {saving ? (

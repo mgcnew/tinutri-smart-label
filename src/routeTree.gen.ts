@@ -9,21 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as LabelTokenRouteImport } from './routes/label.$token'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SistemaRouteImport } from './routes/sistema'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ECodeRouteImport } from './routes/e.$code'
+import { Route as LabelTokenRouteImport } from './routes/label.$token'
 
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -31,14 +27,19 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LabelTokenRoute = LabelTokenRouteImport.update({
-  id: '/label/$token',
-  path: '/label/$token',
+const SistemaRoute = SistemaRouteImport.update({
+  id: '/sistema',
+  path: '/sistema',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ECodeRoute = ECodeRouteImport.update({
@@ -46,11 +47,17 @@ const ECodeRoute = ECodeRouteImport.update({
   path: '/e/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LabelTokenRoute = LabelTokenRouteImport.update({
+  id: '/label/$token',
+  path: '/label/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sistema': typeof SistemaRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/e/$code': typeof ECodeRoute
   '/label/$token': typeof LabelTokenRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sistema': typeof SistemaRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/e/$code': typeof ECodeRoute
   '/label/$token': typeof LabelTokenRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sistema': typeof SistemaRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/e/$code': typeof ECodeRoute
   '/label/$token': typeof LabelTokenRoute
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/reset-password'
+    | '/sistema'
     | '/sitemap.xml'
     | '/e/$code'
     | '/label/$token'
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/reset-password'
+    | '/sistema'
     | '/sitemap.xml'
     | '/e/$code'
     | '/label/$token'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/reset-password'
+    | '/sistema'
     | '/sitemap.xml'
     | '/e/$code'
     | '/label/$token'
@@ -103,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SistemaRoute: typeof SistemaRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ECodeRoute: typeof ECodeRoute
   LabelTokenRoute: typeof LabelTokenRoute
@@ -110,18 +123,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -131,18 +137,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/label/$token': {
-      id: '/label/$token'
-      path: '/label/$token'
-      fullPath: '/label/$token'
-      preLoaderRoute: typeof LabelTokenRouteImport
+    '/sistema': {
+      id: '/sistema'
+      path: '/sistema'
+      fullPath: '/sistema'
+      preLoaderRoute: typeof SistemaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/e/$code': {
@@ -152,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ECodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/label/$token': {
+      id: '/label/$token'
+      path: '/label/$token'
+      fullPath: '/label/$token'
+      preLoaderRoute: typeof LabelTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -159,6 +179,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SistemaRoute: SistemaRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ECodeRoute: ECodeRoute,
   LabelTokenRoute: LabelTokenRoute,

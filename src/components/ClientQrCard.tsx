@@ -50,7 +50,7 @@ export function ClientQrCard({ clientName, publicCode }: { clientName: string; p
       {open && (
         <div className="mt-3 flex flex-col items-center gap-3">
           {dataUrl ? <img src={dataUrl} alt={`QR Code de ${clientName}`} className="size-40 rounded-lg bg-white p-2" /> : <p className="text-sm text-muted-foreground">Gerando…</p>}
-          <p className="break-all text-center text-[11px] text-muted-foreground">{url}</p>
+          <p className="break-all text-center text-xs text-muted-foreground">{url}</p>
           <div className="flex gap-2">
             <Button type="button" variant="outline" size="sm" onClick={download}><Download className="size-4" /> Baixar</Button>
             <Button type="button" variant="outline" size="sm" onClick={print}><Printer className="size-4" /> Imprimir</Button>

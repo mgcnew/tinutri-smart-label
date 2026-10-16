@@ -1,3 +1,4 @@
+import { billingPlan, money, displayDate, SUBSCRIPTION_STATUS } from "@/lib/billing";
 import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ClientQrCard } from "@/components/ClientQrCard";
@@ -20,7 +21,7 @@ export function CompanyModal({
   revision: number;
   onClose: () => void;
   onEdit: () => void;
-  onSection: (section: "usuarios" | "atividades" | "acompanhamento") => void;
+  onSection: (section: "usuarios" | "atividades" | "acompanhamento" | "contratos") => void;
   onChanged: () => void;
   onActivity: (
     action: string,
@@ -110,11 +111,28 @@ export function CompanyModal({
             {company.cnpj || "CNPJ não informado"} · {company.city} / {company.state}
           </p>
           <p className="mt-2 text-xs">
-            Situação: {company.status} · Plano: {company.plan}
+            Acesso: {company.status} · Plano:{" "}
+            {billingPlan(company.plan)?.name ?? `${company.plan} (legado)`}
           </p>
           <p className="mt-2 text-xs">
             Nutricionista: {company.nutritionists?.join(", ") || "Consulte os vínculos em Carteira"}
           </p>
+        </div>
+        <div className="rounded-xl border p-4 text-sm">
+          <h3 className="font-semibold">Assinatura</h3>
+          <p className="mt-2">
+            {SUBSCRIPTION_STATUS[company.subscription_status as keyof typeof SUBSCRIPTION_STATUS] ??
+              "Aguardando revisão comercial"}
+          </p>
+          <p className="mt-2 text-muted-foreground">
+            Adesão: {displayDate(company.subscription_started_on)}
+          </p>
+          {billingPlan(company.plan) && (
+            <p className="mt-2">
+              {money(billingPlan(company.plan).monthlyCents * billingPlan(company.plan).months)} por
+              ciclo · {money(billingPlan(company.plan).monthlyCents)}/mês
+            </p>
+          )}
         </div>
         <dl className="grid gap-4 text-sm sm:grid-cols-2">
           {[
@@ -149,6 +167,9 @@ export function CompanyModal({
           )
         )}
         <div className="grid gap-2 sm:grid-cols-2">
+          <Button variant="outline" onClick={() => onSection("contratos")}>
+            Contratos da empresa
+          </Button>
           <Button variant="outline" onClick={() => onSection("usuarios")}>
             Equipe e acessos
           </Button>

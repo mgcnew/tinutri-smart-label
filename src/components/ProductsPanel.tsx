@@ -339,9 +339,6 @@ export function ProductsPanel({
     <section className="products-page clients-page space-y-6">
       <header className="dashboard-heading flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[.14em] text-primary">
-            Catálogo por empresa
-          </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">Produtos</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Organize os produtos e as regras aplicadas às etiquetas.

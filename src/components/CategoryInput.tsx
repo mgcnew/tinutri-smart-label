@@ -133,7 +133,7 @@ export function CategoryInput({
           )}
         </div>
       )}
-      <p id={`${id}-help`} className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+      <p id={`${id}-help`} className="mt-2 text-xs leading-relaxed text-muted-foreground">
         Categorias pertencem à empresa selecionada. Novas categorias são salvas com o produto.
       </p>
       {announcement && (

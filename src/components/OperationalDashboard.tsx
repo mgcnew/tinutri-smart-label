@@ -13,7 +13,6 @@ import {
   Package,
   Printer,
   RefreshCw,
-  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,26 +32,26 @@ type Props = {
   overview: ReturnType<typeof useOperationalOverview>;
   clients: { id: string; name: string }[];
   userName: string;
-  role: string;
   clientId: string;
   onClientChange: (id: string) => void;
   onNavigate: (tab: "emit" | "products" | "team" | "history") => void;
   onWindow: (window: ExpiryWindow) => void;
   onLabel: (id: string) => void;
   onAction: (event: RecentAction) => void;
+  canViewHistory: boolean;
 };
 
 export function OperationalDashboard({
   overview,
   clients,
   userName,
-  role,
   clientId,
   onClientChange,
   onNavigate,
   onWindow,
   onLabel,
   onAction,
+  canViewHistory,
 }: Props) {
   const [listWindow, setListWindow] = useState<ExpiryWindow>("all");
   const { labels, actions, loading, labelsError, actionsError, now, updatedAt, reload } = overview;
@@ -73,9 +72,6 @@ export function OperationalDashboard({
     <section className="operational-dashboard space-y-6" aria-label="Panorama da operação">
       <header className="dashboard-heading flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[.16em] text-primary">
-            Visão geral
-          </p>
           <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight">
             Olá{userName ? `, ${userName.split(" ")[0]}` : ""}.
           </h1>
@@ -156,22 +152,24 @@ export function OperationalDashboard({
       ) : (
         <>
           {!loading && expired.length > 0 && (
-            <button
-              type="button"
-              onClick={() => onWindow("expired")}
-              className="dashboard-expired flex w-full items-center gap-3 rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-left transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <AlertTriangle className="size-5 shrink-0 text-destructive" />
-              <span className="min-w-0 flex-1">
-                <strong className="block text-sm text-destructive">
-                  {expired.length} etiqueta{expired.length === 1 ? " já venceu" : "s já venceram"}
-                </strong>
-                <span className="text-xs text-muted-foreground">
-                  Confira os produtos e registre o destino de cada um.
+            <div role="alert">
+              <button
+                type="button"
+                onClick={() => onWindow("expired")}
+                className="dashboard-expired flex w-full items-center gap-3 rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-left transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <AlertTriangle className="size-5 shrink-0 text-destructive" />
+                <span className="min-w-0 flex-1">
+                  <strong className="block text-sm text-destructive">
+                    {expired.length} etiqueta{expired.length === 1 ? " já venceu" : "s já venceram"}
+                  </strong>
+                  <span className="text-xs text-muted-foreground">
+                    Confira os produtos e registre o destino de cada um.
+                  </span>
                 </span>
-              </span>
-              <ChevronRight className="size-5 shrink-0 text-destructive" />
-            </button>
+                <ChevronRight className="size-5 shrink-0 text-destructive" />
+              </button>
+            </div>
           )}
           <div className="dashboard-section-label">
             <h2>Controle de validades</h2>
@@ -221,8 +219,7 @@ export function OperationalDashboard({
           </div>
           <p className="dashboard-count-note flex items-start gap-2 text-xs text-muted-foreground">
             <CheckCircle2 className="size-4 shrink-0 text-primary" />
-            Somente etiquetas ativas com impressão confirmada. Cada período tem sua própria
-            contagem.
+            Etiquetas ativas com impressão confirmada, agrupadas por produto.
           </p>
           {invalid.length > 0 && (
             <p role="alert" className="text-sm text-destructive">
@@ -394,7 +391,7 @@ export function OperationalDashboard({
                       {action.label?.lot_number ? ` · Lote ${action.label.lot_number}` : ""}
                     </span>
                     <time
-                      className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground"
+                      className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"
                       dateTime={action.created_at}
                     >
                       <Clock3 className="size-3" />
@@ -408,39 +405,19 @@ export function OperationalDashboard({
               ))}
             </div>
           )}
+          {canViewHistory && (
+            <div className="border-t p-3">
+              <Button
+                variant="ghost"
+                className="w-full text-primary"
+                onClick={() => onNavigate("history")}
+              >
+                Ver histórico de etiquetas <ArrowRight />
+              </Button>
+            </div>
+          )}
         </section>
       </div>
-
-      <section className="dashboard-shortcuts rounded-2xl border bg-card p-5">
-        <h2 className="text-sm font-semibold">Acesso rápido</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {role !== "operator" && (
-            <>
-              <Button
-                variant="outline"
-                className="rounded-lg shadow-none"
-                onClick={() => onNavigate("products")}
-              >
-                <Package /> Produtos
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-lg shadow-none"
-                onClick={() => onNavigate("team")}
-              >
-                <Users /> Equipe
-              </Button>
-            </>
-          )}
-          <Button
-            variant="outline"
-            className="rounded-lg shadow-none"
-            onClick={() => onNavigate("history")}
-          >
-            <History /> Histórico de etiquetas
-          </Button>
-        </div>
-      </section>
     </section>
   );
 }

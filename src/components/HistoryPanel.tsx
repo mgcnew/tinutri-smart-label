@@ -14,11 +14,14 @@ import { AUDIT_HEADER, buildAuditReportHtml } from "@/lib/audit-report";
 
 /** Imprime um documento HTML em um frame invisível: no diálogo do navegador dá para "Salvar como PDF". */
 function printHtml(html: string) {
-  document.querySelectorAll<HTMLIFrameElement>("iframe[data-tinutri-report]").forEach((node) => node.remove());
+  document
+    .querySelectorAll<HTMLIFrameElement>("iframe[data-tinutri-report]")
+    .forEach((node) => node.remove());
   const frame = document.createElement("iframe");
   frame.setAttribute("data-tinutri-report", "1");
   frame.setAttribute("aria-hidden", "true");
-  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;";
+  frame.style.cssText =
+    "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;";
   document.body.appendChild(frame);
   frame.onload = () => {
     frame.contentWindow?.focus();
@@ -64,7 +67,9 @@ export function HistoryPanel({
   revision,
   onReprint,
   onDuplicate,
+  embedded = false,
 }: {
+  embedded?: boolean;
   scope: string[] | null;
   revision: number;
   onReprint: (record: OperationalLabel) => void;
@@ -78,7 +83,13 @@ export function HistoryPanel({
   const [exportNote, setExportNote] = useState("");
   const [dateQuery, setDateQuery] = useState("");
   const terms = useDebouncedValue(
-    JSON.stringify([productQuery.trim(), responsibleQuery.trim(), clientQuery.trim(), dateQuery, lotQuery.trim()]),
+    JSON.stringify([
+      productQuery.trim(),
+      responsibleQuery.trim(),
+      clientQuery.trim(),
+      dateQuery,
+      lotQuery.trim(),
+    ]),
   );
   const accessKey = scopeKey(scope);
   const load = useCallback(
@@ -111,7 +122,9 @@ export function HistoryPanel({
       r.responsible_name,
       r.label_status,
       r.print_status,
-      r.label_status === "descartada" ? discardReasonName(parseCloseReason(r.closed_reason).code) : "",
+      r.label_status === "descartada"
+        ? discardReasonName(parseCloseReason(r.closed_reason).code)
+        : "",
     ]);
   // Busca todas as páginas do filtro atual (até EXPORT_MAX) para o CSV e para o relatório.
   const exportRows = async (kind: "csv" | "print") => {
@@ -149,9 +162,20 @@ export function HistoryPanel({
           responsible && `Responsável: ${responsible}`,
           date && `Data: ${format(new Date(`${date}T00:00:00`), "dd/MM/yyyy")}`,
         ].filter((value): value is string => Boolean(value));
-        printHtml(buildAuditReportHtml({ title: "TiNutri Smart Label® · Relatório de etiquetas", filters, generatedAt: format(new Date(), "dd/MM/yyyy HH:mm"), rows: table, truncated }));
+        printHtml(
+          buildAuditReportHtml({
+            title: "TiNutri Smart Label® · Relatório de etiquetas",
+            filters,
+            generatedAt: format(new Date(), "dd/MM/yyyy HH:mm"),
+            rows: table,
+            truncated,
+          }),
+        );
       }
-      if (truncated) setExportNote(`Limitado às ${EXPORT_MAX.toLocaleString("pt-BR")} etiquetas mais recentes; refine o filtro para ver as demais.`);
+      if (truncated)
+        setExportNote(
+          `Limitado às ${EXPORT_MAX.toLocaleString("pt-BR")} etiquetas mais recentes; refine o filtro para ver as demais.`,
+        );
     } catch {
       setExportNote("Não foi possível gerar o arquivo. Tente novamente.");
     } finally {
@@ -160,15 +184,16 @@ export function HistoryPanel({
   };
   return (
     <section className="history-page space-y-6">
-      <header className="dashboard-heading">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[.14em] text-primary">Registros</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Etiquetas emitidas</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Consulte todas as emissões, com filtros e páginas.
-          </p>
-        </div>
-      </header>
+      {!embedded && (
+        <header className="dashboard-heading">
+          <div>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">Etiquetas emitidas</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Consulte todas as emissões, com filtros e páginas.
+            </p>
+          </div>
+        </header>
+      )}
       <div className="mt-7 grid gap-3 rounded-2xl border bg-card p-4 sm:grid-cols-2 xl:grid-cols-5">
         <Field
           label="Produto"
@@ -216,13 +241,25 @@ export function HistoryPanel({
         </Field>
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <p role="status" className="text-xs text-muted-foreground">{exportNote}</p>
+        <p role="status" className="text-xs text-muted-foreground">
+          {exportNote}
+        </p>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" disabled={exporting || listing.loading || listing.total === 0} onClick={() => void exportRows("print")}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exporting || listing.loading || listing.total === 0}
+            onClick={() => void exportRows("print")}
+          >
             <FileText />
             Relatório (PDF)
           </Button>
-          <Button variant="outline" size="sm" disabled={exporting || listing.loading || listing.total === 0} onClick={() => void exportRows("csv")}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exporting || listing.loading || listing.total === 0}
+            onClick={() => void exportRows("csv")}
+          >
             <Download />
             {exporting ? "Gerando…" : "Exportar CSV"}
           </Button>
