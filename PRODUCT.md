@@ -16,7 +16,7 @@ TiNutri Smart Label é o sistema de etiquetas inteligentes da TiNutri (consultor
 Sistema criado por uma consultoria de nutrição e vigilância sanitária (fundadora: Priscila Santana, nutricionista), não por uma empresa de software genérica: a regra sanitária vem embutida no fluxo de emissão e de baixa.
 
 ## Operating Context
-Cozinhas e áreas de produção; impressoras térmicas (NiiMbot, Elgin, Bematech, Zebra, Tomate, Argox), etiqueta de 60 × 40 mm ou 50 × 30 mm; fiscalização sanitária; equipes com vários perfis (master, nutricionista, admin da empresa, gerente, operador).
+Cozinhas e áreas de produção; atualmente, somente a impressora Elgin L42 deve ser apresentada como opção disponível, conforme confirmação do proprietário em 16/10/2026. Não anunciar outros modelos na landing. Etiqueta de 60 × 40 mm ou 50 × 30 mm; fiscalização sanitária; equipes com vários perfis (master, nutricionista, admin da empresa, gerente, operador).
 
 ## Capabilities and Constraints
 Funcionalidades confirmadas no código: emissão de etiquetas (manipulado, aberto, fracionado, recebido) com 5 presets de conservação, lote e inspeção SIF/SISP/SIM, 1 a 200 cópias e fila de impressão; QR Code individual por etiqueta com consulta pública; PVPS com blocos vencidos, vencem hoje, próximos e dentro do prazo; baixa como utilizada, consumida ou descartada; histórico com reimpressão e duplicação; alertas de validade e notificações push (PWA); foto opcional do produto na etiqueta; produtos e categorias; colaboradores; permissões por perfil; área master com clientes, assinaturas e contratos; modo noturno; uso no celular.

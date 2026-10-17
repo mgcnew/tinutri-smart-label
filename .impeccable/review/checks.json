@@ -1,0 +1,33 @@
+[
+  {
+    "viewports": [
+      1440,
+      390,
+      908,
+      320
+    ],
+    "overflow": false,
+    "captures": "All four captured successfully in preceding pass"
+  },
+  {
+    "interactions": "product, label type, tabs, simulated settlement, history, undo, keyboard, login, FAQ",
+    "anchors": [
+      {
+        "href": "#sl-main",
+        "exists": true
+      },
+      {
+        "href": "#plataforma",
+        "exists": true
+      },
+      {
+        "href": "#rotina",
+        "exists": true
+      },
+      {
+        "href": "#duvidas",
+        "exists": true
+      }
+    ]
+  }
+]

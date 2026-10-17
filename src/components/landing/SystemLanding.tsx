@@ -1,423 +1,487 @@
 import {
   ArrowRight,
-  BellRing,
-  Camera,
+  Check,
   CheckCircle2,
   ChevronDown,
+  Clock3,
+  FileCheck2,
   History,
-  MessageCircle,
-  Moon,
+  Package,
   Printer,
   QrCode,
+  RotateCcw,
   ShieldCheck,
-  Smartphone,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-
+import { useState } from "react";
 import tinutriLogo from "@/assets/tinutri-logo-ui.webp";
 import { AuthLogin } from "@/components/AuthLogin";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import "@/landing.css";
 
-const WHATSAPP_NUMBER = "5511976050662";
-const whatsappLink = (text: string) =>
-  `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
-const DEMO_LINK = whatsappLink(
-  "Olá! Vim pela página do TiNutri Smart Label e quero uma demonstração para a minha cozinha.",
-);
-
-/* Exemplos para a etiqueta interativa. São dados ilustrativos, rotulados como tal na página. */
-const SAMPLES = [
-  { id: "bechamel", product: "Molho bechamel", days: 3, kind: "MANIPULADO", storage: "Refrigerado ≤ 5 °C", inspection: "", lot: "L2410" },
-  { id: "frango", product: "Frango desfiado", days: 2, kind: "MANIPULADO", storage: "Refrigerado ≤ 5 °C", inspection: "SIF 4321", lot: "L2411" },
-  { id: "massa", product: "Massa de pão de queijo", days: 90, kind: "MANIPULADO", storage: "Congelado ≤ −18 °C", inspection: "", lot: "L2398" },
-  { id: "sopa", product: "Sopa de legumes", days: 1, kind: "ABERTO", storage: "Quente ≥ 60 °C", inspection: "", lot: "L2412" },
-] as const;
-
-const pad = (n: number) => String(n).padStart(2, "0");
-const fmtDate = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-const fmtTime = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-
-function ThermalLabel({ sampleId, now, qr }: { sampleId: string; now: Date | null; qr: string }) {
-  const sample = SAMPLES.find((s) => s.id === sampleId) ?? SAMPLES[0];
-  const expiry = now ? new Date(now.getTime() + sample.days * 86_400_000) : null;
-  return (
-    <div className="lp-label" role="img" aria-label={`Etiqueta de exemplo: ${sample.product}, validade em ${sample.days} dia${sample.days === 1 ? "" : "s"}`}>
-      <div className="lp-label__brand">TiNutri Smart Label®</div>
-      <div className="lp-label__kind">{sample.kind}</div>
-      <div className="lp-label__product">{sample.product}</div>
-      <div className="lp-label__body">
-        <div className="lp-label__info">
-          <span className="lp-label__k">MANIPULAÇÃO</span>
-          <span className="lp-label__v">{now ? `${fmtDate(now)} ${fmtTime(now)}` : "—"}</span>
-          <div className="lp-label__val">
-            <span className="lp-label__k">VALIDADE</span>
-            <strong>{expiry ? `${fmtDate(expiry)}` : "—"}</strong>
-          </div>
-          <div className="lp-label__meta">
-            <div>CONSERVAÇÃO: {sample.storage}</div>
-            <div>LOTE: {sample.lot}</div>
-            {sample.inspection && <div>{sample.inspection}</div>}
-            <div>RESP.: EQUIPE COZINHA</div>
-          </div>
-        </div>
-        <div className="lp-label__qr">
-          {qr ? <img src={qr} alt="" width={96} height={96} /> : <span className="lp-label__qr-ph" />}
-          <span>RASTREIO</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Hero() {
-  const [sampleId, setSampleId] = useState<string>(SAMPLES[0].id);
-  const [now, setNow] = useState<Date | null>(null);
-  const [qr, setQr] = useState("");
-  useEffect(() => {
-    setNow(new Date());
-    let alive = true;
-    import("qrcode")
-      .then(({ toDataURL }) =>
-        toDataURL("https://tinutri.com.br", { margin: 0, width: 192, errorCorrectionLevel: "M" }),
-      )
-      .then((url) => alive && setQr(url))
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, []);
-  const sample = SAMPLES.find((s) => s.id === sampleId) ?? SAMPLES[0];
-  return (
-    <section className="lp-hero" aria-labelledby="lp-hero-title">
-      <div className="lp-wrap lp-hero__grid">
-        <div className="lp-hero__copy">
-          <h1 id="lp-hero-title">Nada vence sem você ver.</h1>
-          <p className="lp-lead">
-            Etiquetas térmicas com QR Code e controle de validade PVPS para cozinhas profissionais.
-            Emita em segundos, dê baixa pelo celular e mostre tudo na fiscalização.
-          </p>
-          <div className="lp-actions">
-            <a className="lp-btn lp-btn--light" href={DEMO_LINK} target="_blank" rel="noreferrer">
-              <MessageCircle aria-hidden="true" /> Solicitar demonstração
-            </a>
-            <a className="lp-btn lp-btn--line" href="#como-funciona">
-              Ver como funciona <ArrowRight aria-hidden="true" />
-            </a>
-          </div>
-          <p className="lp-hero__note">
-            Feito pela TiNutri, consultoria de alimentos com nutricionistas especialistas em
-            vigilância sanitária.
-          </p>
-        </div>
-
-        <div className="lp-printer" aria-label="Simulação de impressão de etiqueta">
-          <fieldset className="lp-picker">
-            <legend>Experimente: escolha um produto</legend>
-            <div className="lp-picker__row">
-              {SAMPLES.map((s) => (
-                <label key={s.id} className="lp-chip" data-on={s.id === sampleId}>
-                  <input
-                    type="radio"
-                    name="lp-sample"
-                    value={s.id}
-                    checked={s.id === sampleId}
-                    onChange={() => setSampleId(s.id)}
-                  />
-                  {s.product}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <div className="lp-slot" aria-hidden="true" />
-          <div className="lp-paper">
-            <div key={sampleId} className="lp-paper__feed">
-              <ThermalLabel sampleId={sampleId} now={now} qr={qr} />
-            </div>
-          </div>
-          <p className="lp-caption" role="status">
-            Validade calculada na hora: {sample.days} dia{sample.days === 1 ? "" : "s"} a partir da
-            manipulação. Etiqueta de exemplo, com dados ilustrativos.
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-const FLOW = [
-  { title: "Emitir", text: "Escolha o produto, o responsável e o tipo (manipulado, aberto, fracionado ou recebido). A validade padrão já vem preenchida." },
-  { title: "Etiquetar", text: "Imprima uma ou 200 cópias. Cada etiqueta sai com lote, inspeção, conservação e um QR Code só dela." },
-  { title: "Controlar", text: "O PVPS ordena tudo pelo que vence primeiro e separa vencidas, vencem hoje, próximas e dentro do prazo." },
-  { title: "Dar baixa", text: "Marque como utilizada, consumida ou descartada. O histórico guarda cada passo para a fiscalização." },
+const CONTACT =
+  "https://wa.me/5511976050662?text=" +
+  encodeURIComponent("Olá! Quero conhecer o TiNutri Smart Label para a minha operação.");
+const EXAMPLES = [
+  {
+    id: "tomate",
+    name: "Molho de tomate",
+    storage: "Refrigerado",
+    prepared: "16/10/2026 · 09:15",
+    expires: "19/10/2026 · 09:15",
+    lot: "DEMO-001",
+  },
+  {
+    id: "frango",
+    name: "Frango desfiado",
+    storage: "Refrigerado",
+    prepared: "16/10/2026 · 10:20",
+    expires: "20/10/2026 · 10:20",
+    lot: "DEMO-002",
+  },
+  {
+    id: "salada",
+    name: "Salada de grãos",
+    storage: "Refrigerado",
+    prepared: "16/10/2026 · 08:40",
+    expires: "23/10/2026 · 08:40",
+    lot: "DEMO-003",
+  },
 ];
+const KINDS = ["Manipulado", "Aberto", "Fracionado", "Recebido"];
+type Stage = "emissao" | "validades" | "historico";
 
-function Flow() {
+function ProductTour() {
+  const [stage, setStage] = useState<Stage>("emissao");
+  const [productId, setProductId] = useState("tomate");
+  const [kind, setKind] = useState("Manipulado");
+  const [used, setUsed] = useState(false);
+  const product = EXAMPLES.find((item) => item.id === productId) ?? EXAMPLES[0];
   return (
-    <section id="como-funciona" className="lp-section" aria-labelledby="lp-flow-title">
-      <div className="lp-wrap">
-        <h2 id="lp-flow-title" className="lp-h2">Do balcão à fiscalização, em quatro movimentos</h2>
-        <ol className="lp-flow">
-          {FLOW.map((step, i) => (
-            <li key={step.title}>
-              <span className="lp-flow__n" aria-hidden="true">{i + 1}</span>
-              <h3>{step.title}</h3>
-              <p>{step.text}</p>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </section>
-  );
-}
-
-const PVPS = [
-  { tone: "expired", label: "Vencidas", time: "Venceu ontem", items: ["Creme de leite fresco", "Peito de frango marinado"] },
-  { tone: "today", label: "Vencem hoje", time: "Hoje, 18:00", items: ["Molho bechamel", "Salada de grãos"] },
-  { tone: "soon", label: "Próximas", time: "Em 2 dias", items: ["Frango desfiado", "Molho de tomate"] },
-  { tone: "later", label: "Dentro do prazo", time: "Em 18 dias", items: ["Massa de pão de queijo", "Calda de caramelo"] },
-] as const;
-
-function Pvps() {
-  return (
-    <section className="lp-section lp-section--tint" aria-labelledby="lp-pvps-title">
-      <div className="lp-wrap lp-split">
-        <div className="lp-split__lead">
-          <h2 id="lp-pvps-title" className="lp-h2">O que vence primeiro, aparece primeiro</h2>
-          <p className="lp-copy">
-            PVPS é primeiro que vence, primeiro que sai. A tela de validades lê as etiquetas
-            confirmadas e organiza a cozinha por urgência, com cor, ícone e texto. Nunca só cor.
-          </p>
-          <ul className="lp-ticks">
-            <li><CheckCircle2 aria-hidden="true" /> Antecedência de alerta de 1 a 90 dias</li>
-            <li><CheckCircle2 aria-hidden="true" /> Filtros por empresa, produto e lote</li>
-            <li><CheckCircle2 aria-hidden="true" /> Baixa registrada com data e responsável</li>
-          </ul>
+    <section id="plataforma" className="sl-tour" aria-label="Demonstração do sistema">
+      <Tabs value={stage} onValueChange={(value) => setStage(value as Stage)}>
+        <div className="sl-tour-top">
+          <div className="sl-tour-title">
+            <span className="sl-product-mark">
+              <Package aria-hidden="true" />
+            </span>
+            <div>
+              <strong>Sua rotina, por dentro</strong>
+              <span>Exemplo interativo · dados fictícios</span>
+            </div>
+          </div>
+          <TabsList className="sl-stage-list" aria-label="Etapas do sistema">
+            <TabsTrigger value="emissao">
+              <Printer aria-hidden="true" />
+              Emissão
+            </TabsTrigger>
+            <TabsTrigger value="validades">
+              <Clock3 aria-hidden="true" />
+              Validades
+            </TabsTrigger>
+            <TabsTrigger value="historico">
+              <History aria-hidden="true" />
+              Histórico
+            </TabsTrigger>
+          </TabsList>
         </div>
-        <div className="lp-pvps" role="img" aria-label="Exemplo da tela de validades PVPS com quatro grupos de urgência">
-          <p className="lp-pvps__tag">Tela de validades · exemplo</p>
-          {PVPS.map((group) => (
-            <div key={group.tone} className={`lp-pvps__group lp-tone-${group.tone}`}>
-              <div className="lp-pvps__head">
-                <strong>{group.label}</strong>
-                <span className="lp-pvps__count">{group.items.length}</span>
+        <TabsContent value="emissao" className="sl-stage-panel">
+          <div className="sl-emission">
+            <div className="sl-tour-form">
+              <h2>
+                Informação certa.
+                <br />
+                Etiqueta bem feita.
+              </h2>
+              <p>Escolha um produto para ver como as informações ficam organizadas na etiqueta.</p>
+              <label htmlFor="sl-product">
+                Produto
+                <select
+                  id="sl-product"
+                  aria-label="Produto"
+                  value={productId}
+                  onChange={(event) => setProductId(event.target.value)}
+                >
+                  {EXAMPLES.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label htmlFor="sl-kind">
+                Tipo de etiqueta
+                <select
+                  id="sl-kind"
+                  aria-label="Tipo de etiqueta"
+                  value={kind}
+                  onChange={(event) => setKind(event.target.value)}
+                >
+                  {KINDS.map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="sl-field-note">
+                <CheckCircle2 aria-hidden="true" />
+                <span>Produto, conservação, lote e responsável no mesmo lugar.</span>
               </div>
-              {group.items.map((item) => (
-                <div key={item} className="lp-pvps__row">
-                  <span>{item}</span>
-                  <span className="lp-time">{group.time}</span>
+            </div>
+            <div className="sl-label-space">
+              <div className="sl-label-paper" aria-label="Prévia ilustrativa da etiqueta">
+                <div className="sl-label-brand">
+                  TiNutri <span>Smart Label®</span>
+                </div>
+                <span className="sl-label-kind">{kind}</span>
+                <h3>{product.name}</h3>
+                <dl>
+                  <div>
+                    <dt>Preparação</dt>
+                    <dd>{product.prepared}</dd>
+                  </div>
+                  <div className="sl-label-expiry">
+                    <dt>Validade</dt>
+                    <dd>{product.expires}</dd>
+                  </div>
+                  <div>
+                    <dt>Conservação</dt>
+                    <dd>{product.storage}</dd>
+                  </div>
+                </dl>
+                <div className="sl-label-bottom">
+                  <p>
+                    Lote {product.lot}
+                    <br />
+                    Responsável: equipe exemplo
+                  </p>
+                  <QrCode aria-hidden="true" />
+                </div>
+              </div>
+              <p className="sl-preview-note">Prévia visual. Datas e prazos são apenas exemplos.</p>
+            </div>
+          </div>
+        </TabsContent>
+        <TabsContent value="validades" className="sl-stage-panel">
+          <div className="sl-monitor">
+            <div className="sl-panel-heading">
+              <div>
+                <h2>
+                  O próximo vencimento
+                  <br />
+                  merece sua atenção.
+                </h2>
+                <p>
+                  Uma visão organizada para acompanhar os alimentos e registrar a saída de cada um.
+                  Neste exemplo, considere a data de 19/10/2026.
+                </p>
+              </div>
+              <span className="sl-count">
+                <strong>{used ? 2 : 3}</strong> etiquetas ativas no exemplo
+              </span>
+            </div>
+            <div className="sl-validity-list">
+              {EXAMPLES.map((item, index) => (
+                <div key={item.id} className="sl-validity-row">
+                  <span className="sl-food-icon">
+                    <Package aria-hidden="true" />
+                  </span>
+                  <div className="sl-validity-name">
+                    <strong>{item.name}</strong>
+                    <span>
+                      {item.storage} · {item.lot}
+                    </span>
+                  </div>
+                  <span
+                    className={`sl-status ${index === 0 && !used ? "sl-status-attention" : ""}`}
+                  >
+                    {index === 0
+                      ? used
+                        ? "Utilizada"
+                        : "Vence hoje"
+                      : index === 1
+                        ? "Próxima do vencimento"
+                        : "Dentro do prazo"}
+                  </span>
+                  {index === 0 && (
+                    <button
+                      className="sl-small-button"
+                      disabled={used}
+                      onClick={() => setUsed(true)}
+                    >
+                      {used ? (
+                        <>
+                          <Check aria-hidden="true" />
+                          Baixa simulada
+                        </>
+                      ) : (
+                        "Simular baixa"
+                      )}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-const FEATURES = [
-  { icon: Printer, title: "Etiqueta que a vigilância entende", text: "Quatro tipos de etiqueta, cinco presets de conservação (de congelado ≤ −18 °C a quente ≥ 60 °C), lote, alérgenos e inspeção SIF, SISP ou SIM." },
-  { icon: QrCode, title: "QR Code em cada etiqueta", text: "Cada unidade tem rastreio próprio. Quem escaneia vê produto, lote, responsável, abertura e validade, sem precisar de login." },
-  { icon: History, title: "Histórico, reimpressão e duplicação", text: "Encontre qualquer emissão por produto, responsável, empresa ou data. Reimprima ou duplique para a próxima produção." },
-  { icon: BellRing, title: "Alertas de validade no celular", text: "Instale como aplicativo e receba notificações de validade. Funciona no navegador, sem loja de aplicativos." },
-  { icon: Camera, title: "Foto do produto", text: "Registre a foto no momento da etiqueta. Elas ficam guardadas em área privada da empresa por 90 dias." },
-  { icon: Users, title: "Perfis e permissões", text: "Master, nutricionista, administrador da empresa, gerente e operador. Cada pessoa vê só o que precisa e só da própria empresa." },
-  { icon: Smartphone, title: "Feito para a mão na cozinha", text: "Botões grandes, poucos toques e emissão em fila para imprimir lotes. Do celular ao tablet, no balcão ou no estoque." },
-  { icon: Moon, title: "Modo noturno", text: "Tela escura para câmaras frias, estoques e turnos da noite." },
-];
-
-function Features() {
-  return (
-    <section id="funcionalidades" className="lp-section" aria-labelledby="lp-feat-title">
-      <div className="lp-wrap lp-split lp-split--feat">
-        <div className="lp-split__lead lp-sticky">
-          <h2 id="lp-feat-title" className="lp-h2">Tudo o que a etiqueta precisa dizer, e o que vem depois dela</h2>
-          <p className="lp-copy">Funcionalidades que já estão no sistema hoje.</p>
-        </div>
-        <ul className="lp-rows">
-          {FEATURES.map((f) => (
-            <li key={f.title}>
-              <f.icon aria-hidden="true" />
-              <div>
-                <h3>{f.title}</h3>
-                <p>{f.text}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </section>
-  );
-}
-
-const ROLES = [
-  { who: "Operador", what: "Emite etiquetas, consulta validades e dá baixa. Só o que a rotina da cozinha pede." },
-  { who: "Gerente", what: "Cadastra produtos e equipe, acompanha o painel e o histórico da empresa." },
-  { who: "Administrador da empresa", what: "Cuida de toda a operação da própria empresa, com produtos, equipe e configurações." },
-  { who: "Nutricionista", what: "Acompanha a carteira de empresas clientes e apoia cada uma com os registros em dia." },
-];
-
-function Roles() {
-  return (
-    <section className="lp-section lp-section--tint" aria-labelledby="lp-roles-title">
-      <div className="lp-wrap">
-        <h2 id="lp-roles-title" className="lp-h2">Cada pessoa da equipe, com a tela certa</h2>
-        <dl className="lp-roles">
-          {ROLES.map((r) => (
-            <div key={r.who}>
-              <dt>{r.who}</dt>
-              <dd>{r.what}</dd>
+            <div className="sl-monitor-result" role="status">
+              {used ? (
+                <>
+                  <CheckCircle2 aria-hidden="true" />
+                  <span>Uso registrado no exemplo. Veja a atualização na etapa Histórico.</span>
+                  <button onClick={() => setUsed(false)}>
+                    <RotateCcw aria-hidden="true" />
+                    Desfazer
+                  </button>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck aria-hidden="true" />
+                  <span>
+                    Experimente simular a baixa do primeiro produto. Nenhum dado real será alterado.
+                  </span>
+                </>
+              )}
             </div>
-          ))}
-        </dl>
+          </div>
+        </TabsContent>
+        <TabsContent value="historico" className="sl-stage-panel">
+          <div className="sl-history">
+            <div className="sl-panel-heading">
+              <div>
+                <h2>
+                  Cada etapa
+                  <br />
+                  deixa seu registro.
+                </h2>
+                <p>
+                  Emissões, impressões e baixas ajudam a acompanhar o que aconteceu na operação.
+                </p>
+              </div>
+              <span className="sl-history-product">
+                <Package aria-hidden="true" />
+                Molho de tomate · DEMO-001
+              </span>
+            </div>
+            <ol className="sl-timeline">
+              <li>
+                <span className="sl-timeline-icon">
+                  <FileCheck2 aria-hidden="true" />
+                </span>
+                <div>
+                  <strong>Etiqueta criada</strong>
+                  <p>Produto, lote e responsável identificados.</p>
+                </div>
+                <span>09:15</span>
+              </li>
+              <li>
+                <span className="sl-timeline-icon">
+                  <Printer aria-hidden="true" />
+                </span>
+                <div>
+                  <strong>Impressão confirmada</strong>
+                  <p>Registro de impressão da etiqueta.</p>
+                </div>
+                <span>09:16</span>
+              </li>
+              <li className={used ? "sl-event-complete" : "sl-event-waiting"}>
+                <span className="sl-timeline-icon">
+                  {used ? <CheckCircle2 aria-hidden="true" /> : <Clock3 aria-hidden="true" />}
+                </span>
+                <div>
+                  <strong>{used ? "Baixa como utilizada" : "Acompanhamento da validade"}</strong>
+                  <p>
+                    {used
+                      ? "Uso simulado na etapa Validades."
+                      : "A etiqueta permanece ativa até o registro da baixa."}
+                  </p>
+                </div>
+                <span>{used ? "Agora" : "Em aberto"}</span>
+              </li>
+            </ol>
+            <p className="sl-history-note">
+              <QrCode aria-hidden="true" />
+              No sistema, cada etiqueta tem um QR Code para consulta individual.
+            </p>
+          </div>
+        </TabsContent>
+      </Tabs>
+      <div className="sl-tour-caption">
+        <span>Uma amostra da experiência do TiNutri.</span>
+        <span>Esta demonstração não emite etiquetas nem grava dados.</span>
       </div>
     </section>
   );
 }
 
-function Printers() {
-  return (
-    <section className="lp-section" aria-labelledby="lp-print-title">
-      <div className="lp-wrap lp-split">
-        <div className="lp-split__lead">
-          <h2 id="lp-print-title" className="lp-h2">Funciona com a impressora térmica que você já tem</h2>
-          <p className="lp-copy">
-            Etiquetas de 60 × 40 mm ou 50 × 30 mm, impressas pelo navegador. Compatível com
-            impressoras NiiMbot, Elgin, Bematech, Zebra, Tomate e Argox. Para NiiMbot, o sistema
-            também gera a imagem da etiqueta para enviar pelo aplicativo da impressora.
-          </p>
-        </div>
-        <div className="lp-sizes" aria-label="Tamanhos de etiqueta">
-          <div className="lp-size lp-size--a"><span>60 × 40 mm</span></div>
-          <div className="lp-size lp-size--b"><span>50 × 30 mm</span></div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Consultancy() {
-  return (
-    <section className="lp-consult" aria-labelledby="lp-consult-title">
-      <div className="lp-wrap lp-split">
-        <div className="lp-split__lead">
-          <h2 id="lp-consult-title" className="lp-h2 lp-h2--inv">Criado por quem faz consultoria sanitária todos os dias</h2>
-          <p className="lp-copy lp-copy--inv">
-            O TiNutri Smart Label nasce da TiNutri, consultoria de alimentos fundada pela
-            nutricionista Priscila Santana, com especializações em vigilância sanitária, rotulagem
-            nutricional e auditoria de alimentos. A regra da boa prática já está no fluxo, não
-            num manual esquecido na gaveta.
-          </p>
-        </div>
-        <ul className="lp-services">
-          <li>Ficha técnica e cálculo de custo real</li>
-          <li>Manual de Boas Práticas</li>
-          <li>POPs e planilhas de controle</li>
-          <li>Rotulagem nutricional e informativa</li>
-          <li>Layout funcional de cozinhas</li>
-          <li>
-            <a href="https://tinutri.com.br/" target="_blank" rel="noreferrer">
-              Conheça a consultoria <ArrowRight aria-hidden="true" />
-            </a>
-          </li>
-        </ul>
-      </div>
-    </section>
-  );
-}
-
-const FAQ = [
-  { q: "Preciso instalar algum programa?", a: "Não. O sistema funciona no navegador do celular, do tablet ou do computador. Se quiser, instale como aplicativo na tela inicial." },
-  { q: "Imprime direto por Bluetooth ou Wi-Fi?", a: "Hoje a impressão sai pelo navegador, para qualquer impressora térmica instalada. Para NiiMbot, o sistema gera a imagem da etiqueta para enviar pelo aplicativo da impressora." },
-  { q: "O que a fiscalização consegue ver?", a: "Cada etiqueta tem QR Code com a consulta pública e o histórico guarda emissões, reimpressões e baixas. Você mostra o registro em vez de procurar planilhas." },
-  { q: "Serve para mais de uma empresa?", a: "Sim. Nutricionistas e consultorias acompanham uma carteira de empresas, e cada empresa vê apenas os próprios dados." },
-  { q: "Quanto custa?", a: "Fale com a TiNutri pelo WhatsApp para uma demonstração e uma proposta para o tamanho da sua operação." },
+const QUESTIONS = [
+  {
+    q: "Como funciona a impressão?",
+    a: "No momento, a impressão é feita com a Elgin L42, instalada e configurada no computador, pelo navegador.",
+  },
+  {
+    q: "Posso usar pelo celular?",
+    a: "Sim. O TiNutri funciona no navegador do celular, tablet ou computador. Também pode ser adicionado à tela inicial como aplicativo.",
+  },
+  {
+    q: "Consigo acompanhar mais de uma empresa?",
+    a: "Nutricionistas e consultorias podem acompanhar uma carteira de empresas. Os acessos são organizados por perfil e vínculo com cada empresa.",
+  },
 ];
-
-function Faq() {
-  return (
-    <section id="duvidas" className="lp-section" aria-labelledby="lp-faq-title">
-      <div className="lp-wrap lp-split lp-split--feat">
-        <div className="lp-split__lead">
-          <h2 id="lp-faq-title" className="lp-h2">Dúvidas comuns</h2>
-        </div>
-        <div className="lp-faq">
-          {FAQ.map((item) => (
-            <details key={item.q}>
-              <summary>
-                {item.q}
-                <ChevronDown aria-hidden="true" />
-              </summary>
-              <p>{item.a}</p>
-            </details>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 export function SystemLanding({ openLogin = false }: { openLogin?: boolean }) {
   const [loginOpen, setLoginOpen] = useState(openLogin);
   return (
-    <div className="lp">
-      <a className="lp-skip" href="#conteudo">Ir para o conteúdo</a>
-      <header className="lp-top">
-        <div className="lp-wrap lp-top__bar">
-          <a href="/" className="lp-brand" aria-label="TiNutri Smart Label, página inicial">
-            <img src={tinutriLogo} alt="" width={40} height={45} />
-            <span>Smart Label<sup aria-hidden="true">®</sup></span>
+    <div className="sl-page">
+      <a className="sl-skip" href="#sl-main">
+        Ir para o conteúdo
+      </a>
+      <header className="sl-header">
+        <div className="sl-container sl-header-inner">
+          <a href="/" className="sl-brand" aria-label="TiNutri Smart Label, página inicial">
+            <img src={tinutriLogo} width={32} height={36} alt="" />
+            <span>
+              TiNutri{" "}
+              <strong>
+                Smart Label<sup>®</sup>
+              </strong>
+            </span>
           </a>
-          <nav aria-label="Seções da página" className="lp-nav">
-            <a href="#como-funciona">Como funciona</a>
-            <a href="#funcionalidades">Funcionalidades</a>
+          <nav aria-label="Seções da página">
+            <a href="#plataforma">A plataforma</a>
+            <a href="#rotina">Na sua rotina</a>
             <a href="#duvidas">Dúvidas</a>
           </nav>
-          <div className="lp-top__cta">
-            <button type="button" className="lp-link" onClick={() => setLoginOpen(true)}>Entrar</button>
-            <a className="lp-btn lp-btn--solid" href={DEMO_LINK} target="_blank" rel="noreferrer">
-              Solicitar demonstração
-            </a>
-          </div>
+          <button className="sl-login" onClick={() => setLoginOpen(true)}>
+            Entrar <ArrowRight aria-hidden="true" />
+          </button>
         </div>
       </header>
-      <main id="conteudo">
-        <Hero />
-        <Flow />
-        <Pvps />
-        <Features />
-        <Roles />
-        <Printers />
-        <Consultancy />
-        <Faq />
-        <section className="lp-close" aria-labelledby="lp-close-title">
-          <div className="lp-wrap lp-close__inner">
-            <ShieldCheck aria-hidden="true" />
-            <h2 id="lp-close-title">Leve a validade da sua cozinha para o controle.</h2>
-            <p>Peça uma demonstração e veja o sistema funcionando com os produtos da sua operação.</p>
-            <a className="lp-btn lp-btn--light" href={DEMO_LINK} target="_blank" rel="noreferrer">
-              <MessageCircle aria-hidden="true" /> Falar com a TiNutri no WhatsApp
+      <main id="sl-main">
+        <section className="sl-intro sl-container" aria-labelledby="sl-title">
+          <div>
+            <h1 id="sl-title">
+              Etiquetas prontas.
+              <br />
+              <span>Validades sob controle.</span>
+            </h1>
+            <p>
+              Identifique alimentos, acompanhe os prazos e registre as baixas. Um sistema para
+              organizar o que acontece na sua cozinha.
+            </p>
+          </div>
+          <div className="sl-intro-action">
+            <a className="sl-primary" href={CONTACT} target="_blank" rel="noreferrer">
+              Quero conhecer o sistema <ArrowRight aria-hidden="true" />
             </a>
+            <span>Fale com a equipe TiNutri.</span>
           </div>
         </section>
+        <div className="sl-container">
+          <ProductTour />
+        </div>
+        <section id="rotina" className="sl-routine sl-container" aria-labelledby="sl-routine-title">
+          <div className="sl-section-intro">
+            <h2 id="sl-routine-title">
+              Menos informação espalhada.
+              <br />
+              <span>Uma rotina mais organizada.</span>
+            </h2>
+            <p>
+              Do preparo à consulta do histórico, a equipe trabalha com os registros no mesmo lugar.
+            </p>
+          </div>
+          <div className="sl-routine-content">
+            <div className="sl-routine-line">
+              <Printer aria-hidden="true" />
+              <div>
+                <h3>Prepare e identifique</h3>
+                <p>
+                  Produtos, tipos de etiqueta, conservação e responsáveis definidos para a emissão.
+                </p>
+              </div>
+            </div>
+            <div className="sl-routine-line">
+              <Clock3 aria-hidden="true" />
+              <div>
+                <h3>Enxergue o que precisa de atenção</h3>
+                <p>Validades organizadas por prioridade para acompanhar o que vence primeiro.</p>
+              </div>
+            </div>
+            <div className="sl-routine-line">
+              <History aria-hidden="true" />
+              <div>
+                <h3>Encontre o que foi registrado</h3>
+                <p>Consulte emissões, reimpressões e baixas sem depender de anotações dispersas.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section className="sl-people" aria-labelledby="sl-people-title">
+          <div className="sl-container sl-people-inner">
+            <div>
+              <Users aria-hidden="true" />
+              <h2 id="sl-people-title">
+                Cada pessoa com
+                <br />o acesso que precisa.
+              </h2>
+            </div>
+            <dl>
+              <div>
+                <dt>Equipe da cozinha</dt>
+                <dd>Emissão e acompanhamento na rotina do preparo.</dd>
+              </div>
+              <div>
+                <dt>Gestores</dt>
+                <dd>Produtos, colaboradores e registros da empresa.</dd>
+              </div>
+              <div>
+                <dt>Nutricionistas</dt>
+                <dd>Acompanhamento das empresas da sua carteira.</dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+        <section id="duvidas" className="sl-faq sl-container" aria-labelledby="sl-faq-title">
+          <div>
+            <h2 id="sl-faq-title">Antes de começar.</h2>
+            <p>Algumas respostas para entender como o sistema se encaixa na sua operação.</p>
+          </div>
+          <div className="sl-faq-list">
+            {QUESTIONS.map((item) => (
+              <details key={item.q}>
+                <summary>
+                  {item.q}
+                  <ChevronDown aria-hidden="true" />
+                </summary>
+                <p>{item.a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+        <section className="sl-contact sl-container">
+          <div>
+            <h2>Vamos olhar para a sua cozinha?</h2>
+            <p>Conheça o TiNutri com uma demonstração para a sua operação.</p>
+          </div>
+          <a className="sl-primary" href={CONTACT} target="_blank" rel="noreferrer">
+            Conversar com a TiNutri <ArrowRight aria-hidden="true" />
+          </a>
+        </section>
       </main>
+      <footer className="sl-footer">
+        <div className="sl-container">
+          <span>TiNutri Smart Label®</span>
+          <a href="mailto:contato@tinutri.com.br">contato@tinutri.com.br</a>
+          <a href="https://instagram.com/tinutri.nutricao" target="_blank" rel="noreferrer">
+            Instagram
+          </a>
+          <span>Validade simples. Segurança sempre.</span>
+        </div>
+      </footer>
       <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
         <DialogContent className="auth-dialog" aria-describedby={undefined}>
           <AuthLogin modal />
         </DialogContent>
       </Dialog>
-      <footer className="lp-foot">
-        <div className="lp-wrap lp-foot__inner">
-          <p>TiNutri · Soluções em consultoria de alimentos</p>
-          <p>
-            <a href="mailto:contato@tinutri.com.br">contato@tinutri.com.br</a> ·{" "}
-            <a href={whatsappLink("Olá!")} target="_blank" rel="noreferrer">(11) 97605-0662</a> ·{" "}
-            <a href="https://instagram.com/tinutri.nutricao" target="_blank" rel="noreferrer">@tinutri.nutricao</a>
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }
