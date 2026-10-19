@@ -17,6 +17,7 @@ import { useState } from "react";
 import tinutriLogo from "@/assets/tinutri-logo-ui.webp";
 import { AuthLogin } from "@/components/AuthLogin";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { SystemSelect } from "@/components/ui/system-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import "@/landing.css";
 
@@ -97,7 +98,7 @@ function ProductTour() {
               <p>Escolha um produto para ver como as informações ficam organizadas na etiqueta.</p>
               <label htmlFor="sl-product">
                 Produto
-                <select
+                <SystemSelect
                   id="sl-product"
                   aria-label="Produto"
                   value={productId}
@@ -108,20 +109,22 @@ function ProductTour() {
                       {item.name}
                     </option>
                   ))}
-                </select>
+                </SystemSelect>
               </label>
               <label htmlFor="sl-kind">
                 Tipo de etiqueta
-                <select
+                <SystemSelect
                   id="sl-kind"
                   aria-label="Tipo de etiqueta"
                   value={kind}
                   onChange={(event) => setKind(event.target.value)}
                 >
                   {KINDS.map((value) => (
-                    <option key={value}>{value}</option>
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
                   ))}
-                </select>
+                </SystemSelect>
               </label>
               <div className="sl-field-note">
                 <CheckCircle2 aria-hidden="true" />
@@ -471,8 +474,8 @@ export function SystemLanding({ openLogin = false }: { openLogin?: boolean }) {
         <div className="sl-container">
           <span>TiNutri Smart Label®</span>
           <a href="mailto:contato@tinutri.com.br">contato@tinutri.com.br</a>
-          <a href="https://instagram.com/tinutri.nutricao" target="_blank" rel="noreferrer">
-            Instagram
+          <a href="https://tinutri.com.br/" target="_blank" rel="noreferrer">
+            tinutri.com.br
           </a>
           <span>Validade simples. Segurança sempre.</span>
         </div>

@@ -308,8 +308,8 @@ body:has(.sl-page) > div .app-footer {
   font-size: 12px;
   font-weight: 600;
 }
-.sl-tour-form select {
-  display: block;
+.sl-tour-form .system-select-trigger {
+  display: flex;
   width: 100%;
   min-height: 44px;
   margin-top: 7px;
@@ -945,7 +945,7 @@ body:has(.sl-page) > div .app-footer {
   .sl-tour-form > p {
     font-size: 12px;
   }
-  .sl-tour-form select {
+  .sl-tour-form .system-select-trigger {
     font-size: 16px;
   }
   .sl-label-space {
