@@ -185,7 +185,7 @@ function Index() {
   const [pendingPrint, setPendingPrint] = useState<{ rows: { id: string; client_id: string; product_name: string }[]; total: number; product: string } | null>(null);
   const [alertDays, setAlertDays] = useState(3);
   useEffect(() => { setAlertDays(loadAlertDays()); }, []);
-  const { counts: alertCounts, items: alertItems } = useAlerts(Boolean(userId && role && !loading), accessScope, overviewRevision, alertDays);
+  const { counts: alertCounts } = useAlerts(Boolean(userId && role && !loading), accessScope, overviewRevision, alertDays);
   const alertSound = useAlertSound(alertCounts);
   const urgentCount = (alertCounts?.expired ?? 0) + (alertCounts?.today ?? 0);
   const updateAlertDays = (value: number) => {
@@ -867,7 +867,7 @@ function Index() {
           </div>
         </aside>
         <main className="workspace-main min-w-0 flex-1">
-          {tab !== "dashboard" && tab !== "validades" && <AlertBanner counts={alertCounts} items={alertItems} soonDays={alertDays} onOpen={(window) => { setValidityWindow(window); setTab("validades"); }} />}
+          {tab !== "dashboard" && tab !== "validades" && <AlertBanner counts={alertCounts} soonDays={alertDays} onOpen={(window) => { setValidityWindow(window); setTab("validades"); }} />}
           {entryError && <p role="alert" className="clients-error mb-5">{entryError}</p>}
           {entryCompany && <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3 text-sm"><span>Empresa selecionada: <strong>{clients.find(item => item.id === entryCompany)?.name ?? "Carregando…"}</strong></span><Button variant="ghost" size="sm" onClick={() => { setEntryCompany(""); setDashboardClient(""); }}>Limpar seleção</Button></div>}
           {activityWarning && <div role="alert" className="mb-5 flex items-center gap-3 rounded-xl border border-accent bg-card p-4 text-sm"><p className="flex-1">{activityWarning}</p><Button variant="ghost" size="icon" aria-label="Fechar aviso" onClick={() => setActivityWarning(null)}><X /></Button></div>}

@@ -3,8 +3,7 @@ import { TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { AlertCounts } from "@/lib/alert-plan";
-import { remainingTime, type ExpiryWindow } from "@/lib/dashboard";
-import type { AlertItem } from "@/hooks/use-alerts";
+import type { ExpiryWindow } from "@/lib/dashboard";
 import {
   disablePush,
   enablePush,
@@ -21,12 +20,10 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
  */
 export function AlertBanner({
   counts,
-  items,
   soonDays,
   onOpen,
 }: {
   counts: AlertCounts | null;
-  items: AlertItem[];
   soonDays: number;
   onOpen: (window: ExpiryWindow) => void;
 }) {
@@ -47,63 +44,53 @@ export function AlertBanner({
         </Button>
       </div>
     );
-  const now = new Date();
   return (
     <section
       role="alert"
-      className={`mb-5 rounded-xl border-2 p-4 ${counts.expired > 0 ? "border-destructive bg-destructive/5" : "border-accent bg-accent/10"}`}
+      className={`mb-5 rounded-xl border border-l-4 p-4 ${counts.expired > 0 ? "border-destructive/25 border-l-destructive bg-destructive/5" : "border-accent border-l-accent-foreground bg-accent/10"}`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
         <div className="flex min-w-0 items-start gap-3">
           <TriangleAlert
             className={`mt-0.5 size-6 shrink-0 ${counts.expired > 0 ? "text-destructive" : "text-accent-foreground"}`}
           />
           <div className="min-w-0">
-            <h2 className="text-base font-bold">
+            <h2 className="text-sm font-semibold tabular-nums">
               {counts.expired > 0 &&
                 plural(counts.expired, "etiqueta vencida", "etiquetas vencidas")}
               {counts.expired > 0 && counts.today > 0 && " · "}
               {counts.today > 0 && `${plural(counts.today, "vence", "vencem")} hoje`}
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Retire o produto e registre a baixa. Este aviso só some quando todas receberem baixa.
+              {counts.expired > 0
+                ? "Retire os produtos vencidos e registre a baixa em Validades."
+                : "Confira as etiquetas de hoje e registre a baixa após o uso."}
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
           {counts.expired > 0 && (
-            <Button size="sm" variant="destructive" onClick={() => onOpen("expired")}>
+            <Button
+              className="min-h-11 flex-1 sm:flex-none"
+              size="sm"
+              variant="destructive"
+              onClick={() => onOpen("expired")}
+            >
               Ver vencidas
             </Button>
           )}
           {counts.today > 0 && (
-            <Button size="sm" variant="outline" onClick={() => onOpen("today")}>
+            <Button
+              className="min-h-11 flex-1 sm:flex-none"
+              size="sm"
+              variant="outline"
+              onClick={() => onOpen("today")}
+            >
               Ver as de hoje
             </Button>
           )}
         </div>
       </div>
-      {items.length > 0 && (
-        <ul className="mt-3 divide-y rounded-lg border bg-card text-sm">
-          {items.map((item) => (
-            <li
-              key={item.id}
-              className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
-            >
-              <span className="min-w-0 truncate font-medium">
-                {item.product_name}{" "}
-                <span className="font-normal text-muted-foreground">· {item.client_name}</span>
-              </span>
-              <span className="shrink-0 text-xs font-semibold">{remainingTime(item, now)}</span>
-            </li>
-          ))}
-          {grave > items.length && (
-            <li className="px-3 py-2 text-xs text-muted-foreground">
-              e mais {grave - items.length}…
-            </li>
-          )}
-        </ul>
-      )}
     </section>
   );
 }
