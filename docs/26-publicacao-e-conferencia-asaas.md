@@ -2,6 +2,14 @@
 
 Atualizado em **20/10/2026**, após o usuário aplicar os SQLs e pedir continuidade.
 
+## Registro de publicação — atualização mais recente
+
+O código foi enviado para `origin/main`: `11d3556` (alertas compactos) e `cc9828b` (contratação por link e Asaas sandbox). O Git estava sincronizado e sem alterações pendentes após o envio. O `.env` local e os relatórios não foram incluídos.
+
+A primeira tentativa de produção de `cc9828b` foi bloqueada pela Vercel com `Deployment was blocked`. O usuário informou que o repositório privado era a causa e o tornou público. A visibilidade **pública** foi confirmada pela API GitHub em 20/10/2026. Esta atualização documental dispara uma nova tentativa de publicação, sem alterar o código validado. Acompanhar o status dessa tentativa antes de configurar o webhook. O endpoint público ainda retornava 404 antes deste novo envio.
+
+As descrições de “mudanças locais” abaixo são o histórico anterior ao envio. A publicação só deve ser considerada concluída depois de conferir o deployment e as respostas HTTP do domínio público.
+
 ## Estado atual confirmado
 
 - Os SQLs 22/23/24 estão presentes no Supabase remoto: tabelas/colunas consultadas pela API e bucket privado de PDF conferidos. A consulta de metadados também encontrou as 13 RPCs esperadas pelo servidor. Não houve alteração de registros remotos nesta conferência.
