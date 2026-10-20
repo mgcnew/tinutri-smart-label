@@ -1,6 +1,6 @@
 # Passagem de contexto para Claude Code
 
-**Leia primeiro o [documento 26](26-publicacao-e-conferencia-asaas.md):** o banco novo já foi aplicado pelo usuário e conferido pela API; boleto e cartão também passaram no sandbox. Há consulta ao Asaas pelo Master e setup automático do webhook. A publicação na Vercel e a conta de assinatura continuam pendentes. Os estados iniciais abaixo são históricos.
+**Leia primeiro o [documento 26](26-publicacao-e-conferencia-asaas.md):** o banco novo já foi aplicado pelo usuário e conferido pela API; boleto e cartão também passaram no sandbox. Há consulta ao Asaas pelo Master e setup automático do webhook. A publicação na Vercel e a configuração do webhook sandbox foram concluídas. Conta de assinatura e fluxo externo completo continuam pendentes. Os estados iniciais abaixo são históricos.
 
 Atualizado em 20/10/2026.
 

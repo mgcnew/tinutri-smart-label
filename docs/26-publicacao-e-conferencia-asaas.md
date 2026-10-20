@@ -2,6 +2,23 @@
 
 Atualizado em **20/10/2026**, após o usuário aplicar os SQLs e pedir continuidade.
 
+## Publicação concluída e webhook configurado
+
+A nova tentativa foi concluída com sucesso na Vercel após o usuário tornar o repositório público. O deployment de `22aa693` publicou o código de contratação de `cc9828b` em `https://labeltinutri.vercel.app`.
+
+Conferências públicas realizadas:
+
+- Home e `/contratar`: **HTTP 200**, também abertas em Chromium sem erros JavaScript.
+- Webhook com token inválido: **HTTP 401**.
+- Webhook autenticado com um identificador financeiro fictício, sem vínculo: **HTTP 200 / ignored** após consultar o Supabase. Nenhum registro financeiro ou usuário foi alterado.
+- `npm run asaas:webhook -- --apply`: configuração sandbox criada com sucesso. A consulta posterior confirmou a URL correta, `enabled=true`, `interrupted=false`, entrega sequencial e os nove eventos financeiros esperados.
+
+O ID da configuração está preservado em `integration-state.local/asaas-webhook.json`; o estado da publicação está em `integration-state.local/deployment-status.json`. Nenhuma chave ou token foi versionado. Os provedores de assinatura/criação de cobrança e a ativação permanecem desligados conforme o ambiente preparado; o receptor autenticado está disponível independentemente da flag de novas cobranças.
+
+A instalação da integração Vercel nesta conversa não foi necessária para esse deploy: foi usada a publicação automática vinculada ao GitHub, depois que o usuário configurou as variáveis na hospedagem. Não repetir o bloqueio anterior como se ainda estivesse ativo.
+
+**Ainda pendente:** configurar a conta Clicksign sandbox e homologar um contrato com as duas assinaturas, pagamento e acompanhamento do evento real enviado pelo Asaas. O teste HTTP autenticado acima valida o receptor, mas não equivale à conferência de uma entrega do provedor nos Logs de Webhooks. Nenhuma assinatura ou pagamento foi forjado para uma empresa real; produção do cliente e liberação de acesso continuam como etapas posteriores.
+
 ## Registro de publicação — atualização mais recente
 
 O código foi enviado para `origin/main`: `11d3556` (alertas compactos) e `cc9828b` (contratação por link e Asaas sandbox). O Git estava sincronizado e sem alterações pendentes após o envio. O `.env` local e os relatórios não foram incluídos.
