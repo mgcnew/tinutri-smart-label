@@ -18,7 +18,14 @@
     "test:alerts": "node --experimental-strip-types --test tests/alert-plan.test.ts",
     "test:digest": "node --experimental-strip-types --test tests/digest.test.ts",
     "test:dashboard": "node --experimental-strip-types --test tests/dashboard.test.ts",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:contracting": "node --experimental-strip-types --test tests/contracting.test.ts tests/contracting-sql.test.mjs tests/contracting-webhook.test.ts tests/contracting-activation.test.ts tests/contracting-activation-sql.test.mjs tests/contracting-provider.test.ts tests/contracting-asaas.test.ts tests/contracting-asaas-sql.test.mjs tests/contracting-asaas-setup.test.ts",
+    "test:contracting:browser": "playwright test --config tests/browser/contracting.playwright.config.ts",
+    "sql:contracting": "node scripts/prepare-contracting-sql.mjs",
+    "asaas:check": "node --experimental-strip-types scripts/check-asaas-sandbox.mjs",
+    "asaas:webhook": "node --experimental-strip-types scripts/setup-asaas-webhook.mjs",
+    "supabase:contracting:check": "node scripts/check-contracting-supabase.mjs",
+    "asaas:resume": "node --experimental-strip-types scripts/resume-asaas-sandbox.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -63,6 +70,7 @@
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.575.0",
+    "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-day-picker": "^9.14.0",
@@ -79,8 +87,10 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "@eslint/js": "^9.32.0",
     "@lovable.dev/vite-tanstack-config": "2.23.1",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

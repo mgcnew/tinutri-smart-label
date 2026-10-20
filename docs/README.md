@@ -20,16 +20,15 @@ A consulta sob demanda das quatro listas está em [Paginação das listas](14-pa
 
 ## Leitura sugerida
 
-| Documento | Conteúdo |
-| --- | --- |
-| [Arquitetura e estrutura](01-arquitetura.md) | Tecnologias, organização, rotas, execução, integrações e configuração |
-| [Funcionalidades e regras](02-funcionalidades.md) | Perfis, cadastros, emissão, impressão, PVPS, histórico e jornadas |
-| [Design system](03-design-system.md) | Identidade, tokens, tipografia, componentes, responsividade e acessibilidade |
-| [Banco de dados](04-banco-de-dados.md) | Dicionário das dez tabelas, relacionamentos, enums, RLS, funções e migrações |
-| [Diagnóstico e pontos de atenção](05-diagnostico.md) | Problemas encontrados, evidências, impactos e prioridades sugeridas |
+| Documento                                              | Conteúdo                                                                                    |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| [Arquitetura e estrutura](01-arquitetura.md)           | Tecnologias, organização, rotas, execução, integrações e configuração                       |
+| [Funcionalidades e regras](02-funcionalidades.md)      | Perfis, cadastros, emissão, impressão, PVPS, histórico e jornadas                           |
+| [Design system](03-design-system.md)                   | Identidade, tokens, tipografia, componentes, responsividade e acessibilidade                |
+| [Banco de dados](04-banco-de-dados.md)                 | Dicionário das dez tabelas, relacionamentos, enums, RLS, funções e migrações                |
+| [Diagnóstico e pontos de atenção](05-diagnostico.md)   | Problemas encontrados, evidências, impactos e prioridades sugeridas                         |
 | [Saída do Lovable e migração](06-migracao-supabase.md) | Dependências, dados a preservar, autenticação, infraestrutura e roteiro para futura decisão |
-| [Verificação e limites](07-verificacao.md) | Comandos executados, resultados, cobertura e o que exige validação posterior |
-
+| [Verificação e limites](07-verificacao.md)             | Comandos executados, resultados, cobertura e o que exige validação posterior                |
 
 A preparação comercial do SaaS está em [Assinaturas e contratos](19-assinaturas-contratos.md), com preços por período, gestão de adesão, minutas e SQL de ativação.
 
@@ -61,3 +60,13 @@ O README original e o plano em `.lovable/plan` foram usados como referências hi
 O fluxo de geração do documento completo e as referências pesquisadas estão em [Gerador de contratos](20-gerador-contratos.md).
 
 A consolidação do menu operacional, avisos e fluxos de etiquetas está em [Estação principal: navegação](21-estacao-navegacao.md).
+
+O fluxo de contratação por link e as integrações pendentes estão em [Contratação por link](22-contratacao-por-link.md). Para continuar em outro agente, use [Passagem de contexto para Claude Code](23-continuar-no-claude-code.md).
+
+A continuação do fluxo, com fila de ativação, recuperação de falhas e SQL 23, está em [Ativação e confiabilidade](24-ativacao-e-confiabilidade.md).
+
+O [pacote SQL manual](sql/README.md) pode ser gerado sem conexão com o banco e inclui a ordem de instalação e consultas de conferência antes/depois.
+
+A integração inicial com a chave de teste, as configurações e o que falta para produção estão em [Asaas sandbox](25-asaas-sandbox.md).
+
+O estado mais recente, com consulta financeira no Master, confirmação dos três métodos em sandbox e preparação da publicação na Vercel, está em [Publicação e conferência Asaas](26-publicacao-e-conferencia-asaas.md).

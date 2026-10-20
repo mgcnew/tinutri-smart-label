@@ -1,3 +1,4 @@
+import { ContractOfferModal } from "./ContractOfferModal";
 import { ContractEditor } from "./ContractEditor";
 import { useCallback, useState } from "react";
 import { Download, FileText, Plus, Printer } from "lucide-react";
@@ -28,6 +29,7 @@ export function ContractsPanel({
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [editing, setEditing] = useState<ServiceContract | null | undefined>(undefined);
+  const [offering, setOffering] = useState<ServiceContract | null>(null);
   const [notice, setNotice] = useState("");
   const term = useDebouncedValue(search.trim());
   const load = useCallback(
@@ -54,7 +56,7 @@ export function ContractsPanel({
     <section className="space-y-6">
       <Heading
         title="Contratos"
-        description="Minutas e condições comerciais por empresa. O aceite e a assinatura eletrônica ainda não estão disponíveis."
+        description="Prepare o documento, compartilhe a contratação por link e acompanhe a formalização."
         action={
           <Button className="dashboard-primary" onClick={() => setEditing(null)}>
             <Plus />
@@ -126,6 +128,9 @@ export function ContractsPanel({
                 {displayDate(row.updated_at)}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => setOffering(row)}>
+                  Contratação por link
+                </Button>
                 <Button variant="outline" onClick={() => setEditing(row)}>
                   Abrir e revisar
                 </Button>
@@ -158,6 +163,7 @@ export function ContractsPanel({
         onPageChange={listing.setPage}
         onSizeChange={listing.setSize}
       />
+      {offering && <ContractOfferModal contract={offering} onClose={() => setOffering(null)} />}
       {editing !== undefined && (
         <ContractEditor
           record={editing}

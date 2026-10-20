@@ -11,11 +11,14 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as ContratarRouteImport } from './routes/contratar'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SistemaRouteImport } from './routes/sistema'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ECodeRouteImport } from './routes/e.$code'
 import { Route as LabelTokenRouteImport } from './routes/label.$token'
+import { Route as ApiWebhooksAsaasRouteImport } from './routes/api.webhooks.asaas'
+import { Route as ApiWebhooksClicksignRouteImport } from './routes/api.webhooks.clicksign'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -25,6 +28,11 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContratarRoute = ContratarRouteImport.update({
+  id: '/contratar',
+  path: '/contratar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -52,73 +60,104 @@ const LabelTokenRoute = LabelTokenRouteImport.update({
   path: '/label/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWebhooksAsaasRoute = ApiWebhooksAsaasRouteImport.update({
+  id: '/api/webhooks/asaas',
+  path: '/api/webhooks/asaas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWebhooksClicksignRoute = ApiWebhooksClicksignRouteImport.update({
+  id: '/api/webhooks/clicksign',
+  path: '/api/webhooks/clicksign',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/contratar': typeof ContratarRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sistema': typeof SistemaRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/e/$code': typeof ECodeRoute
   '/label/$token': typeof LabelTokenRoute
+  '/api/webhooks/asaas': typeof ApiWebhooksAsaasRoute
+  '/api/webhooks/clicksign': typeof ApiWebhooksClicksignRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/contratar': typeof ContratarRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sistema': typeof SistemaRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/e/$code': typeof ECodeRoute
   '/label/$token': typeof LabelTokenRoute
+  '/api/webhooks/asaas': typeof ApiWebhooksAsaasRoute
+  '/api/webhooks/clicksign': typeof ApiWebhooksClicksignRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/contratar': typeof ContratarRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sistema': typeof SistemaRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/e/$code': typeof ECodeRoute
   '/label/$token': typeof LabelTokenRoute
+  '/api/webhooks/asaas': typeof ApiWebhooksAsaasRoute
+  '/api/webhooks/clicksign': typeof ApiWebhooksClicksignRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/admin'
+    | '/contratar'
     | '/reset-password'
     | '/sistema'
     | '/sitemap.xml'
     | '/e/$code'
     | '/label/$token'
+    | '/api/webhooks/asaas'
+    | '/api/webhooks/clicksign'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/admin'
+    | '/contratar'
     | '/reset-password'
     | '/sistema'
     | '/sitemap.xml'
     | '/e/$code'
     | '/label/$token'
+    | '/api/webhooks/asaas'
+    | '/api/webhooks/clicksign'
   id:
     | '__root__'
     | '/'
     | '/admin'
+    | '/contratar'
     | '/reset-password'
     | '/sistema'
     | '/sitemap.xml'
     | '/e/$code'
     | '/label/$token'
+    | '/api/webhooks/asaas'
+    | '/api/webhooks/clicksign'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  ContratarRoute: typeof ContratarRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SistemaRoute: typeof SistemaRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ECodeRoute: typeof ECodeRoute
   LabelTokenRoute: typeof LabelTokenRoute
+  ApiWebhooksAsaasRoute: typeof ApiWebhooksAsaasRoute
+  ApiWebhooksClicksignRoute: typeof ApiWebhooksClicksignRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -135,6 +174,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contratar': {
+      id: '/contratar'
+      path: '/contratar'
+      fullPath: '/contratar'
+      preLoaderRoute: typeof ContratarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -172,17 +218,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LabelTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/webhooks/asaas': {
+      id: '/api/webhooks/asaas'
+      path: '/api/webhooks/asaas'
+      fullPath: '/api/webhooks/asaas'
+      preLoaderRoute: typeof ApiWebhooksAsaasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/webhooks/clicksign': {
+      id: '/api/webhooks/clicksign'
+      path: '/api/webhooks/clicksign'
+      fullPath: '/api/webhooks/clicksign'
+      preLoaderRoute: typeof ApiWebhooksClicksignRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  ContratarRoute: ContratarRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SistemaRoute: SistemaRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ECodeRoute: ECodeRoute,
   LabelTokenRoute: LabelTokenRoute,
+  ApiWebhooksAsaasRoute: ApiWebhooksAsaasRoute,
+  ApiWebhooksClicksignRoute: ApiWebhooksClicksignRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

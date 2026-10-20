@@ -60,3 +60,7 @@ Validação do refinamento: TypeScript, lint e build aprovados; navegador com AP
 ## Evolução do gerador
 
 O roteiro inicial de texto foi substituído pelo [gerador de contratos](20-gerador-contratos.md), com condições, dados opcionais da TiNutri, prévia integral e impressão/PDF pelo navegador. Registros anteriores são preservados. Continua sem exigir SQL além do script 19.
+
+## Contratação por link (20/10/2026)
+
+A próxima etapa foi preparada em [Contratação por link](22-contratacao-por-link.md), com página pública, cópias imutáveis, adaptador de assinatura e SQL 22. Assinatura real depende da conta/homologação; pagamento e ativação automática aguardam o Asaas. O comportamento manual descrito acima continua existente.

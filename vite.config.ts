@@ -5,6 +5,15 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { loadEnvFile } from "node:process";
+
+// Preserve literal $ in server secrets (e.g. Asaas keys) before Vite's dotenv expansion.
+// Existing hosting variables take precedence; production still uses the host's secret settings.
+try {
+  loadEnvFile(".env");
+} catch (error) {
+  if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+}
 
 export default defineConfig({
   vite: {

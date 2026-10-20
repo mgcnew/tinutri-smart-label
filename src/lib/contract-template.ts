@@ -1,6 +1,6 @@
 import { billingPlan, displayDate, money } from "./billing.ts";
 
-export const CONTRACT_TEMPLATE_VERSION = "TiNutri SaaS · modelo 1.0 · 16/10/2026";
+export const CONTRACT_TEMPLATE_VERSION = "TiNutri SaaS · modelo 1.1 · 20/10/2026";
 export type ContractCompany = {
   name: string;
   legal_name: string | null;
@@ -24,6 +24,7 @@ export type ContractProvider = {
 };
 export type ContractTerms = {
   startsOn: string;
+  startOnActivation?: boolean;
   firstDueOn: string;
   payment: "a_definir" | "pix" | "boleto" | "cartao";
   renewal: "manual" | "automatica";
@@ -41,6 +42,7 @@ export const EMPTY_PROVIDER: ContractProvider = {
 };
 export const EMPTY_TERMS: ContractTerms = {
   startsOn: "",
+  startOnActivation: false,
   firstDueOn: "",
   payment: "a_definir",
   renewal: "manual",
@@ -99,8 +101,8 @@ Contato: ${fill(provider.email, "e-mail da TiNutri")} · ${fill(provider.phone, 
 Plano: ${plan.name}. Período contratado: ${plan.months} ${plan.months === 1 ? "mês" : "meses"}.
 Preço mensal equivalente: ${money(plan.monthlyCents)}. Valor total por ciclo: ${money(plan.monthlyCents * plan.months)}.
 O valor mensal equivalente é uma referência de comparação; a cobrança prevista é pelo total de cada ciclo, sem parcelamento presumido.
-Início da vigência: ${date(terms.startsOn, "data de início da vigência")}.
-Primeiro vencimento: ${date(terms.firstDueOn, "primeiro vencimento")}. Forma de pagamento: ${payment}.
+Início da vigência: ${terms.startOnActivation ? "na ativação do acesso, após conclusão das assinaturas e confirmação do primeiro pagamento" : date(terms.startsOn, "data de início da vigência")}.
+Primeiro vencimento: ${terms.startOnActivation ? "conforme a cobrança disponibilizada após a assinatura, antes da ativação" : date(terms.firstDueOn, "primeiro vencimento")}. Forma de pagamento: ${payment}.
 Renovação: ${terms.renewal === "manual" ? "mediante nova confirmação das partes, sem renovação automática" : "automática por períodos iguais, mediante informação prévia das condições da próxima renovação e possibilidade de cancelamento antes do novo ciclo"}.
 Suporte: ${fill(terms.supportChannel, "canal de suporte")}.
 Atendimento: ${fill(terms.supportHours, "dias e horários de suporte")}.
@@ -158,7 +160,7 @@ Prazo para solicitar exportação após o encerramento: ${terms.exportDays ? `${
 10.3. Este texto é um modelo inicial para revisão jurídica e comercial. Campos pendentes e condições do quadro resumo devem ser completados e aprovados antes do uso como instrumento definitivo.
 
 LOCAL, DATA E ASSINATURAS
-Local: ${company.city}/${company.state}. Data: [PENDENTE: data da formalização].
+Local: ${company.city}/${company.state}. Data: ${terms.startOnActivation ? "registrada na conclusão das assinaturas eletrônicas" : "[PENDENTE: data da formalização]"}.
 
 Pela contratante: ${fill(company.responsible_name, "representante da contratante")}
 Assinatura: _______________________________________________

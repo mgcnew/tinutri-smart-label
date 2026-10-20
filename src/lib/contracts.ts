@@ -16,6 +16,7 @@ export type ServiceContract = {
   status: keyof typeof CONTRACT_STATUS;
   company_snapshot: Json;
   plan_snapshot: Json;
+  commercial_snapshot?: Json | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -25,8 +26,11 @@ type ContractsDatabase = Omit<Database, "public"> & {
     Tables: Database["public"]["Tables"] & {
       service_contracts: {
         Row: ServiceContract;
-        Insert: Pick<ServiceContract, "client_id" | "title" | "body" | "status">;
-        Update: Partial<Pick<ServiceContract, "title" | "body" | "status">>;
+        Insert: Pick<
+          ServiceContract,
+          "client_id" | "title" | "body" | "status" | "commercial_snapshot"
+        >;
+        Update: Partial<Pick<ServiceContract, "title" | "body" | "status" | "commercial_snapshot">>;
         Relationships: [];
       };
     };

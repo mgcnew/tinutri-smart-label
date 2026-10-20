@@ -52,3 +52,7 @@ A impressão abre uma janela própria com o conteúdo escapado, sem carregar dad
 Testes de geração com dados empresariais e condições, pendências sem dados inventados, preservação dos valores por ciclo, limite do corpo, rejeição de planos legados e escape de HTML na impressão. TypeScript, lint e build de produção. Ensaios de navegador usam somente APIs simuladas; não criam contratos nem cobranças no banco remoto.
 
 No navegador, foram conferidos formulário e prévia em 320, 375, 768 e 1440 px, preenchimento empresarial, dez grupos de cláusulas, marcadores da prestadora, edição e retorno à prévia, conteúdo da janela de impressão, salvamento com falha sem perda e reabertura da minuta salva. A identificação do documento fica recolhida para priorizar a leitura do contrato. As condições comerciais não são reconstruídas a partir do texto ao reabrir um documento; a revisão de minutas salvas utiliza o editor livre.
+
+## Evolução para contratação por link (20/10/2026)
+
+O modelo 1.1 permite início na ativação, após assinatura e pagamento, e registra condições estruturadas na minuta. A publicação por link exige esses dados e ausência de marcadores pendentes. Requer o SQL 22, além do SQL 19. Veja [Contratação por link](22-contratacao-por-link.md) e [Passagem de contexto](23-continuar-no-claude-code.md).

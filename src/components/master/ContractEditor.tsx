@@ -15,6 +15,7 @@ import {
   type ContractTerms,
   type ContractProvider,
 } from "@/lib/contract-template";
+import type { CommercialSnapshot } from "@/lib/contracting/domain";
 import { MasterModal, Field, Feedback, SaveButton } from "./Shared";
 import { RemoteSelect } from "./RemoteSelect";
 
@@ -34,7 +35,10 @@ export function ContractEditor({
   const [title, setTitle] = useState(record?.title ?? "");
   const [body, setBody] = useState(record?.body ?? "");
   const [status, setStatus] = useState<ServiceContract["status"]>(record?.status ?? "rascunho");
-  const [terms, setTerms] = useState<ContractTerms>({ ...EMPTY_TERMS });
+  const [commercial, setCommercial] = useState<CommercialSnapshot | null>(
+    (record?.commercial_snapshot as CommercialSnapshot | null) ?? null,
+  );
+  const [terms, setTerms] = useState<ContractTerms>({ ...EMPTY_TERMS, startOnActivation: true });
   const [provider, setProvider] = useState<ContractProvider>({ ...EMPTY_PROVIDER });
   const [step, setStep] = useState<"condicoes" | "previa" | "texto">(
     record ? "previa" : "condicoes",
@@ -48,6 +52,7 @@ export function ContractEditor({
     if (record) return;
     setCompany(null);
     setBody("");
+    setCommercial(null);
     setTitle("");
     setError("");
     if (!client) {
@@ -89,6 +94,22 @@ export function ContractEditor({
     if (!company || busy || loading) return;
     try {
       setBody(contractDraft(company, terms, provider));
+      const selected = billingPlan(company.plan)!;
+      setCommercial(
+        terms.startOnActivation && terms.payment !== "a_definir"
+          ? {
+              start: "activation",
+              payment: terms.payment,
+              renewal: terms.renewal,
+              plan: {
+                cycle: company.plan as CommercialSnapshot["plan"]["cycle"],
+                months: selected.months,
+                monthly_cents: selected.monthlyCents,
+                total_cents: selected.monthlyCents * selected.months,
+              },
+            }
+          : null,
+      );
       setStep("previa");
       setError("");
     } catch (e) {
@@ -105,7 +126,12 @@ export function ContractEditor({
     setBusy(true);
     setError("");
     try {
-      const payload = { title: title.trim(), body: body.trim(), status };
+      const payload = {
+        title: title.trim(),
+        body: body.trim(),
+        status,
+        commercial_snapshot: commercial,
+      };
       const query = record
         ? contracts
             .from("service_contracts")
@@ -248,10 +274,28 @@ export function ContractEditor({
                   </div>
                   <section className="space-y-4">
                     <h3 className="font-semibold">Condições comerciais</h3>
+                    <label className="flex items-start gap-3 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-1 size-4 shrink-0"
+                        checked={Boolean(terms.startOnActivation)}
+                        onChange={(e) =>
+                          setTerms({ ...terms, startOnActivation: e.target.checked })
+                        }
+                      />
+                      <span>
+                        Iniciar o período de uso após assinatura e pagamento.
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          Necessário para contratar por link. A primeira cobrança será apresentada
+                          após a assinatura.
+                        </span>
+                      </span>
+                    </label>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <Field label="Início da vigência">
                         <input
                           type="date"
+                          disabled={terms.startOnActivation}
                           value={terms.startsOn}
                           onChange={(e) => setTerms({ ...terms, startsOn: e.target.value })}
                         />
@@ -259,6 +303,7 @@ export function ContractEditor({
                       <Field label="Primeiro vencimento">
                         <input
                           type="date"
+                          disabled={terms.startOnActivation}
                           value={terms.firstDueOn}
                           onChange={(e) => setTerms({ ...terms, firstDueOn: e.target.value })}
                         />
@@ -460,8 +505,8 @@ export function ContractEditor({
                 </Field>
               )}
               <p className="text-xs text-muted-foreground">
-                Minuta para revisão. Salvar ou imprimir não registra aceite, assinatura ou
-                pagamento.
+                Minuta para revisão. Para contratar por link, salve e use “Contratação por link” na
+                lista. Salvar ou imprimir não registra aceite, assinatura ou pagamento.
                 {record
                   ? " Os dados de origem foram preservados na criação; edições no cadastro não alteram este documento."
                   : ""}
