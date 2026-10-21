@@ -368,3 +368,41 @@ test("conferência não aceita contrato diferente do vínculo financeiro", async
   assert.equal(result.status, 409);
   assert.deepEqual(h.calls, []);
 });
+
+test("estorno parcial concluído impede confirmar o valor original", async () => {
+  const h = harness();
+  h.ports.payment = async () => ({
+    ...payment,
+    value: 548.8,
+    refunds: [{ value: 50, status: "DONE" }],
+  });
+  await handleAsaasWebhook(h.request(), token, h.ports);
+  assert.deepEqual(h.calls, ["invalidate"]);
+});
+test("estorno em andamento invalida a prova sem afirmar devolução concluída", async () => {
+  const h = harness();
+  h.ports.payment = async () => ({ ...payment, refunds: [{ value: 50, status: "PENDING" }] });
+  await handleAsaasWebhook(h.request(), token, h.ports);
+  assert.deepEqual(h.calls, ["invalidate"]);
+});
+test("estorno cancelado não é tratado como valor devolvido", async () => {
+  const h = harness();
+  h.ports.payment = async () => ({ ...payment, refunds: [{ value: 50, status: "CANCELLED" }] });
+  await handleAsaasWebhook(h.request(), token, h.ports);
+  assert.deepEqual(h.calls, ["confirm"]);
+});
+test("status de estorno desconhecido exige revisão antes de confirmar", async () => {
+  const h = harness();
+  h.ports.payment = async () => ({ ...payment, refunds: [{ value: 50, status: "UNKNOWN" }] });
+  assert.equal((await handleAsaasWebhook(h.request(), token, h.ports)).status, 409);
+  assert.deepEqual(h.calls, []);
+});
+test("cobrança conhecida não encontrada na conta correta invalida a prova anterior", async () => {
+  const { AsaasApiError } = await import("../src/lib/contracting/asaas.server.ts");
+  const h = harness();
+  h.ports.payment = async () => {
+    throw new AsaasApiError(404);
+  };
+  await handleAsaasWebhook(h.request(), token, h.ports);
+  assert.deepEqual(h.calls, ["invalidate"]);
+});

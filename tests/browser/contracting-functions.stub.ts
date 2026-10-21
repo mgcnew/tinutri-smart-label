@@ -153,3 +153,33 @@ export async function manageOffer({ data }: { data: { action: string } }) {
   }
   return { link: "http://localhost:8083/contratar#" + "b".repeat(43) };
 }
+
+const notifications: import("../../src/lib/contracting/notification-domain").PaymentNotification[] =
+  Array.from({ length: 21 }, (_, i) => ({
+    id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+    event_type: i === 0 ? "PAYMENT_RECEIVED" : "PAYMENT_REFUNDED",
+    status: i === 0 ? "pending" : "completed",
+    result_code: i === 0 ? "retry" : "invalidated",
+    attempts: 1,
+    deliveries: 1,
+    received_at: "2026-10-21T12:00:00Z",
+    updated_at: "2026-10-21T12:00:00Z",
+    locked_until: null,
+  }));
+export async function listPaymentNotifications({ data }: { data: { page: number } }) {
+  if (scenario === "notifications-missing") return { installed: false, rows: [], total: 0 };
+  return {
+    installed: true,
+    rows: structuredClone(notifications.slice(data.page * 10, data.page * 10 + 10)),
+    total: notifications.length,
+  };
+}
+export async function retryPaymentNotification({ data }: { data: { id: string } }) {
+  if (scenario === "notifications-failure")
+    throw new Error("Serviço temporariamente indisponível.");
+  const row = notifications.find((item) => item.id === data.id)!;
+  row.status = "completed";
+  row.result_code = "confirmed_sandbox";
+  row.attempts++;
+  return { state: "completed" };
+}

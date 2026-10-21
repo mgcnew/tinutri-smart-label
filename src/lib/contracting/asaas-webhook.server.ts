@@ -1,10 +1,52 @@
 import { asaasWebhookReady, asaasConfig, asaasGetPayment, asaasWallet } from "./asaas.server";
 import {
-  handleAsaasWebhook,
+  handleAsaasEvent,
   verifyBoundAsaasPayment,
   type AsaasWebhookPorts,
 } from "./asaas-webhook-handler.server";
 import { offerDb, loadOffer, event } from "./store.server";
+import { waitUntil } from "@vercel/functions";
+import {
+  receiveQueuedAsaas,
+  processInboxJob,
+  type InboxPorts,
+  type InboxClaim,
+} from "./webhook-queue.server";
+
+export const inboxPorts: InboxPorts = {
+  enqueue: async (payload, hash) => {
+    const { data, error } = await offerDb
+      .rpc("enqueue_contract_webhook", {
+        p_event: payload.id,
+        p_type: payload.event,
+        p_payment: payload.payment.id,
+        p_reference: payload.payment.externalReference ?? null,
+        p_hash: hash,
+      })
+      .abortSignal(AbortSignal.timeout(6_000));
+    if (error?.code === "PGRST202") return null;
+    if (error) throw new Error("Não foi possível preservar a notificação.");
+    return data;
+  },
+  claim: async (id, actor) => {
+    const { data, error } = await offerDb.rpc("claim_contract_webhook", {
+      p_id: id,
+      p_actor: actor ?? null,
+    });
+    if (error) throw new Error("Não foi possível reservar a notificação.");
+    return data as InboxClaim | null;
+  },
+  finish: async (claim, status, result) => {
+    const { error } = await offerDb.rpc("finish_contract_webhook", {
+      p_id: claim.id,
+      p_token: claim.worker_token,
+      p_status: status,
+      p_result: result,
+    });
+    if (error) throw new Error("Não foi possível preservar o resultado da notificação.");
+  },
+  verify: (payload) => handleAsaasEvent(payload, ports),
+};
 
 const ports: AsaasWebhookPorts = {
   binding: async (paymentId) => {
@@ -45,8 +87,11 @@ const ports: AsaasWebhookPorts = {
 };
 export function receiveAsaas(request: Request) {
   if (!asaasWebhookReady()) return Response.json({ state: "unconfigured" }, { status: 503 });
-  return handleAsaasWebhook(request, process.env.ASAAS_WEBHOOK_TOKEN, ports);
+  return receiveQueuedAsaas(request, process.env.ASAAS_WEBHOOK_TOKEN, inboxPorts, waitUntil);
 }
+
+export const retryAsaasNotification = (id: string, actor: string) =>
+  processInboxJob(id, inboxPorts, actor);
 
 /** Called only after server-side Master authorization. Does not create or repeat a payment. */
 export async function checkOfferPayment(offerId: string, actor: string) {

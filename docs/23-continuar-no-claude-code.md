@@ -1,3 +1,5 @@
+> Atualização mais recente: ler primeiro `docs/27-fila-e-estornos-asaas.md`. SQL 25 e entrega real de evento na nova fila ainda precisam de confirmação remota.
+
 # Passagem de contexto para Claude Code
 
 **Leia primeiro o [documento 26](26-publicacao-e-conferencia-asaas.md):** o banco novo já foi aplicado pelo usuário e conferido pela API; boleto e cartão também passaram no sandbox. Há consulta ao Asaas pelo Master e setup automático do webhook. A publicação na Vercel e a configuração do webhook sandbox foram concluídas. Conta de assinatura e fluxo externo completo continuam pendentes. Os estados iniciais abaixo são históricos.

@@ -86,3 +86,41 @@ export const checkPayment = createServerFn({ method: "POST" })
     const { checkOfferPayment } = await import("./asaas-webhook.server");
     return checkOfferPayment(data.id, context.userId);
   });
+
+export const listPaymentNotifications = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({ page: z.number().int().min(0).max(10000) }))
+  .handler(async ({ data, context }) => {
+    privateResponse();
+    const { requireMaster } = await import("./store.server");
+    await requireMaster(context.supabase, context.userId);
+    const result = await context.supabase
+      .from("contract_webhook_inbox" as never)
+      .select(
+        "id,event_type,status,result_code,attempts,deliveries,received_at,updated_at,locked_until",
+        { count: "exact" },
+      )
+      .order("received_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(data.page * 10, data.page * 10 + 9);
+    if (result.error?.code === "PGRST205" || result.error?.code === "42P01")
+      return { installed: false, rows: [], total: 0 };
+    if (result.error || result.count === null)
+      throw new Error("Não foi possível consultar as notificações.");
+    return {
+      installed: true,
+      rows: result.data as unknown as import("./notification-domain").PaymentNotification[],
+      total: result.count,
+    };
+  });
+
+export const retryPaymentNotification = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    privateResponse();
+    const { requireMaster } = await import("./store.server");
+    await requireMaster(context.supabase, context.userId);
+    const { retryAsaasNotification } = await import("./asaas-webhook.server");
+    return retryAsaasNotification(data.id, context.userId);
+  });

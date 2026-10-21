@@ -38,6 +38,7 @@ try {
     ["contract_payment_confirmations", "offer_id"],
     ["contract_activation_jobs", "offer_id"],
     ["contract_payment_checkouts", "offer_id"],
+    ["contract_webhook_inbox", "id,event_type,status,attempts"],
   ];
   const checks = await Promise.all(
     tables.map(async ([table, columns]) => {
@@ -104,6 +105,9 @@ try {
     "save_contract_checkout",
     "block_contract_checkout",
     "invalidate_sandbox_contract_payment",
+    "enqueue_contract_webhook",
+    "claim_contract_webhook",
+    "finish_contract_webhook",
   ];
   for (const name of routines) {
     const path = `/rpc/${name}`;

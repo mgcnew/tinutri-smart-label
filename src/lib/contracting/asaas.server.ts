@@ -19,6 +19,14 @@ export function asaasWebhookReady() {
 export function asaasAvailable() {
   return process.env.CONTRACT_PAYMENT_PROVIDER === "asaas" && asaasWebhookReady();
 }
+export class AsaasApiError extends Error {
+  readonly status: number;
+  constructor(status: number) {
+    super(`O Asaas não concluiu a operação (HTTP ${status}).`);
+    this.name = "AsaasApiError";
+    this.status = status;
+  }
+}
 export async function asaasRequest(path: string, method = "GET", body?: unknown): Promise<unknown> {
   const config = asaasConfig();
   if (!path.startsWith("/") || path.startsWith("//")) throw new Error("Recurso Asaas inválido.");
@@ -41,7 +49,7 @@ export async function asaasRequest(path: string, method = "GET", body?: unknown)
       "Não foi possível confirmar a resposta do Asaas. A operação precisa de revisão.",
     );
   }
-  if (!response.ok) throw new Error(`O Asaas não concluiu a operação (HTTP ${response.status}).`);
+  if (!response.ok) throw new AsaasApiError(response.status);
   return response.json();
 }
 const resourceId = z.string().regex(/^[A-Za-z0-9_-]{3,100}$/);
@@ -53,11 +61,14 @@ export const asaasPaymentSchema = z.object({
   id: resourceId,
   customer: resourceId,
   externalReference: z.string().nullable(),
-  value: z.number().finite().positive(),
-  billingType: z.enum(["PIX", "BOLETO", "CREDIT_CARD"]),
+  value: z.number().finite().nonnegative(),
+  billingType: z.enum(["PIX", "BOLETO", "CREDIT_CARD", "RECEIVED_IN_CASH", "UNDEFINED"]),
   status: z.string(),
   deleted: z.boolean().optional(),
-  invoiceUrl: z.string().url(),
+  invoiceUrl: z.string().url().nullish(),
+  refunds: z
+    .array(z.object({ value: z.number().finite().nonnegative(), status: z.string().optional() }))
+    .nullish(),
   confirmedDate: z.string().nullable().optional(),
   paymentDate: z.string().nullable().optional(),
 });
@@ -130,8 +141,9 @@ export async function asaasCreatePayment(input: {
     payment.deleted
   )
     throw new Error("A cobrança retornada pelo Asaas diverge da contratação.");
+  if (!payment.invoiceUrl) throw new Error("O Asaas não retornou a fatura para pagamento.");
   asaasInvoiceUrl(payment.invoiceUrl);
-  return payment;
+  return { ...payment, invoiceUrl: payment.invoiceUrl };
 }
 export async function asaasGetPayment(id: string) {
   resourceId.parse(id);

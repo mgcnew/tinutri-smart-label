@@ -1,3 +1,5 @@
+> Atualização de 21/10/2026: nova conferência de leitura confirmou as estruturas 22–24, mas a tabela `contract_webhook_inbox` e suas três RPCs ainda não estão expostas. Executar o SQL 25 incremental e depois a conferência 99 atualizada. O histórico anterior abaixo continua preservado. Roteiro atual: `docs/27-fila-e-estornos-asaas.md`.
+
 # Conferência remota antes da instalação
 
 Em **20/10/2026**, a pedido do usuário, foi testada a conexão com o Supabase usando as credenciais locais do servidor, sem exibir os valores. O identificador do projeto corresponde ao frontend. Foram realizadas exclusivamente consultas de leitura da API, com `limit=0`, sem exportar dados de clientes ou usuários.

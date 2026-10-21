@@ -1,3 +1,5 @@
+> Continuidade em 21/10/2026: ler primeiro `docs/27-fila-e-estornos-asaas.md` para a fila, SQL 25 e revisão de estornos. Os registros de bloqueio abaixo são históricos; a publicação e a configuração do webhook foram concluídas.
+
 # Continuidade: publicação e conferência Asaas
 
 Atualizado em **20/10/2026**, após o usuário aplicar os SQLs e pedir continuidade.

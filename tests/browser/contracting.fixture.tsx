@@ -1,4 +1,5 @@
 import React from "react";
+import { PaymentNotifications } from "../../src/components/master/PaymentNotifications";
 import { createRoot } from "react-dom/client";
 import { ContractJourney } from "../../src/components/contracting/ContractJourney";
 import { ContractOfferModal } from "../../src/components/master/ContractOfferModal";
@@ -6,7 +7,9 @@ import { fixture } from "./contracting-functions.stub";
 import "../../src/styles.css";
 const scenario = new URLSearchParams(window.location.search).get("scenario");
 createRoot(document.getElementById("root")!).render(
-  scenario?.startsWith("master") ? (
+  scenario?.startsWith("notifications") ? (
+    <PaymentNotifications />
+  ) : scenario?.startsWith("master") ? (
     <ContractOfferModal
       contract={{
         id: fixture.id,

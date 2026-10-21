@@ -126,3 +126,49 @@ test("divergência financeira exige revisão e não confirma pagamento", async (
     page.getByText("Pagamento de teste confirmado no Asaas.", { exact: false }),
   ).toHaveCount(0);
 });
+
+test("Master consulta notificações paginadas e retoma sem liberar acesso sandbox", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=notifications");
+  await expect(page.getByRole("table")).toHaveCount(0);
+  await page.getByRole("button", { name: "Ver notificações" }).click();
+  await expect(page.locator("tbody tr")).toHaveCount(10);
+  await expect(page.getByText("21 notificação(ões) · Página 1")).toBeVisible();
+  for (const width of [320, 375, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  }
+  await page.getByRole("button", { name: "Retomar", exact: true }).click();
+  await expect(
+    page.getByText("Pagamento de teste confirmado. Nenhum acesso real liberado.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retomar", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Próxima" }).click();
+  await expect(page.getByText("21 notificação(ões) · Página 2")).toBeVisible();
+  await expect(page.locator("tbody tr")).toHaveCount(10);
+  await page.getByRole("button", { name: "Próxima" }).click();
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Próxima" })).toBeDisabled();
+});
+
+test("Master preserva compatibilidade antes do SQL e permite atualizar histórico", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=notifications-missing");
+  await page.getByRole("button", { name: "Ver notificações" }).click();
+  await expect(page.getByText("O histórico será disponibilizado", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Atualizar notificações" }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("falha ao retomar notificação mantém o registro e informa o Master", async ({ page }) => {
+  await page.goto("/?scenario=notifications-failure");
+  await page.getByRole("button", { name: "Ver notificações" }).click();
+  await page.getByRole("button", { name: "Retomar", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Serviço temporariamente indisponível.");
+  await expect(page.locator("tbody tr")).toHaveCount(10);
+  await expect(page.getByRole("button", { name: "Retomar", exact: true })).toBeEnabled();
+});

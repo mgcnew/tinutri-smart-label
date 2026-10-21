@@ -18,6 +18,7 @@ import {
 } from "@/lib/contracts";
 import { Heading, Field, Feedback } from "./Shared";
 import { RemoteSelect } from "./RemoteSelect";
+import { PaymentNotifications } from "./PaymentNotifications";
 export function ContractsPanel({
   initialClient = "",
   revision,
@@ -64,6 +65,7 @@ export function ContractsPanel({
           </Button>
         }
       />
+      <PaymentNotifications />
       <div className="clients-toolbar grid items-end gap-4 rounded-2xl border bg-card p-4 md:grid-cols-3">
         <RemoteSelect label="Empresa" value={client} onChange={setClient} />
         <Field label="Título">

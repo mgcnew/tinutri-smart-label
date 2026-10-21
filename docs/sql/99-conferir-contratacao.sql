@@ -6,7 +6,7 @@ select objeto,
  case when c.oid is not null and c.relrowsecurity then 'OK' else 'AUSENTE OU SEM RLS' end as resultado
 from (values ('public.service_contracts'), ('public.contract_offers'),
  ('public.contract_offer_events'), ('public.contract_signature_receipts'),
- ('public.contract_payment_confirmations'), ('public.contract_activation_jobs'), ('public.contract_payment_checkouts')) as expected(objeto)
+ ('public.contract_payment_confirmations'), ('public.contract_activation_jobs'), ('public.contract_payment_checkouts'), ('public.contract_webhook_inbox')) as expected(objeto)
 left join pg_class c on c.oid=to_regclass(expected.objeto);
 
 select coluna, case when exists (
@@ -33,7 +33,10 @@ from (values
  ('public.claim_contract_checkout(uuid,uuid)'),
  ('public.save_contract_checkout(uuid,uuid,text,text,text)'),
  ('public.block_contract_checkout(uuid,uuid)'),
- ('public.invalidate_sandbox_contract_payment(uuid,text)')
+ ('public.invalidate_sandbox_contract_payment(uuid,text)'),
+ ('public.enqueue_contract_webhook(text,text,text,text,text)'),
+ ('public.claim_contract_webhook(uuid,uuid)'),
+ ('public.finish_contract_webhook(uuid,uuid,text,text)')
 ) as expected(rotina)
 left join pg_proc p on p.oid=to_regprocedure(expected.rotina);
 
