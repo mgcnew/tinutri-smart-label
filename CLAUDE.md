@@ -1,3 +1,5 @@
+> Decisão de 21/10/2026: o usuário desistiu de Autentique e escolheu assinatura própria. Ler `docs/28-assinatura-propria-proposta.md`: é proposta de arquitetura, ainda não implementada. Não retomar integração Autentique ou exigir conta Clicksign como próximo passo. O histórico abaixo descreve a implementação anterior.
+
 # Continuidade do TiNutri Smart Label
 
 Para continuar o fluxo de contratação por link, leia:
