@@ -2,7 +2,7 @@
 
 **Estado atual — 24/10/2026:** assinatura própria implementada localmente, seguindo a proposta aprovada. Ler primeiro `docs/29-assinatura-propria-implementacao.md`. O usuário escolheu Gmail da TiNutri e pediu para configurar a senha de app depois. Não pedir conta Clicksign/Autentique como pré-requisito e não retomar essas integrações para contratos novos.
 
-SQLs 22–26 aplicados no projeto Supabase `ylkiyncsqubuxrtwyxwv` (também é o `project_id` de `supabase/config.toml`); em 26/10/2026 o usuário aplicou o 26 manualmente e a conferência pela API passou em 37/37. A conferência 99 completa (RLS/permissões) no SQL Editor ainda não foi registrada. O código não aplica DDL remoto automaticamente. Não declarar entrega Gmail ou homologação real com base nos testes isolados.
+SQLs 22–26 aplicados no projeto Supabase `ylkiyncsqubuxrtwyxwv` (também é o `project_id` de `supabase/config.toml`); em 26/10/2026 o usuário aplicou o 26 manualmente e a conferência pela API passou em 37/37. A conferência 99 completa (RLS/permissões) no SQL Editor ainda não foi registrada. O código não aplica DDL remoto automaticamente. O SQL 27 (desempenho do `master_summary`) foi criado em 26/10/2026 e ainda aguarda aplicação manual; as funções da Vercel passaram a ser publicadas em `gru1` via `vite.config.ts`. Não declarar entrega Gmail ou homologação real com base nos testes isolados.
 
 A `.env` local contém credenciais reais de Supabase e Asaas sandbox e chaves da assinatura própria; preservar, nunca imprimir nem versionar. O script `signature:setup` preenche ausentes/vazios e preserva segredos; `signature:mail:check` não envia mensagens. O usuário autorizou commit/push anteriormente. Relatórios de testes/publicação ficam em `integration-state.local/`, ignorada pelo Git.
 

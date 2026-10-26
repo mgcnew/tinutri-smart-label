@@ -15,6 +15,13 @@ try {
   if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
 }
 
+// Vercel defaults functions to iad1 (EUA); gru1 keeps SSR and server functions next to Supabase (sa-east-1).
+// Only the Vercel preset reads this; inside Lovable the Cloudflare preset is pinned and ignores it.
+// The Lovable typing exposes only a narrow subset of nitro options, so the vercel key needs the cast.
+const vercelRegion = { vercel: { functions: { regions: ["gru1"] } } } as NonNullable<
+  Parameters<typeof defineConfig>[0]
+>["nitro"];
+
 export default defineConfig({
   vite: {
     server: { port: 8081, strictPort: true },
@@ -25,6 +32,7 @@ export default defineConfig({
       include: ["qrcode"],
     },
   },
+  nitro: vercelRegion,
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this

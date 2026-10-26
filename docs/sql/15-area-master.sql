@@ -113,7 +113,9 @@ returns jsonb language plpgsql stable security definer set search_path='' as $$
 declare result jsonb;
 begin
  if not private.tinutri_master(auth.uid()) then raise exception 'Acesso restrito à Área Master.' using errcode='42501'; end if;
- if not exists(select 1 from pg_catalog.pg_timezone_names where name=p_zone) or p_start>p_now or p_today<p_now or p_three<p_today or p_seven<p_three then raise exception 'Período inválido.'; end if;
+ -- AT TIME ZONE valida o fuso em ~2 ms; pg_timezone_names lê os arquivos de fuso (~500 ms).
+ begin perform pg_catalog.now() at time zone p_zone; exception when invalid_parameter_value then raise exception 'Período inválido.'; end;
+ if p_zone is null or p_start>p_now or p_today<p_now or p_three<p_today or p_seven<p_three then raise exception 'Período inválido.'; end if;
  with labels as materialized(select *,coalesce(expires_at,(expires_on+time '23:59:59') at time zone p_zone) expiry from public.issued_labels where p_client is null or client_id=p_client)
  select jsonb_build_object(
  'companies',(select count(*) from public.clients where p_client is null or id=p_client),

@@ -61,3 +61,9 @@ Para o banco que já recebeu 22–24, executar somente `25-fila-webhooks-asaas.s
 Depois dos SQLs anteriores, executar integralmente `26-assinatura-propria.sql`, seguido da conferência 99 atualizada. A migração é reaplicável, preserva método dos contratos anteriores e adiciona as provas próprias, desafios e outbox privados. A função de publicação recebe um argumento adicional opcional. Reaplicar 26 por último se uma migração antiga recriar funções.
 
 Esta integração exige novas variáveis de servidor e configuração Gmail. O roteiro atual está em `docs/29-assinatura-propria-implementacao.md`; nenhum código é enviado sem essa configuração. Não preencher tabelas de aceites/recibos manualmente para simular assinatura.
+
+## Desempenho do resumo da Área Master (SQL 27)
+
+Independente do pacote de contratação. Em 26/10/2026, `public.master_summary` levava ~510 ms por chamada no projeto `ylkiyncsqubuxrtwyxwv`: a validação do fuso consultava `pg_catalog.pg_timezone_names`, que custou 522 ms isoladamente; a validação por `AT TIME ZONE` custou ~2 ms. Executar integralmente `27-master-summary-fuso.sql` no SQL Editor. Ele só substitui essa função, mantém as permissões e continua recusando fuso inválido ou vazio com "Período inválido.". O `15-area-master.sql` já traz a mesma correção; se o 15 for reaplicado, o 27 é desnecessário.
+
+Validado localmente em PGlite (aplicado duas vezes, fuso válido, inválido e nulo). Após a aplicação remota, conferir com `select prosrc not ilike '%pg_timezone_names%' from pg_proc where proname='master_summary';`, que deve retornar `true`.
