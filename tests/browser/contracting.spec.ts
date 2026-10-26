@@ -172,3 +172,80 @@ test("falha ao retomar notificação mantém o registro e informa o Master", asy
   await expect(page.locator("tbody tr")).toHaveCount(10);
   await expect(page.getByRole("button", { name: "Retomar", exact: true })).toBeEnabled();
 });
+
+test("assinatura própria solicita código, exige aceite e registra apenas a parte cliente", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=own");
+  const request = page.getByRole("button", { name: "Enviar código de assinatura" });
+  await expect(request).toBeDisabled();
+  await page.getByRole("checkbox").check();
+  await request.click();
+  await expect(page.getByText("Código enviado.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Confirmar assinatura" })).toBeDisabled();
+  await page.getByLabel("Código recebido por e-mail").fill("000000");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Confirmar assinatura" }).click();
+  await expect(page.getByRole("alert")).toContainText("Código inválido");
+  await page.getByLabel("Código recebido por e-mail").fill("482731");
+  await page.getByRole("button", { name: "Confirmar assinatura" }).click();
+  await expect(
+    page.getByText(
+      "Seu aceite foi registrado. Aguardando a assinatura do representante da TiNutri.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Acessar o sistema" })).toHaveCount(0);
+});
+test("falha no envio mantém pedido e não permite confirmar código não enviado", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=own-mail-failure");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Enviar código de assinatura" }).click();
+  await expect(
+    page.getByText("O envio ainda não foi confirmado. Aguarde e atualize a situação", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await page.getByLabel("Código recebido por e-mail").fill("482731");
+  await page.getByRole("checkbox").check();
+  await expect(page.getByRole("button", { name: "Confirmar assinatura" })).toBeDisabled();
+});
+test("Master assina sua própria parte após cliente e mantém layout responsivo", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=master-own");
+  await expect(
+    page.getByRole("heading", { name: "Assinatura do representante TiNutri" }),
+  ).toBeVisible();
+  const section = page
+    .getByRole("heading", { name: "Assinatura do representante TiNutri" })
+    .locator("..");
+  await section.getByRole("checkbox").check();
+  await section.getByRole("button", { name: "Enviar código de assinatura" }).click();
+  for (const width of [320, 375, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+  await section.getByLabel("Código recebido por e-mail").fill("482731");
+  await section.getByRole("checkbox").check();
+  await section.getByRole("button", { name: "Confirmar assinatura" }).click();
+  await expect(page.getByText("Assinatura concluída.", { exact: false })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Assinatura do representante TiNutri" }),
+  ).toHaveCount(0);
+});
+test("aceites preservados permitem finalizar sem pedir nova assinatura", async ({ page }) => {
+  await page.goto("/?scenario=master-own-finalize");
+  await expect(
+    page.getByText("Os dois aceites estão registrados.", { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Enviar código de assinatura" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Finalizar documento", exact: true }).click();
+  await expect(
+    page.getByText("Documento finalizado com os dois aceites preservados.", { exact: true }),
+  ).toBeVisible();
+});

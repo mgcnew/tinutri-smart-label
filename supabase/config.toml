@@ -1,1 +1,10 @@
-project_id = "nfwxeofswnzddwhfkkpx"
+# Projeto Supabase usado pelo app (mesmo de SUPABASE_URL na .env).
+project_id = "ylkiyncsqubuxrtwyxwv"
+
+# Chamadas pelo pg_cron e protegidas por CRON_SECRET, sem JWT
+# (docs/16-notificacoes-push.md e docs/17-fotos-de-etiqueta.md).
+[functions.send-alert-push]
+verify_jwt = false
+
+[functions.purge-label-photos]
+verify_jwt = false

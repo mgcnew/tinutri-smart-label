@@ -1,8 +1,16 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 /** The exact frozen text is rendered; unsupported characters fail rather than disappear. */
-export async function contractPdf(title: string, body: string): Promise<Uint8Array> {
+export async function contractPdf(
+  title: string,
+  body: string,
+  createdAt?: string,
+): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
+  if (createdAt) {
+    pdf.setCreationDate(new Date(createdAt));
+    pdf.setModificationDate(new Date(createdAt));
+  }
   pdf.setTitle(title);
   pdf.setAuthor("TiNutri Smart Label");
   const font = await pdf.embedFont(StandardFonts.Helvetica);

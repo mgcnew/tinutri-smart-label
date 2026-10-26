@@ -25,6 +25,7 @@ import {
 } from "./store.server";
 import { contractPdf } from "./pdf.server";
 import { cancelClicksign, prepareClicksign } from "./clicksign.server";
+import { signatureMethod } from "./config.server";
 
 export async function publish(input: PublishInput, db: SupabaseClient, userId: string) {
   await requireMaster(db, userId);
@@ -49,6 +50,7 @@ export async function publish(input: PublishInput, db: SupabaseClient, userId: s
   const body = finalContractBody(contract.body);
   // Fail before publishing when PDF cannot faithfully render the frozen text.
   await contractPdf(contract.title, body);
+  if (signatureMethod() === "tinutri") await contractPdf("Representantes", [input.signer.name,input.signer.email,input.providerSigner.name,input.providerSigner.email].join("\n"));
   const { data, error: failed } = await db.rpc("publish_contract_offer", {
     p_contract: input.contractId,
     p_updated: input.updatedAt,
@@ -60,6 +62,7 @@ export async function publish(input: PublishInput, db: SupabaseClient, userId: s
     p_access: input.accessContact,
     p_days: input.expiresDays,
     p_environment: signatureEnvironment(),
+    ...(signatureMethod() === "tinutri" ? { p_method: "tinutri" } : {}),
   });
   if (failed) {
     if (failed.code === "23505")
@@ -67,21 +70,33 @@ export async function publish(input: PublishInput, db: SupabaseClient, userId: s
         "Esta empresa já tem uma contratação em aberto. Abra o contrato correspondente ou revogue a contratação anterior antes de preparar outra.",
       );
     if (failed.code === "PGRST202" || failed.code === "42P01")
-      throw new Error("Aplique o SQL 22 de contratação por link neste ambiente.");
+      throw new Error(
+        "Aplique o SQL 26 de assinatura própria após os SQLs anteriores neste ambiente.",
+      );
     throw new Error(failed.message);
   }
   return { id: data as string, link };
 }
 export async function list(contractId: string, db: SupabaseClient, userId: string) {
   await requireMaster(db, userId);
-  const { data, error } = await db
-    .from("contract_offers")
-    .select(
-      "id,created_at,expires_at,revoked_at,signature_status,signature_issue,payment_status,signature_environment,activated_at,signer,provider_signer,access_contact",
-    )
-    .eq("contract_id", contractId)
-    .order("created_at", { ascending: false })
-    .limit(20);
+  const columns =
+    "id,created_at,expires_at,revoked_at,signature_status,signature_issue,payment_status,signature_environment,signature_method,activated_at,signer,provider_signer,access_contact";
+  const fetchOffers = (selection: string) =>
+    db
+      .from("contract_offers")
+      .select(selection)
+      .eq("contract_id", contractId)
+      .order("created_at", { ascending: false })
+      .limit(20);
+  let result = await fetchOffers(columns);
+  // Legacy offers remain readable while the manual SQL 26 migration is pending.
+  if (
+    result.error &&
+    ["42703", "PGRST204"].includes(result.error.code) &&
+    result.error.message.includes("signature_method")
+  )
+    result = await fetchOffers(columns.replace(",signature_method", ""));
+  const { data, error } = result;
   if (error)
     throw new Error("Contratação por link indisponível. Confira a aplicação dos SQLs 22 e 23.");
   const rows = (data ?? []) as Pick<
@@ -94,6 +109,7 @@ export async function list(contractId: string, db: SupabaseClient, userId: strin
     | "signature_issue"
     | "payment_status"
     | "signature_environment"
+    | "signature_method"
     | "activated_at"
     | "signer"
     | "provider_signer"
@@ -131,18 +147,30 @@ export async function list(contractId: string, db: SupabaseClient, userId: strin
   } catch {
     /* Configuração ainda pendente. */
   }
+  const currentUser = rows.some((row) => row.signature_method === "tinutri")
+    ? await db.auth.getUser()
+    : null;
   return {
-    offers: rows.map((row) => ({
-      ...row,
-      activation: ((jobs.data ?? []).find((job) => job.offer_id === row.id) ??
-        null) as ActivationSummary | null,
-      events: (events.data ?? []).filter((item) => item.offer_id === row.id) as OfferEvent[],
-      checkout: ((checkouts.data ?? []).find((item) => item.offer_id === row.id) ?? null) as {
-        status: "preparing" | "ready" | "blocked";
-      } | null,
-    })),
+    offers: await Promise.all(
+      rows.map(async (row) => ({
+        ...row,
+        ownSignature:
+          row.signature_method === "tinutri"
+            ? await (
+                await import("./own.server")
+              ).ownSummary(row as Offer, "tinutri", userId, currentUser?.data.user?.email)
+            : undefined,
+        activation: ((jobs.data ?? []).find((job) => job.offer_id === row.id) ??
+          null) as ActivationSummary | null,
+        events: (events.data ?? []).filter((item) => item.offer_id === row.id) as OfferEvent[],
+        checkout: ((checkouts.data ?? []).find((item) => item.offer_id === row.id) ?? null) as {
+          status: "preparing" | "ready" | "blocked";
+        } | null,
+      })),
+    ),
     activationAvailable: activationAvailable(),
     signatureAvailable: signatureAvailable(),
+    signatureMethod: signatureMethod(),
     environment: signatureEnvironment(),
     paymentAvailable: asaasAvailable() && signatureEnvironment() === "sandbox",
     paymentCheckAvailable,
@@ -179,7 +207,11 @@ export async function manage(
     offer.signature_issue !== "canceled" &&
     offer.signature_issue !== "deadline"
   ) {
-    if (offer.signature_environment !== signatureEnvironment() || !signatureAvailable())
+    if (
+      offer.signature_environment !== signatureEnvironment() ||
+      signatureMethod() !== "clicksign" ||
+      !signatureAvailable()
+    )
       throw new Error(
         "Restaure a configuração de assinatura original para cancelar também no provedor.",
       );
@@ -220,14 +252,28 @@ export async function readPublic(token: string): Promise<PublicOffer> {
     stage: offerStage(o),
     signerName: o.signer.name,
     signerEmailHint: emailHint(o.signer.email),
-    signatureAvailable: signatureAvailable() && o.signature_environment === signatureEnvironment(),
+    signatureMethod: o.signature_method ?? "clicksign",
+    ownSignature:
+      o.signature_method === "tinutri"
+        ? await (await import("./own.server")).ownSummary(o, "client")
+        : undefined,
+    signatureAvailable:
+      signatureAvailable() &&
+      o.signature_environment === signatureEnvironment() &&
+      (o.signature_method ?? "clicksign") === signatureMethod(),
     paymentAvailable: (await import("./payment.server")).paymentAvailable(o),
     signedDocumentAvailable: !!o.signed_file_path,
   };
 }
 export async function begin(token: string) {
   const offer = await loadOfferByToken(token);
-  if (!signatureAvailable() || offer.signature_environment !== signatureEnvironment())
+  if (offer.signature_method === "tinutri")
+    return (await import("./own.server")).requestCode(offer, "client", null);
+  if (
+    signatureMethod() !== "clicksign" ||
+    !signatureAvailable() ||
+    offer.signature_environment !== signatureEnvironment()
+  )
     throw new Error(
       "A assinatura eletrônica ainda não está disponível. A TiNutri avisará quando você puder continuar.",
     );
@@ -290,6 +336,16 @@ export async function download(token: string, signed: boolean) {
       .from("contract-documents")
       .createSignedUrl(offer.signed_file_path, 60, { download: "contrato-tinutri-assinado.pdf" });
     if (error || !data) throw new Error("Não foi possível abrir o contrato assinado.");
+    return { url: data.signedUrl, base64: null };
+  }
+  if (offer.signature_method === "tinutri") {
+    const { preserveOwnDocument } = await import("./own-flow.server");
+    const { ownPorts } = await import("./own.server");
+    const doc = await preserveOwnDocument(offer, ownPorts);
+    const { data, error } = await offerDb.storage
+      .from("contract-documents")
+      .createSignedUrl(doc.original_path, 60, { download: "contrato-tinutri.pdf" });
+    if (error || !data) throw new Error("Não foi possível abrir o PDF original preservado.");
     return { url: data.signedUrl, base64: null };
   }
   return {

@@ -36,3 +36,7 @@ dist-ssr
 
 # Agente de impressão: contém o token da empresa
 agent/config.json
+
+# Estado local da CLI do Supabase
+supabase/.temp/
+supabase/.branches/

@@ -1,3 +1,4 @@
+import { OwnSignatureForm } from "@/components/contracting/OwnSignatureForm";
 import { useEffect, useState, type FormEvent } from "react";
 import { Copy, ExternalLink, Link2, RefreshCw, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,8 @@ import {
   publishOffer,
   retryOfferActivation,
   checkPayment,
+  masterOwnSignature,
+  downloadOwnContract,
 } from "@/lib/contracting/functions";
 import { money } from "@/lib/billing";
 import type { ServiceContract } from "@/lib/contracts";
@@ -133,8 +136,8 @@ export function ContractOfferModal({
             </p>
             <p className="mt-2 text-muted-foreground">
               {listing.signatureAvailable
-                ? "Assinatura configurada. O cliente poderá solicitar os links de assinatura por e-mail."
-                : "A conta de assinatura ainda precisa ser configurada. O link permite revisar o contrato, mas não assinar."}{" "}
+                ? "Assinatura configurada. O cliente poderá continuar pela página do contrato."
+                : "A assinatura ainda precisa ser configurada. O link permite revisar o contrato, mas não assinar."}{" "}
               {listing.paymentAvailable
                 ? "Pagamento de teste configurado para contratos com renovação manual. Nenhum acesso real será liberado pelo sandbox."
                 : "Pagamento online ainda indisponível."}
@@ -331,6 +334,126 @@ export function ContractOfferModal({
                   )}
               </div>
             )}
+            {offer.signature_method === "tinutri" && (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      const result = await downloadOwnContract({
+                        data: { id: offer.id, signed: false },
+                      });
+                      window.location.assign(result.url);
+                    })
+                  }
+                >
+                  Conferir PDF original
+                </Button>
+                {offer.signature_status === "signed" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() =>
+                      void run(async () => {
+                        const result = await downloadOwnContract({
+                          data: { id: offer.id, signed: true },
+                        });
+                        window.location.assign(result.url);
+                      })
+                    }
+                  >
+                    Baixar contrato com comprovante
+                  </Button>
+                )}
+              </div>
+            )}
+            {offer.signature_method === "tinutri" &&
+              offer.ownSignature &&
+              !offer.revoked_at &&
+              offer.signature_status !== "signed" && (
+                <section className="min-w-0 rounded-lg border p-3">
+                  <h3 className="text-sm font-semibold">Assinatura do representante TiNutri</h3>
+                  <p className="mt-2 break-words text-xs text-muted-foreground">
+                    {offer.provider_signer.name} · {offer.provider_signer.email}
+                  </p>
+                  {listing.signatureAvailable && listing.signatureMethod === "tinutri" ? (
+                    <OwnSignatureForm
+                      key={offer.id}
+                      party="tinutri"
+                      summary={offer.ownSignature}
+                      onRequest={() =>
+                        masterOwnSignature({ data: { id: offer.id, action: "request" } })
+                      }
+                      onConfirm={(challengeId, code) =>
+                        masterOwnSignature({
+                          data: {
+                            id: offer.id,
+                            action: "confirm",
+                            confirmation: {
+                              challengeId,
+                              code,
+                              accepted: true,
+                              consentVersion: "tinutri-email-v1",
+                            },
+                          },
+                        })
+                      }
+                      onRefresh={refresh}
+                    />
+                  ) : (
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Configure o envio de códigos para continuar.
+                    </p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {listing.signatureAvailable && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await masterOwnSignature({
+                              data: { id: offer.id, action: "retry_mail" },
+                            });
+                            await refresh();
+                            setNotice(
+                              "Pedidos de envio conferidos. Consulte a situação do código.",
+                            );
+                          })
+                        }
+                      >
+                        Retomar envio pendente
+                      </Button>
+                    )}
+                    {offer.ownSignature.clientAccepted && offer.ownSignature.tinutriAccepted && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            const result = await masterOwnSignature({
+                              data: { id: offer.id, action: "finalize" },
+                            });
+                            await refresh();
+                            setNotice(
+                              result.state === "signed"
+                                ? "Documento finalizado com os dois aceites preservados."
+                                : "Aguardando os dois aceites.",
+                            );
+                          })
+                        }
+                      >
+                        Finalizar documento
+                      </Button>
+                    )}
+                  </div>
+                </section>
+              )}
             {offer.checkout && (
               <div className="rounded-lg border p-3 text-sm">
                 <strong>

@@ -1,21 +1,18 @@
-> Decisão de 21/10/2026: o usuário desistiu de Autentique e escolheu assinatura própria. Ler `docs/28-assinatura-propria-proposta.md`: é proposta de arquitetura, ainda não implementada. Não retomar integração Autentique ou exigir conta Clicksign como próximo passo. O histórico abaixo descreve a implementação anterior.
-
 # Continuidade do TiNutri Smart Label
 
-Para continuar o fluxo de contratação por link, leia:
+**Estado atual — 24/10/2026:** assinatura própria implementada localmente, seguindo a proposta aprovada. Ler primeiro `docs/29-assinatura-propria-implementacao.md`. O usuário escolheu Gmail da TiNutri e pediu para configurar a senha de app depois. Não pedir conta Clicksign/Autentique como pré-requisito e não retomar essas integrações para contratos novos.
 
-0. `docs/27-fila-e-estornos-asaas.md` — fila durável, SQL 25 incremental, retomada e limitações atuais.
-1. `docs/26-publicacao-e-conferencia-asaas.md` — publicação e configuração do webhook concluídas.
-2. `docs/23-continuar-no-claude-code.md`
-3. `docs/22-contratacao-por-link.md`
-4. `docs/24-ativacao-e-confiabilidade.md`
-5. `docs/25-asaas-sandbox.md` — evolução atual da integração Asaas.
-6. `docs/sql/README.md` — pacote SQL manual, geração offline e conferências antes/depois.
+SQLs 22–26 aplicados no projeto Supabase `ylkiyncsqubuxrtwyxwv` (também é o `project_id` de `supabase/config.toml`); em 26/10/2026 o usuário aplicou o 26 manualmente e a conferência pela API passou em 37/37. A conferência 99 completa (RLS/permissões) no SQL Editor ainda não foi registrada. O código não aplica DDL remoto automaticamente. Não declarar entrega Gmail ou homologação real com base nos testes isolados.
 
-O usuário forneceu uma chave Asaas sandbox em `.env`. A primeira integração sandbox está implementada; produção do cliente fica para a etapa final. Leia o documento 25 antes de continuar. Também ainda não há conta de assinatura eletrônica. O código prepara o fluxo e o adaptador; os serviços externos precisam de configuração e homologação. Nunca simule confirmação de assinatura/pagamento em produção.
+A `.env` local contém credenciais reais de Supabase e Asaas sandbox e chaves da assinatura própria; preservar, nunca imprimir nem versionar. O script `signature:setup` preenche ausentes/vazios e preserva segredos; `signature:mail:check` não envia mensagens. O usuário autorizou commit/push anteriormente. Relatórios de testes/publicação ficam em `integration-state.local/`, ignorada pelo Git.
 
-Preserve as alterações locais de `.env`; não exponha ou inclua segredos em commits. O usuário aplicou o SQL: tabelas/colunas, bucket e metadados do servidor foram confirmados pela API remota em 20/10/2026. O SQL 99 é a conferência completa de permissões/RLS. Relatórios atuais estão em `integration-state.local/`, ignorada pelo Git. A publicação e a configuração do webhook sandbox foram concluídas; home/contratação retornam 200, token inválido retorna 401 e callback autenticado sem vínculo retorna 200/ignored.
+Produção Asaas da conta do cliente permanece como etapa final. Sandbox não convida nem ativa usuários reais. Manter `CONTRACT_ACTIVATION_ENABLED=false` e a assinatura em sandbox até homologar. Uma única assinatura não permite pagamento. O comprovante próprio não é certificado ICP-Brasil.
 
-O código já foi enviado para `origin/main` em `11d3556` e `cc9828b`. O primeiro deploy foi bloqueado; o usuário tornou o repositório público e o deploy de `22aa693` foi concluído. O webhook foi configurado no Asaas e seus IDs estão preservados localmente. Consulte o estado atual do documento 26. Conta Clicksign, assinatura externa completa e entrega de evento real do provedor ainda precisam de homologação; não habilitar ativação real por causa do sucesso do sandbox.
+Leitura complementar:
 
-Atualização de 21/10/2026: a nova fila depende do SQL 25, ainda sem confirmação de aplicação remota. O aplicativo detecta a ausência e mantém o receptor anterior. Não há cron de consumo; pendências podem ser retomadas pelo Master ou por reentrega. Não são necessárias novas variáveis na Vercel. A assinatura externa continua dependendo da conta Clicksign.
+1. `docs/28-assinatura-propria-proposta.md` — proposta aprovada; implementação no documento 29.
+2. `docs/27-fila-e-estornos-asaas.md` — fila durável, SQL 25, retomada e limites.
+3. `docs/26-publicacao-e-conferencia-asaas.md` — histórico de publicação e webhook.
+4. `docs/25-asaas-sandbox.md`, `docs/24-ativacao-e-confiabilidade.md`.
+5. `docs/23-continuar-no-claude-code.md`, `docs/22-contratacao-por-link.md` — histórico anterior à decisão de assinatura própria.
+6. `docs/sql/README.md` — pacote manual 22–26, pré/pós-conferências.

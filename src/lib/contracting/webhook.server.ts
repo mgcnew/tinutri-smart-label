@@ -1,10 +1,11 @@
 import { offerDb, signatureAvailable, signatureEnvironment } from "./store.server";
 import { signedPdf } from "./clicksign.server";
 import { signatureWebhookHandler } from "./webhook-handler.server";
+import { signatureMethod } from "./config.server";
 import type { Offer } from "./domain";
 
 export const receiveClicksign = signatureWebhookHandler({
-  enabled: signatureAvailable,
+  enabled: () => signatureMethod() === "clicksign" && signatureAvailable(),
   environment: signatureEnvironment,
   secret: () => process.env.CLICKSIGN_WEBHOOK_SECRET ?? "",
   findOffer: async (documentId) => {
@@ -14,7 +15,9 @@ export const receiveClicksign = signatureWebhookHandler({
       .eq("provider_document_id", documentId)
       .maybeSingle();
     if (error) throw new Error("Database unavailable");
-    return data as Offer | null;
+    return data && (!data.signature_method || data.signature_method === "clicksign")
+      ? (data as Offer)
+      : null;
   },
   recordReceipt: async (offer, signerId, hash) => {
     const { error } = await offerDb

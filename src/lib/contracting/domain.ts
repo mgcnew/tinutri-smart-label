@@ -58,6 +58,8 @@ export const OFFER_EVENT_NAMES: Record<string, string> = {
   revoked: "Contratação revogada",
   signature_requested: "Assinatura solicitada",
   signature_sent: "Solicitação enviada",
+  signature_code_requested: "Código de assinatura solicitado",
+  signature_accepted: "Aceite de assinatura registrado",
   signature_failed: "Envio precisa de verificação",
   signature_completed: "Assinaturas concluídas",
   signature_refused: "Assinatura recusada",
@@ -75,6 +77,7 @@ export const OFFER_EVENT_NAMES: Record<string, string> = {
 };
 export type PaymentStatus = "unconfigured" | "pending" | "confirmed" | "refunded";
 export type Offer = {
+  signature_method?: "clicksign" | "tinutri";
   id: string;
   contract_id: string;
   client_id: string;
@@ -176,6 +179,8 @@ export type PublicOffer = Pick<
   | "signed_at"
   | "activated_at"
 > & {
+  signatureMethod?: "clicksign" | "tinutri";
+  ownSignature?: import("./own-domain").OwnSignatureSummary;
   stage: OfferStage;
   signatureIssue?: SignatureIssue | null;
   signerName: string;

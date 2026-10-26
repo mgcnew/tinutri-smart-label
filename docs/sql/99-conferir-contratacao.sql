@@ -6,14 +6,16 @@ select objeto,
  case when c.oid is not null and c.relrowsecurity then 'OK' else 'AUSENTE OU SEM RLS' end as resultado
 from (values ('public.service_contracts'), ('public.contract_offers'),
  ('public.contract_offer_events'), ('public.contract_signature_receipts'),
- ('public.contract_payment_confirmations'), ('public.contract_activation_jobs'), ('public.contract_payment_checkouts'), ('public.contract_webhook_inbox')) as expected(objeto)
+ ('public.contract_payment_confirmations'), ('public.contract_activation_jobs'), ('public.contract_payment_checkouts'), ('public.contract_webhook_inbox'),
+ ('public.contract_own_documents'), ('public.contract_own_challenges'),
+ ('public.contract_own_acceptances'), ('public.contract_own_mail_outbox')) as expected(objeto)
 left join pg_class c on c.oid=to_regclass(expected.objeto);
 
 select coluna, case when exists (
  select 1 from information_schema.columns c
  where c.table_schema='public' and c.table_name=expected.tabela and c.column_name=expected.coluna
 ) then 'OK' else 'AUSENTE' end as resultado
-from (values ('service_contracts','commercial_snapshot'), ('contract_offers','signature_issue')) as expected(tabela,coluna);
+from (values ('service_contracts','commercial_snapshot'), ('contract_offers','signature_issue'), ('contract_offers','signature_method')) as expected(tabela,coluna);
 
 select rotina, case when p.oid is null then 'AUSENTE'
  when has_function_privilege('anon',p.oid,'EXECUTE')
@@ -36,7 +38,14 @@ from (values
  ('public.invalidate_sandbox_contract_payment(uuid,text)'),
  ('public.enqueue_contract_webhook(text,text,text,text,text)'),
  ('public.claim_contract_webhook(uuid,uuid)'),
- ('public.finish_contract_webhook(uuid,uuid,text,text)')
+ ('public.finish_contract_webhook(uuid,uuid,text,text)'),
+ ('public.register_own_contract_document(uuid,text)'),
+ ('public.issue_own_signature_code(uuid,uuid,text,text,uuid,text,text,text,text,text)'),
+ ('public.claim_own_signature_mail(uuid)'),
+ ('public.finish_own_signature_mail(uuid,uuid,boolean)'),
+ ('public.confirm_own_signature(uuid,text,text,uuid)'),
+ ('public.finish_own_contract_signature(uuid,text,text,jsonb,text,text)'),
+ ('public.expire_own_signature_codes()')
 ) as expected(rotina)
 left join pg_proc p on p.oid=to_regprocedure(expected.rotina);
 

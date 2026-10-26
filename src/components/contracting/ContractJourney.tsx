@@ -1,3 +1,4 @@
+import { OwnSignatureForm } from "./OwnSignatureForm";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowRight, Check, Download, FileText, LockKeyhole, Mail, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,7 @@ import { money } from "@/lib/billing";
 import { SIGNATURE_ISSUE_NAMES, type PublicOffer } from "@/lib/contracting/domain";
 import {
   beginSignature,
+  confirmOwnSignature,
   downloadOffer,
   payOffer,
   readPublicOffer,
@@ -13,6 +15,10 @@ import logo from "@/assets/tinutri-logo-ui.webp";
 
 const contractJourneyApi = {
   read: (token: string) => readPublicOffer({ data: { token } }),
+  confirmOwn: (token: string, challengeId: string, code: string) =>
+    confirmOwnSignature({
+      data: { token, challengeId, code, accepted: true, consentVersion: "tinutri-email-v1" },
+    }),
   sign: (token: string) => beginSignature({ data: { token, reviewed: true } }),
   download: (token: string, signed: boolean) => downloadOffer({ data: { token, signed } }),
   pay: (token: string) => payOffer({ data: { token } }),
@@ -239,6 +245,15 @@ export function ContractJourney({
                         A assinatura eletrônica ainda não está disponível. Você já pode conferir o
                         documento; a TiNutri avisará quando for possível continuar.
                       </p>
+                    ) : offer.signatureMethod === "tinutri" && offer.ownSignature ? (
+                      <OwnSignatureForm
+                        key={token}
+                        summary={offer.ownSignature}
+                        party="client"
+                        onRequest={() => api.sign(token) as Promise<{ state: string }>}
+                        onConfirm={(id, code) => api.confirmOwn(token, id, code)}
+                        onRefresh={refresh}
+                      />
                     ) : offer.signature_status === "pending" ? (
                       <>
                         <label className="mt-5 flex items-start gap-3 text-sm">

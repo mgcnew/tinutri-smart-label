@@ -34,6 +34,21 @@ export const fixture = {
   signedDocumentAvailable: false,
 } satisfies PublicOffer;
 let current: PublicOffer = structuredClone(fixture);
+const ownSummary = {
+  clientAccepted: false,
+  tinutriAccepted: false,
+  maySign: true,
+  challenge: null,
+} as import("../../src/lib/contracting/own-domain").OwnSignatureSummary;
+if (scenario.startsWith("own"))
+  current = { ...current, signatureMethod: "tinutri", ownSignature: structuredClone(ownSummary) };
+if (scenario === "own-finalizing")
+  current = {
+    ...current,
+    signature_status: "awaiting",
+    ownSignature: { ...ownSummary, clientAccepted: true, tinutriAccepted: true },
+  };
+
 if (["signed", "sandbox-payment", "sandbox-payment-failure"].includes(scenario))
   current = {
     ...current,
@@ -60,6 +75,21 @@ export async function readPublicOffer() {
   return structuredClone(current);
 }
 export async function beginSignature() {
+  if (scenario.startsWith("own")) {
+    current = {
+      ...current,
+      signature_status: "awaiting",
+      ownSignature: {
+        ...ownSummary,
+        challenge: {
+          id: fixture.id,
+          expiresAt: "2030-01-01T00:00:00Z",
+          delivery: scenario === "own-mail-failure" ? "failed" : "sent",
+        },
+      },
+    };
+    return { state: scenario === "own-mail-failure" ? "pending" : "sent" };
+  }
   window.dispatchEvent(new CustomEvent("fixture-sign-request"));
   current = { ...current, signature_status: "awaiting" };
   return { requested: true };
@@ -71,6 +101,7 @@ type TestOffer = Partial<Offer> & {
   events: OfferEvent[];
   activation: ActivationSummary | null;
   checkout: { status: "preparing" | "ready" | "blocked" } | null;
+  ownSignature?: import("../../src/lib/contracting/own-domain").OwnSignatureSummary;
 };
 function preparedOffer(): TestOffer {
   return {
@@ -132,10 +163,24 @@ export async function retryOfferActivation() {
   }));
   return { state: "completed" };
 }
+if (scenario.startsWith("master-own"))
+  offers = [
+    {
+      ...preparedOffer(),
+      signature_method: "tinutri",
+      signature_status: "awaiting",
+      ownSignature: {
+        ...ownSummary,
+        clientAccepted: true,
+        tinutriAccepted: scenario === "master-own-finalize",
+      },
+    },
+  ];
 export async function listOffers() {
   return {
     offers: structuredClone(offers),
-    signatureAvailable: false,
+    signatureAvailable: scenario.startsWith("master-own"),
+    signatureMethod: scenario.startsWith("master-own") ? "tinutri" : "clicksign",
     activationAvailable: scenario === "master-blocked",
     environment: scenario === "master-blocked" ? "production" : "sandbox",
     paymentAvailable: false,
@@ -182,4 +227,40 @@ export async function retryPaymentNotification({ data }: { data: { id: string } 
   row.result_code = "confirmed_sandbox";
   row.attempts++;
   return { state: "completed" };
+}
+
+export async function confirmOwnSignature({ data }: { data: { code: string } }) {
+  if (data.code !== "482731")
+    throw new Error(
+      "Código inválido, expirado ou indisponível. Solicite um novo código se necessário.",
+    );
+  current = { ...current, ownSignature: { ...ownSummary, clientAccepted: true } };
+  return { state: "waiting" };
+}
+export async function masterOwnSignature({
+  data,
+}: {
+  data: { action: string; confirmation?: { code: string } };
+}) {
+  if (data.action === "confirm" && data.confirmation?.code !== "482731")
+    throw new Error("Código inválido, expirado ou indisponível.");
+  offers = offers.map((o) => ({
+    ...o,
+    ownSignature: {
+      ...ownSummary,
+      clientAccepted: true,
+      tinutriAccepted: data.action !== "request",
+      challenge:
+        data.action === "request"
+          ? { id: fixture.id, expiresAt: "2030-01-01T00:00:00Z", delivery: "sent" }
+          : null,
+    },
+    signature_status:
+      data.action === "confirm" || data.action === "finalize" ? "signed" : "awaiting",
+  }));
+  return { state: data.action === "confirm" || data.action === "finalize" ? "signed" : "sent" };
+}
+
+export async function downloadOwnContract() {
+  return { url: "https://example.com/private-original.pdf" };
 }

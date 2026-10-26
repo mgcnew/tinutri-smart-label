@@ -1,3 +1,5 @@
+> Estado atual em 24/10/2026: ler primeiro `docs/29-assinatura-propria-implementacao.md`. Assinatura própria implementada; não retomar Autentique/Clicksign para contratos novos. Gmail e SQL 26 aguardam configuração/conferência remota.
+
 > Atualização mais recente: ler primeiro `docs/27-fila-e-estornos-asaas.md`. SQL 25 e entrega real de evento na nova fila ainda precisam de confirmação remota.
 
 # Passagem de contexto para Claude Code

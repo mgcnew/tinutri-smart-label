@@ -10,13 +10,14 @@ const migrations = [
   "23-ativacao-contratacao.sql",
   "24-asaas-sandbox.sql",
   "25-fila-webhooks-asaas.sql",
+  "26-assinatura-propria.sql",
 ];
 const checks = ["00-conferir-contratacao.sql", "99-conferir-contratacao.sql"];
 const hashes = {};
 let combined = `-- GERADO por npm run sql:contracting. Não editar; alterar docs/sql e gerar novamente.
 -- Requer o banco existente do TiNutri com SQL 15 e 19 aplicados.
 -- Aplicar manualmente depois de ler docs/sql/README.md e executar a conferência 00.
--- Uma transação para os SQLs 22, 23, 24 e 25: qualquer erro impede a instalação parcial.
+-- Uma transação para os SQLs 22, 23, 24, 25 e 26: qualquer erro impede a instalação parcial.
 begin;
 `;
 for (const name of migrations) {

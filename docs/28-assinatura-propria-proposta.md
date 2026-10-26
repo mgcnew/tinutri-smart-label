@@ -1,6 +1,6 @@
 # Proposta de assinatura eletrônica própria — 21/10/2026
 
-**Estado: proposta, ainda não implementada.** O usuário mudou a decisão de Autentique para assinatura própria antes de qualquer envio externo. As alterações locais incompletas do adaptador Autentique foram retiradas; não houve publicação, envio de documento ou inclusão de credenciais dessa integração. O código publicado continua com o adaptador Clicksign desativado. A fila Asaas do documento 27 é independente e permanece preservada.
+**Estado em 24/10/2026: proposta implementada localmente; instalação e homologação conforme `docs/29-assinatura-propria-implementacao.md`.** O usuário mudou a decisão de Autentique para assinatura própria antes de qualquer envio externo. As alterações locais incompletas do adaptador Autentique foram retiradas; não houve publicação, envio de documento ou inclusão de credenciais dessa integração. O código publicado continua com o adaptador Clicksign desativado. A fila Asaas do documento 27 é independente e permanece preservada.
 
 ## Experiência recomendada
 

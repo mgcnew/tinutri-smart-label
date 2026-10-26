@@ -32,13 +32,17 @@ try {
   const tables = [
     ["clients", "subscription_started_on,subscription_status"],
     ["service_contracts", "id,commercial_snapshot"],
-    ["contract_offers", "id,signature_issue"],
+    ["contract_offers", "id,signature_issue,signature_method"],
     ["contract_offer_events", "offer_id"],
     ["contract_signature_receipts", "offer_id"],
     ["contract_payment_confirmations", "offer_id"],
     ["contract_activation_jobs", "offer_id"],
     ["contract_payment_checkouts", "offer_id"],
     ["contract_webhook_inbox", "id,event_type,status,attempts"],
+    ["contract_own_documents", "offer_id,original_sha256"],
+    ["contract_own_challenges", "id"],
+    ["contract_own_acceptances", "offer_id"],
+    ["contract_own_mail_outbox", "challenge_id,status"],
   ];
   const checks = await Promise.all(
     tables.map(async ([table, columns]) => {
@@ -108,6 +112,13 @@ try {
     "enqueue_contract_webhook",
     "claim_contract_webhook",
     "finish_contract_webhook",
+    "register_own_contract_document",
+    "issue_own_signature_code",
+    "claim_own_signature_mail",
+    "finish_own_signature_mail",
+    "confirm_own_signature",
+    "finish_own_contract_signature",
+    "expire_own_signature_codes",
   ];
   for (const name of routines) {
     const path = `/rpc/${name}`;

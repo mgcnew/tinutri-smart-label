@@ -124,3 +124,79 @@ export const retryPaymentNotification = createServerFn({ method: "POST" })
     const { retryAsaasNotification } = await import("./asaas-webhook.server");
     return retryAsaasNotification(data.id, context.userId);
   });
+
+const ownConfirmation = z.object({
+  challengeId: z.string().uuid(),
+  code: z.string().regex(/^\d{6}$/),
+  consentVersion: z.literal("tinutri-email-v1"),
+  accepted: z.literal(true),
+});
+export const confirmOwnSignature = createServerFn({ method: "POST" })
+  .validator(ownConfirmation.extend({ token: tokenSchema }))
+  .handler(async ({ data }) => {
+    privateResponse();
+    const { loadOfferByToken } = await import("./store.server");
+    const { confirmCode } = await import("./own.server");
+    return confirmCode(
+      await loadOfferByToken(data.token),
+      "client",
+      null,
+      data.challengeId,
+      data.code,
+    );
+  });
+export const masterOwnSignature = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    z.object({
+      id: z.string().uuid(),
+      action: z.enum(["request", "confirm", "finalize", "retry_mail"]),
+      confirmation: ownConfirmation.optional(),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    privateResponse();
+    const { requireMaster, loadOffer } = await import("./store.server");
+    await requireMaster(context.supabase, context.userId);
+    const api = await import("./own.server");
+    if (data.action === "finalize") return api.recoverOwnSignature(data.id);
+    if (data.action === "retry_mail") return api.retryOwnMail(data.id);
+    const offer = await loadOffer(data.id);
+    if (data.action === "request") return api.requestCode(offer, "tinutri", context.userId);
+    if (!data.confirmation) throw new Error("Informe o código e confirme o aceite do contrato.");
+    return api.confirmCode(
+      offer,
+      "tinutri",
+      context.userId,
+      data.confirmation.challengeId,
+      data.confirmation.code,
+    );
+  });
+
+export const downloadOwnContract = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({ id: z.string().uuid(), signed: z.boolean() }))
+  .handler(async ({ data, context }) => {
+    privateResponse();
+    const { requireMaster, loadOffer, offerDb } = await import("./store.server");
+    await requireMaster(context.supabase, context.userId);
+    const offer = await loadOffer(data.id);
+    if (offer.signature_method !== "tinutri")
+      throw new Error("Documento de assinatura própria indisponível.");
+    let path = offer.signed_file_path;
+    if (!data.signed) {
+      const { preserveOwnDocument } = await import("./own-flow.server");
+      const { ownPorts } = await import("./own.server");
+      path = (await preserveOwnDocument(offer, ownPorts)).original_path;
+    } else if (offer.signature_status !== "signed")
+      throw new Error("O comprovante ainda não foi finalizado.");
+    if (!path) throw new Error("Documento indisponível.");
+    const result = await offerDb.storage
+      .from("contract-documents")
+      .createSignedUrl(path, 60, {
+        download: data.signed ? "contrato-tinutri-assinado.pdf" : "contrato-tinutri-original.pdf",
+      });
+    if (result.error || !result.data)
+      throw new Error("Não foi possível abrir o documento preservado.");
+    return { url: result.data.signedUrl };
+  });
