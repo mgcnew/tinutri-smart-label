@@ -10,7 +10,7 @@ Produção Asaas da conta do cliente permanece como etapa final. Sandbox não co
 
 Leitura complementar:
 
-1. `docs/30-asaas-producao-e-ativacao.md` — Asaas de produção e pagamento → ativação (26/10/2026), tudo desligado; SQL 29 aplicado e conferido em 26/10/2026. SQL 30 (QR com alérgenos, linha do tempo e conferências) aplicado em 26/10/2026.
+1. `docs/30-asaas-producao-e-ativacao.md` — Asaas de produção e pagamento → ativação (26/10/2026), tudo desligado; SQL 29 aplicado e conferido em 26/10/2026. SQL 30 (QR com alérgenos, linha do tempo e conferências) aplicado em 26/10/2026. SQL 31 (painel da carteira e permissão `emitir`; nutricionista sem emitir/descartar por padrão) aplicado em 26/10/2026.
 1. `docs/28-assinatura-propria-proposta.md` — proposta aprovada; implementação no documento 29.
 2. `docs/27-fila-e-estornos-asaas.md` — fila durável, SQL 25, retomada e limites.
 3. `docs/26-publicacao-e-conferencia-asaas.md` — histórico de publicação e webhook.
