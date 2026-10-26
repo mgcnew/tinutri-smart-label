@@ -66,7 +66,7 @@ Esta integração exige novas variáveis de servidor e configuração Gmail. O r
 
 Independente do pacote de contratação. Em 26/10/2026, `public.master_summary` levava ~510 ms por chamada no projeto `ylkiyncsqubuxrtwyxwv`: a validação do fuso consultava `pg_catalog.pg_timezone_names`, que custou 522 ms isoladamente; a validação por `AT TIME ZONE` custou ~2 ms. Executar integralmente `27-master-summary-fuso.sql` no SQL Editor. Ele só substitui essa função, mantém as permissões e continua recusando fuso inválido ou vazio com "Período inválido.". O `15-area-master.sql` já traz a mesma correção; se o 15 for reaplicado, o 27 é desnecessário.
 
-Validado localmente em PGlite (aplicado duas vezes, fuso válido, inválido e nulo). Após a aplicação remota, conferir com `select prosrc not ilike '%pg_timezone_names%' from pg_proc where proname='master_summary';`, que deve retornar `true`.
+Validado localmente em PGlite (aplicado duas vezes, fuso válido, inválido e nulo). Após a aplicação remota, conferir com `select prosrc ~ 'perform pg_catalog\.now\(\) at time zone p_zone' from pg_proc where proname='master_summary';`, que deve retornar `true`. (Não procurar só por `pg_timezone_names`: o comentário da função nova cita esse nome.)
 
 ## Regras RLS e índices (SQL 28)
 
@@ -75,3 +75,7 @@ Também independente do pacote de contratação. O advisor de desempenho do Supa
 As expressões foram geradas em 26/10/2026 a partir das regras do projeto `ylkiyncsqubuxrtwyxwv`. Se alguma das regras listadas mudar antes da aplicação, gerar o arquivo novamente, para não restaurar uma versão antiga.
 
 Validação local em 26/10/2026 (PGlite): uma réplica com as colunas reais das tabelas, as 50 regras originais (texto idêntico ao remoto, conferido por hash) e funções `private` simuladas. Comparou 285 cenários de leitura e escrita para Master, operador, gerente, nutricionista e usuário anônimo, em duas empresas, antes e depois do SQL 28: sem diferenças. O arquivo foi aplicado duas vezes. Depois da aplicação remota, os avisos `auth_rls_initplan` e `unindexed_foreign_keys` do advisor devem zerar. Aplicar fora do horário de uso: `alter policy` e `create index` bloqueiam rapidamente as tabelas envolvidas.
+
+## Aplicação registrada dos SQLs 27 e 28
+
+Em 26/10/2026, no projeto `ylkiyncsqubuxrtwyxwv`, os SQLs foram aplicados pela conexão Supabase do Claude Code, com autorização do usuário, como migrações `master_summary_fuso` e `rls_initplan_e_indices_fk` (sem `begin`/`commit`, porque a ferramenta de migração já usa transação). Antes da aplicação do 28, o hash das 50 regras conferia com o usado para gerar o arquivo. Conferência posterior: o `master_summary` contém a validação nova e mantém as permissões, nenhuma regra do schema `public` chama `auth.uid()` por linha (50 reescritas, de 53 regras no total) e os 17 índices `*_fk_idx` estão válidos. Os avisos `auth_rls_initplan` e `unindexed_foreign_keys` do advisor zeraram. O `master_summary` com sessão Master simulada levou 24 ms (antes, ~510 ms). `npm run supabase:contracting:check` continuou 37/37. Os índices novos aparecem como "não usados" no advisor até receberem consultas, o que é esperado.
