@@ -36,7 +36,10 @@ from (values
  ('public.save_contract_checkout(uuid,uuid,text,text,text)'),
  ('public.block_contract_checkout(uuid,uuid)'),
  ('public.invalidate_sandbox_contract_payment(uuid,text)'),
- ('public.enqueue_contract_webhook(text,text,text,text,text)'),
+ -- Criada pelo SQL 29 (Asaas de produção); AUSENTE antes dele.
+ ('public.invalidate_contract_payment(uuid,text)'),
+ -- Depois do SQL 29 a fila tem 6 argumentos; antes dele, 5.
+ ('public.enqueue_contract_webhook(text,text,text,text,text,text)|public.enqueue_contract_webhook(text,text,text,text,text)'),
  ('public.claim_contract_webhook(uuid,uuid)'),
  ('public.finish_contract_webhook(uuid,uuid,text,text)'),
  ('public.register_own_contract_document(uuid,text)'),
@@ -47,7 +50,8 @@ from (values
  ('public.finish_own_contract_signature(uuid,text,text,jsonb,text,text)'),
  ('public.expire_own_signature_codes()')
 ) as expected(rotina)
-left join pg_proc p on p.oid=to_regprocedure(expected.rotina);
+left join pg_proc p on p.oid=coalesce(to_regprocedure(split_part(expected.rotina,'|',1)),
+ to_regprocedure(nullif(split_part(expected.rotina,'|',2),'')));
 
 select indice, case when i.indisvalid and i.indisunique then 'OK' else 'AUSENTE OU INVÁLIDO' end as resultado
 from (values ('public.contract_offers_company_open_idx'), ('public.contract_offers_document_idx')) as expected(indice)
