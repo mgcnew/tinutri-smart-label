@@ -333,11 +333,21 @@ export function ValidadesPanel({
       <div className="validities-filters rounded-2xl border bg-card p-4 sm:p-5">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <FilterField label="Cliente">
-            <input
-              value={clientQuery}
-              onChange={(event) => setClientQuery(event.target.value)}
-              placeholder="Nome da empresa"
-            />
+            {/* Quem acessa uma única empresa vê o nome dela fixo; a busca livre é para quem vê várias. */}
+            {scope?.length === 1 ? (
+              <input
+                value={clientName}
+                readOnly
+                aria-readonly="true"
+                className="validities-fixed"
+              />
+            ) : (
+              <input
+                value={clientQuery}
+                onChange={(event) => setClientQuery(event.target.value)}
+                placeholder="Nome da empresa"
+              />
+            )}
           </FilterField>
           <FilterField label="Produto">
             <input
