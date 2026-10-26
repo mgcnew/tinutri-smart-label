@@ -1,4 +1,5 @@
 import { LabelWorkspaceNav } from "@/components/LabelWorkspaceNav";
+import { FixedCompany } from "@/components/FixedCompany";
 import { SystemSelect } from "@/components/ui/system-select";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { addDays, format, isValid } from "date-fns";
@@ -148,6 +149,7 @@ export function Workspace() {
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("aparencia");
   const accessScope = role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : [];
   const overviewScope = dashboardClient && (accessScope === null || accessScope.includes(dashboardClient)) ? [dashboardClient] : accessScope;
+  const historyScope = entryCompany && (accessScope === null || accessScope.includes(entryCompany)) ? [entryCompany] : accessScope;
   const overview = useOperationalOverview(Boolean(userId && role && !loading && tab === "dashboard"), overviewScope, overviewRevision);
   const [message, setMessage] = useState("");
   const [selectedClient, setSelectedClient] = useState("");
@@ -345,6 +347,13 @@ export function Workspace() {
   useEffect(() => { void refresh(); }, []);
 
   const activeClients = useMemo(() => clients.filter(c => c.active), [clients]);
+  // Login de empresa pertence a uma só: o seletor da emissão vira nome fixo.
+  const singleCompany = role !== "admin_master" && activeClients.length === 1 ? activeClients[0] : null;
+  // Com uma única empresa no acesso (ex.: nutricionista com uma empresa na carteira), ela já fica selecionada.
+  useEffect(() => {
+    if (singleCompany && selectedClient !== singleCompany.id) selectClient(singleCompany.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- selectClient é recriado a cada render
+  }, [singleCompany?.id]);
   const visibleCollaborators = collaborators.filter((item) => item.client_id === selectedClient);
   // Responsável pré-selecionado: o próprio usuário, se for colaborador; senão o último escolhido nesta empresa.
   useEffect(() => {
@@ -868,7 +877,7 @@ export function Workspace() {
             <div className="emit-layout grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
               <div className="emit-form min-w-0 rounded-2xl border bg-card p-5 sm:p-6">
                 <fieldset disabled={Boolean(emissionBusy)} className="min-w-0 space-y-4"><div className="emit-group-title"><span>1</span><h2>Dados da etiqueta</h2></div>
-                <div className="grid gap-4 sm:grid-cols-2"><EmitField label="Cliente"><SystemSelect value={selectedClient} disabled={role === "operator" || role === "admin_cliente"} onChange={(e) => selectClient(e.target.value)}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</SystemSelect></EmitField>
+                <div className="grid gap-4 sm:grid-cols-2"><EmitField label="Cliente">{singleCompany ? <FixedCompany name={singleCompany.name} /> : <SystemSelect value={selectedClient} disabled={role === "operator" || role === "admin_cliente"} onChange={(e) => selectClient(e.target.value)}><option value="">Selecione o cliente</option>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</SystemSelect>}</EmitField>
                 <EmissionProductPicker key={selectedClient} clientId={selectedClient} value={selectedProduct} disabled={!selectedClient} revision={overviewRevision} onRecord={handleProductRecord} onChange={(selected) => { setSelectedProduct(selected?.id ?? ""); setProducts(selected ? [selected] : []); setLot(""); setLabelDraft(null); setShelfDays(selected ? String(shelfDaysFor(selected, storage)) : ""); }} />
                 <EmitField label="Responsável"><SystemSelect value={selectedResponsible} disabled={!selectedClient} onChange={(e) => { setSelectedResponsible(e.target.value); try { window.localStorage.setItem(`tinutri.last-responsible.${selectedClient}`, e.target.value); } catch { /* Preferência local opcional. */ } }}><option value="">Selecione o responsável</option>{visibleCollaborators.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</SystemSelect></EmitField>
                 <EmitField label="Tipo da etiqueta"><SystemSelect value={kind} onChange={(e) => setKind(e.target.value as LabelKind)}>{LABEL_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</SystemSelect></EmitField></div>
@@ -986,7 +995,7 @@ export function Workspace() {
           {tab === "team" && <TeamPanel scope={accessScope} clients={clients} collaborators={collaborators} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
           {tab === "validades" && <ValidadesPanel embedded canDiscard={permissions.descartar} scope={overviewScope} revision={overviewRevision} alertDays={alertDays} onOpenAlertSettings={() => { setSettingsTab("alertas"); navigateTab("settings"); }} onSettle={settleLabel} window={validityWindow} onWindowChange={setValidityWindow} clientName={clients.find((item) => item.id === (overviewScope?.length === 1 ? overviewScope[0] : dashboardClient))?.name ?? "Todas as empresas acessíveis"} onOpenLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} />}
           {tab === "acompanhamento" && (role === "admin_master" || role === "nutricionista") && <CarePanel scope={role === "admin_master" ? null : carteira} revision={overviewRevision} initialClient={entryCompany} focusedId={focusedEntityId} />}
-          {tab === "history" && <HistoryPanel embedded scope={entryCompany && (accessScope === null || accessScope.includes(entryCompany)) ? [entryCompany] : accessScope} revision={overviewRevision} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
+          {tab === "history" && <HistoryPanel embedded scope={historyScope} clientName={clients.find((item) => historyScope?.length === 1 && item.id === historyScope[0])?.name} revision={overviewRevision} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
           </Suspense>
         </main>
       </div>
@@ -1096,7 +1105,9 @@ function PanelHeader({ eyebrow, title, description }: { eyebrow: string; title: 
 
 
 function TeamPanel({ scope, clients, collaborators, refresh, recordActivity, focusedId }: { scope: string[] | null; clients: Client[]; collaborators: Collaborator[]; refresh: () => Promise<void>; recordActivity: ActivityRecorder; focusedId: string | null }) {
-  const empty = { client_id: "", name: "", role_title: "", active: true };
+  const activeClients = clients.filter((c) => c.active);
+  const onlyClient = scope?.length === 1 ? activeClients.find((c) => c.id === scope[0]) ?? null : null;
+  const empty = { client_id: onlyClient?.id ?? "", name: "", role_title: "", active: true };
   const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -1107,7 +1118,7 @@ function TeamPanel({ scope, clients, collaborators, refresh, recordActivity, foc
   const filtered = collaborators.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()) || (c.role_title ?? "").toLowerCase().includes(search.toLowerCase()));
   return <section><PanelHeader eyebrow="Equipe" title="Colaboradores" description="Cadastre os responsáveis que aparecerão nas etiquetas."/>
     <form className="mt-7 grid gap-4 rounded-2xl border bg-card p-5 sm:grid-cols-3 sm:items-end" onSubmit={async (e) => { e.preventDefault(); setMsg(""); const payload = { client_id: form.client_id, name: form.name.trim(), role_title: form.role_title.trim() || null, active: form.active }; const op = editingId ? supabase.from("collaborators").update(payload).eq("id", editingId).select("id").maybeSingle() : supabase.from("collaborators").insert(payload).select("id").single(); const { data: saved, error } = await op; if (error || !saved) { setMsg("Não foi possível salvar."); return; } await recordActivity(editingId ? "colaborador_atualizado" : "colaborador_criado", payload.client_id, "collaborator", saved.id, payload.name, editingId ? { ...collaborators.find((item) => item.id === editingId) } : {}, payload); reset(); await refresh(); }}>
-      <Field label="Cliente"><SystemSelect required value={form.client_id} onChange={(e) => setForm(p => ({ ...p, client_id: e.target.value }))}><option value="">Selecione</option>{clients.filter(c => c.active).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SystemSelect></Field>
+      <Field label="Cliente">{onlyClient ? <FixedCompany name={onlyClient.name} /> : <SystemSelect required value={form.client_id} onChange={(e) => setForm(p => ({ ...p, client_id: e.target.value }))}><option value="">Selecione</option>{activeClients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SystemSelect>}</Field>
       <Field label="Nome"><input required minLength={2} maxLength={120} value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))}/></Field>
       <Field label="Função"><input maxLength={80} value={form.role_title} onChange={(e) => setForm(p => ({ ...p, role_title: e.target.value }))} placeholder="Ex.: Cozinheira"/></Field>
       <label className="flex items-center gap-3 font-semibold sm:col-span-3"><input className="size-5 w-auto" type="checkbox" checked={form.active} onChange={(e) => setForm(p => ({ ...p, active: e.target.checked }))}/> Colaborador ativo</label>

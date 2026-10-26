@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { scopeKey, scopeIds, searchPattern } from "@/lib/list-query";
 import type { OperationalLabel } from "@/lib/dashboard";
 import { downloadCsv } from "@/lib/management";
+import { FixedCompany } from "@/components/FixedCompany";
 import { discardReasonName, parseCloseReason } from "@/lib/settlement";
 import { AUDIT_HEADER, buildAuditReportHtml } from "@/lib/audit-report";
 
@@ -64,6 +65,7 @@ function applyFilters<
 
 export function HistoryPanel({
   scope,
+  clientName,
   revision,
   onReprint,
   onDuplicate,
@@ -71,6 +73,8 @@ export function HistoryPanel({
 }: {
   embedded?: boolean;
   scope: string[] | null;
+  /** Nome da empresa quando o acesso é a uma só. */
+  clientName?: string;
   revision: number;
   onReprint: (record: OperationalLabel) => void;
   onDuplicate: (record: OperationalLabel) => void;
@@ -219,11 +223,15 @@ export function HistoryPanel({
           />
         </Field>
         <Field label="Cliente">
-          <input
-            value={clientQuery}
-            onChange={(event) => setClientQuery(event.target.value)}
-            placeholder="Pesquisar cliente"
-          />
+          {scope?.length === 1 && clientName ? (
+            <FixedCompany name={clientName} />
+          ) : (
+            <input
+              value={clientQuery}
+              onChange={(event) => setClientQuery(event.target.value)}
+              placeholder="Pesquisar cliente"
+            />
+          )}
         </Field>
         <Field label="Lote">
           <input

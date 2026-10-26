@@ -41,6 +41,7 @@ import {
   type OperationalLabel,
 } from "@/lib/dashboard";
 import { supabase } from "@/integrations/supabase/client";
+import { FixedCompany } from "@/components/FixedCompany";
 import { useDebouncedValue, usePaginatedQuery } from "@/hooks/use-paginated-query";
 import { PaginationControls } from "@/components/PaginationControls";
 import { scopeKey, scopeIds, searchPattern, expiryRange, windowRange } from "@/lib/list-query";
@@ -335,12 +336,7 @@ export function ValidadesPanel({
           <FilterField label="Cliente">
             {/* Quem acessa uma única empresa vê o nome dela fixo; a busca livre é para quem vê várias. */}
             {scope?.length === 1 ? (
-              <input
-                value={clientName}
-                readOnly
-                aria-readonly="true"
-                className="validities-fixed"
-              />
+              <FixedCompany name={clientName} />
             ) : (
               <input
                 value={clientQuery}
