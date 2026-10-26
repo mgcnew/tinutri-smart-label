@@ -198,7 +198,7 @@ function LabelLookup() {
             <Row term="Estabelecimento" value={row.client_name} />
             <Row term="Setor" value={row.sector ?? "—"} />
             <Row term="Manipulação / abertura" value={fmt(row.opened_at)} />
-            <Row term="Validade" value={fmt(row.expires_at)} strong />
+            <Row term="Validade" value={fmt(row.expires_at)} strong tone={status === "vencido" ? "text-destructive" : status === "proximo" ? "text-[var(--warn-ink)]" : undefined} />
             <Row term="Conservação" value={row.storage_condition ?? "—"} />
             <Row term="Lote" value={row.lot_number ?? "—"} />
             {row.inspection_label && <Row term="Inspeção" value={row.inspection_label} />}
@@ -268,11 +268,11 @@ function LabelLookup() {
   );
 }
 
-function Row({ term, value, strong = false }: { term: string; value: string; strong?: boolean }) {
+function Row({ term, value, strong = false, tone }: { term: string; value: string; strong?: boolean; tone?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border/60 pb-2 last:border-0">
       <dt className="shrink-0 text-xs font-bold uppercase tracking-wide text-muted-foreground">{term}</dt>
-      <dd className={`min-w-0 text-right ${strong ? "text-lg font-extrabold text-primary" : "font-semibold"}`}>{value}</dd>
+      <dd className={`min-w-0 text-right ${strong ? `text-lg font-extrabold ${tone ?? "text-primary"}` : "font-semibold"}`}>{value}</dd>
     </div>
   );
 }
