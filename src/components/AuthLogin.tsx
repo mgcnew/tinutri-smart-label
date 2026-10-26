@@ -85,7 +85,6 @@ export function AuthLogin({ modal = false }: { modal?: boolean }) {
           <p className="auth-product">
             Smart Label<span aria-hidden="true">®</span>
           </p>
-          <span className="auth-brand-accent" aria-hidden="true" />
         </header>
 
         <div className="auth-heading">
