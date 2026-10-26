@@ -73,6 +73,7 @@ export const OFFER_EVENT_NAMES: Record<string, string> = {
   payment_created: "Fatura preparada",
   payment_review_required: "Cobrança precisa de revisão",
   payment_invalidated: "Pagamento invalidado",
+  payment_invalidated_after_activation: "Pagamento invalidado após a liberação: revisar o acesso",
   payment_checked: "Pagamento conferido no Asaas",
 };
 export type PaymentStatus = "unconfigured" | "pending" | "confirmed" | "refunded";

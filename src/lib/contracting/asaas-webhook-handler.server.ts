@@ -1,6 +1,11 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import { AsaasApiError, billingTypes, type AsaasPayment } from "./asaas.server.ts";
+import {
+  AsaasApiError,
+  billingTypes,
+  type AsaasEnvironment,
+  type AsaasPayment,
+} from "./asaas.server.ts";
 import type { Offer } from "./domain";
 
 export type PaymentBinding = {
@@ -16,6 +21,8 @@ export interface AsaasWebhookPorts {
   offer(id: string): Promise<Offer>;
   confirm(offer: Offer, binding: PaymentBinding, eventId: string): Promise<void>;
   invalidate(offerId: string, paymentId: string): Promise<void>;
+  /** Inicia a ativação já enfileirada pelo SQL; só é chamada para pagamento de produção verificado. */
+  activate?(offerId: string): Promise<void>;
 }
 const confirmationEvents = new Set(["PAYMENT_CONFIRMED", "PAYMENT_RECEIVED"]);
 const reversalEvents = new Set([
@@ -46,14 +53,28 @@ const reply = (status: number, state: string) =>
 export type AsaasWebhookEvent = z.infer<typeof asaasEventSchema>;
 export const supportedAsaasEvent = (name: string) =>
   confirmationEvents.has(name) || reversalEvents.has(name);
+const tokenDigest = (value: string) => createHash("sha256").update(value).digest();
+/**
+ * Cada ambiente do Asaas tem seu próprio token de webhook. O token recebido decide de qual conta veio a
+ * notificação; sem correspondência, o sandbox é usado e a leitura recusa o token como não autorizado.
+ */
+export function asaasRequestEnvironment(
+  request: Request,
+  tokens: Partial<Record<AsaasEnvironment, string>>,
+): AsaasEnvironment {
+  const supplied = tokenDigest(request.headers.get("asaas-access-token") || "");
+  const production = tokens.production;
+  return production && production.length >= 32 && timingSafeEqual(tokenDigest(production), supplied)
+    ? "production"
+    : "sandbox";
+}
 export async function readAsaasWebhook(
   request: Request,
   token: string | undefined,
 ): Promise<AsaasWebhookEvent | Response> {
   if (!token || token.length < 32) return reply(503, "unconfigured");
   const supplied = request.headers.get("asaas-access-token") || "";
-  const digest = (value: string) => createHash("sha256").update(value).digest();
-  if (!supplied || !timingSafeEqual(digest(token), digest(supplied)))
+  if (!supplied || !timingSafeEqual(tokenDigest(token), tokenDigest(supplied)))
     return reply(401, "unauthorized");
   let payload: z.infer<typeof asaasEventSchema>;
   try {
@@ -82,12 +103,17 @@ export async function handleAsaasWebhook(
   request: Request,
   token: string | undefined,
   ports: AsaasWebhookPorts,
+  environment: AsaasEnvironment = "sandbox",
 ) {
   const payload = await readAsaasWebhook(request, token);
   if (payload instanceof Response) return payload;
-  return handleAsaasEvent(payload, ports);
+  return handleAsaasEvent(payload, ports, environment);
 }
-export async function handleAsaasEvent(payload: AsaasWebhookEvent, ports: AsaasWebhookPorts) {
+export async function handleAsaasEvent(
+  payload: AsaasWebhookEvent,
+  ports: AsaasWebhookPorts,
+  environment: AsaasEnvironment = "sandbox",
+) {
   if (!confirmationEvents.has(payload.event) && !reversalEvents.has(payload.event))
     return reply(200, "ignored");
   try {
@@ -102,6 +128,7 @@ export async function handleAsaasEvent(payload: AsaasWebhookEvent, ports: AsaasW
       ports,
       payload.id,
       confirmationEvents.has(payload.event),
+      environment,
     );
   } catch {
     return reply(503, "retry");
@@ -114,10 +141,12 @@ export async function verifyBoundAsaasPayment(
   ports: AsaasWebhookPorts,
   eventId: string,
   allowConfirmation = true,
+  environment: AsaasEnvironment = "sandbox",
 ): Promise<Response> {
   if (binding.account_id !== (await ports.wallet())) return reply(409, "account_mismatch");
   const offer = await ports.offer(binding.offer_id);
-  if (binding.offer_id !== offer.id || offer.signature_environment !== "sandbox")
+  // A conta que notificou e a contratação precisam ser do mesmo ambiente; sandbox nunca confirma produção.
+  if (binding.offer_id !== offer.id || offer.signature_environment !== environment)
     return reply(409, "payment_mismatch");
   let payment: AsaasPayment;
   try {
@@ -135,7 +164,7 @@ export async function verifyBoundAsaasPayment(
     payment.id !== binding.payment_id ||
     payment.customer !== binding.customer_id ||
     payment.externalReference !== `tinutri:${offer.id}` ||
-    offer.signature_environment !== "sandbox" ||
+    offer.signature_environment !== environment ||
     payment.billingType !== billingTypes[offer.commercial.payment]
   )
     return reply(409, "payment_mismatch");
@@ -160,5 +189,12 @@ export async function verifyBoundAsaasPayment(
   if (offer.signature_status !== "signed" || !offer.signed_file_path || offer.signature_issue)
     return reply(409, "signature_required");
   await ports.confirm(offer, binding, eventId);
-  return reply(200, "confirmed_sandbox");
+  // Sandbox não convida usuários, não enfileira ativação e não libera acesso real.
+  if (environment !== "production") return reply(200, "confirmed_sandbox");
+  try {
+    await ports.activate?.(offer.id);
+  } catch {
+    /* A confirmação já foi gravada; a fila persistente e a retomada no Master preservam a ativação. */
+  }
+  return reply(200, "confirmed");
 }

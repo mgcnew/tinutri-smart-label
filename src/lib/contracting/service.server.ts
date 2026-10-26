@@ -141,13 +141,16 @@ export async function list(contractId: string, db: SupabaseClient, userId: strin
     throw new Error("Confira a aplicação dos SQLs 22, 23 e 24 para acompanhar a contratação.");
   const { activationAvailable } = await import("./activation.server");
   const { asaasAvailable, asaasConfig } = await import("./asaas.server");
-  let paymentCheckAvailable = false;
-  try {
-    asaasConfig();
-    paymentCheckAvailable = true;
-  } catch {
-    /* Configuração ainda pendente. */
-  }
+  // Conferência manual no Asaas por ambiente: contratações antigas de teste continuam conferíveis em produção.
+  const paymentCheckEnvironments = (["sandbox", "production"] as const).filter((environment) => {
+    try {
+      asaasConfig(environment);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  const paymentCheckAvailable = paymentCheckEnvironments.length > 0;
   const currentUser = rows.some((row) => row.signature_method === "tinutri")
     ? await db.auth.getUser()
     : null;
@@ -173,8 +176,9 @@ export async function list(contractId: string, db: SupabaseClient, userId: strin
     signatureAvailable: signatureAvailable(),
     signatureMethod: signatureMethod(),
     environment: signatureEnvironment(),
-    paymentAvailable: asaasAvailable() && signatureEnvironment() === "sandbox",
+    paymentAvailable: asaasAvailable(signatureEnvironment()),
     paymentCheckAvailable,
+    paymentCheckEnvironments,
   };
 }
 export async function manage(

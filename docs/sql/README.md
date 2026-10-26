@@ -79,3 +79,7 @@ Validação local em 26/10/2026 (PGlite): uma réplica com as colunas reais das 
 ## Aplicação registrada dos SQLs 27 e 28
 
 Em 26/10/2026, no projeto `ylkiyncsqubuxrtwyxwv`, os SQLs foram aplicados pela conexão Supabase do Claude Code, com autorização do usuário, como migrações `master_summary_fuso` e `rls_initplan_e_indices_fk` (sem `begin`/`commit`, porque a ferramenta de migração já usa transação). Antes da aplicação do 28, o hash das 50 regras conferia com o usado para gerar o arquivo. Conferência posterior: o `master_summary` contém a validação nova e mantém as permissões, nenhuma regra do schema `public` chama `auth.uid()` por linha (50 reescritas, de 53 regras no total) e os 17 índices `*_fk_idx` estão válidos. Os avisos `auth_rls_initplan` e `unindexed_foreign_keys` do advisor zeraram. O `master_summary` com sessão Master simulada levou 24 ms (antes, ~510 ms). `npm run supabase:contracting:check` continuou 37/37. Os índices novos aparecem como "não usados" no advisor até receberem consultas, o que é esperado.
+
+## Asaas de produção (SQL 29)
+
+Aplicar `29-asaas-producao.sql` depois de 24 e 25, quando for homologar a cobrança de produção. Ele permite o ambiente `production` nas cobranças e na fila de notificações, confere o domínio da fatura pelo ambiente e cria `invalidate_contract_payment` para estornos de produção. Não cria cobranças nem ativa empresas. O sandbox continua funcionando sem ele. Se o 24 ou o 25 forem reaplicados, reaplicar o 29 por último. Detalhes em `docs/30-asaas-producao-e-ativacao.md`.

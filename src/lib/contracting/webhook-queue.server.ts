@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
 import {
   asaasEventSchema,
+  asaasRequestEnvironment,
   readAsaasWebhook,
   supportedAsaasEvent,
   type AsaasWebhookEvent,
 } from "./asaas-webhook-handler.server.ts";
+import type { AsaasEnvironment } from "./asaas.server.ts";
 
 export type InboxResult =
   | "ignored"
@@ -14,6 +16,7 @@ export type InboxResult =
   | "invalidated"
   | "waiting"
   | "confirmed_sandbox"
+  | "confirmed"
   | "signature_required"
   | "retry";
 export type InboxClaim = {
@@ -23,16 +26,22 @@ export type InboxClaim = {
   event_type: string;
   payment_id: string;
   external_reference: string | null;
+  /** Ausente antes do SQL 25 gravar a coluna: a fila só recebia sandbox. */
+  environment?: AsaasEnvironment;
 };
 export interface InboxPorts {
-  enqueue(event: AsaasWebhookEvent, hash: string): Promise<{ id: string; status: string } | null>;
+  enqueue(
+    event: AsaasWebhookEvent,
+    hash: string,
+    environment: AsaasEnvironment,
+  ): Promise<{ id: string; status: string } | null>;
   claim(id: string, actor?: string): Promise<InboxClaim | null>;
   finish(
     claim: InboxClaim,
     status: "pending" | "completed" | "blocked",
     result: InboxResult,
   ): Promise<void>;
-  verify(event: AsaasWebhookEvent): Promise<Response>;
+  verify(event: AsaasWebhookEvent, environment: AsaasEnvironment): Promise<Response>;
 }
 const resultCodes = new Set<InboxResult>([
   "ignored",
@@ -42,6 +51,7 @@ const resultCodes = new Set<InboxResult>([
   "invalidated",
   "waiting",
   "confirmed_sandbox",
+  "confirmed",
   "signature_required",
   "retry",
 ]);
@@ -84,7 +94,7 @@ export async function processInboxJob(id: string, ports: InboxPorts, actor?: str
       event: claim.event_type,
       payment: { id: claim.payment_id, externalReference: claim.external_reference },
     });
-    const response = await ports.verify(event);
+    const response = await ports.verify(event, claim.environment ?? "sandbox");
     const body = (await response.json()) as { state?: InboxResult };
     result = body.state && resultCodes.has(body.state) ? body.state : "retry";
     status =
@@ -104,11 +114,13 @@ export async function processInboxJob(id: string, ports: InboxPorts, actor?: str
 }
 export async function receiveQueuedAsaas(
   request: Request,
-  token: string | undefined,
+  tokens: string | undefined | Partial<Record<AsaasEnvironment, string>>,
   ports: InboxPorts,
   schedule: (work: Promise<unknown>) => void,
 ) {
-  const event = await readAsaasWebhook(request, token);
+  const configured = typeof tokens === "object" ? tokens : { sandbox: tokens };
+  const environment = asaasRequestEnvironment(request, configured);
+  const event = await readAsaasWebhook(request, configured[environment]);
   if (event instanceof Response) return event;
   const reply = (state: string, status = 200) =>
     Response.json({ state }, { status, headers: { "Cache-Control": "no-store" } });
@@ -116,14 +128,14 @@ export async function receiveQueuedAsaas(
   let saved: { id: string; status: string } | null;
   try {
     const stored = inboxEvent(event);
-    saved = await ports.enqueue(stored, asaasEventHash(stored));
+    saved = await ports.enqueue(stored, asaasEventHash(stored), environment);
   } catch {
     return reply("retry", 503);
   }
   // The existing SQL 22/23/24 installation stays functional before the optional SQL 25 is applied.
   if (!saved) {
     try {
-      return await ports.verify(event);
+      return await ports.verify(event, environment);
     } catch {
       return reply("retry", 503);
     }

@@ -6,20 +6,29 @@ import {
   asaasCustomer,
   asaasCreatePayment,
   asaasInvoiceUrl,
+  type AsaasEnvironment,
 } from "./asaas.server";
 import { offerDb } from "./store.server";
 import { prepareContractPayment } from "./payment-flow.server";
 
+/** A cobrança usa a conta Asaas do mesmo ambiente em que o contrato foi publicado e assinado. */
+export function paymentEnvironment(
+  offer: Pick<Offer, "signature_environment">,
+): AsaasEnvironment | null {
+  return offer.signature_environment === "sandbox" || offer.signature_environment === "production"
+    ? offer.signature_environment
+    : null;
+}
 export function paymentAvailable(offer: Pick<Offer, "signature_environment" | "commercial">) {
-  return (
-    asaasAvailable() &&
-    offer.signature_environment === "sandbox" &&
-    offer.commercial.renewal === "manual"
+  const environment = paymentEnvironment(offer);
+  return Boolean(
+    environment && asaasAvailable(environment) && offer.commercial.renewal === "manual",
   );
 }
 /** One durable reservation per offer. Never automatically retry an uncertain external creation. */
 export async function createCheckout(offer: Offer): Promise<{ checkoutUrl: string }> {
-  if (!paymentAvailable(offer))
+  const environment = paymentEnvironment(offer);
+  if (!environment || !paymentAvailable(offer))
     throw new Error("O pagamento online ainda não está disponível para esta contratação.");
   const { data: contract, error } = await offerDb
     .from("service_contracts")
@@ -40,7 +49,7 @@ export async function createCheckout(offer: Offer): Promise<{ checkoutUrl: strin
     return result.data;
   };
   return prepareContractPayment(offer, {
-    wallet: asaasWallet,
+    wallet: () => asaasWallet(environment),
     claim: async (account) =>
       z
         .discriminatedUnion("state", [
@@ -50,12 +59,15 @@ export async function createCheckout(offer: Offer): Promise<{ checkoutUrl: strin
         ])
         .parse(await call("claim_contract_checkout", { p_offer: offer.id, p_account: account })),
     customer: () =>
-      asaasCustomer({
-        reference: `tinutri:${offer.id}`,
-        name: company.data.legal_name || company.data.name,
-        cpfCnpj,
-        email: offer.signer.email,
-      }),
+      asaasCustomer(
+        {
+          reference: `tinutri:${offer.id}`,
+          name: company.data.legal_name || company.data.name,
+          cpfCnpj,
+          email: offer.signer.email,
+        },
+        environment,
+      ),
     save: async (token, customer, payment) => {
       await call("save_contract_checkout", {
         p_offer: offer.id,
@@ -72,17 +84,20 @@ export async function createCheckout(offer: Offer): Promise<{ checkoutUrl: strin
         month: "2-digit",
         day: "2-digit",
       }).format(new Date(Math.min(Date.now() + 3 * 86400_000, Date.parse(offer.expires_at))));
-      return asaasCreatePayment({
-        reference: `tinutri:${offer.id}`,
-        customer,
-        cents: offer.commercial.plan.total_cents,
-        method: offer.commercial.payment,
-        dueDate,
-      });
+      return asaasCreatePayment(
+        {
+          reference: `tinutri:${offer.id}`,
+          customer,
+          cents: offer.commercial.plan.total_cents,
+          method: offer.commercial.payment,
+          dueDate,
+        },
+        environment,
+      );
     },
     block: async (token) => {
       await call("block_contract_checkout", { p_offer: offer.id, p_token: token });
     },
-    invoice: asaasInvoiceUrl,
+    invoice: (value) => asaasInvoiceUrl(value, environment),
   });
 }

@@ -1,23 +1,52 @@
 import { z } from "zod";
 
-// Esta primeira integração funciona exclusivamente em sandbox.
-export function asaasConfig() {
+export type AsaasEnvironment = "sandbox" | "production";
+const HOSTS = {
+  sandbox: { api: "https://api-sandbox.asaas.com/v3", invoice: "https://sandbox.asaas.com" },
+  production: { api: "https://api.asaas.com/v3", invoice: "https://www.asaas.com" },
+} as const;
+// Produção tem chave, token de webhook e liberação próprios; sem ASAAS_PRODUCTION_ENABLED=true só o sandbox funciona.
+export function asaasConfig(environment: AsaasEnvironment = "sandbox") {
+  if (environment === "production") {
+    const key = process.env.ASAAS_PRODUCTION_API_KEY?.trim();
+    if (process.env.ASAAS_PRODUCTION_ENABLED !== "true" || !key?.startsWith("$aact_prod_"))
+      throw new Error("A cobrança de produção do Asaas não está habilitada no servidor.");
+    return { key, base: HOSTS.production.api, environment };
+  }
   const key = process.env.ASAAS_API_KEY?.trim();
   if (process.env.ASAAS_ENVIRONMENT !== "sandbox" || !key?.startsWith("$aact_hmlg_"))
     throw new Error("Configure a chave e o ambiente sandbox do Asaas no servidor.");
-  return { key, base: "https://api-sandbox.asaas.com/v3", environment: "sandbox" as const };
+  return { key, base: HOSTS.sandbox.api, environment: "sandbox" as const };
 }
-export function asaasWebhookReady() {
+export function asaasWebhookToken(environment: AsaasEnvironment = "sandbox") {
+  return environment === "production"
+    ? process.env.ASAAS_PRODUCTION_WEBHOOK_TOKEN
+    : process.env.ASAAS_WEBHOOK_TOKEN;
+}
+export function asaasWebhookReady(environment: AsaasEnvironment = "sandbox") {
   try {
-    asaasConfig();
-    const token = process.env.ASAAS_WEBHOOK_TOKEN ?? "";
-    return /^[^\s]{32,255}$/.test(token) && token !== process.env.ASAAS_API_KEY;
+    asaasConfig(environment);
+    const token = asaasWebhookToken(environment) ?? "";
+    const secrets = [
+      process.env.ASAAS_API_KEY,
+      process.env.ASAAS_PRODUCTION_API_KEY,
+      // Um único token para os dois ambientes impediria saber de qual conta veio a notificação.
+      asaasWebhookToken(environment === "production" ? "sandbox" : "production"),
+    ];
+    return /^[^\s]{32,255}$/.test(token) && !secrets.includes(token);
   } catch {
     return false;
   }
 }
-export function asaasAvailable() {
-  return process.env.CONTRACT_PAYMENT_PROVIDER === "asaas" && asaasWebhookReady();
+export function asaasAvailable(environment: AsaasEnvironment = "sandbox") {
+  return process.env.CONTRACT_PAYMENT_PROVIDER === "asaas" && asaasWebhookReady(environment);
+}
+/** Ambientes com webhook configurado, na ordem em que o token recebido é comparado. */
+export function asaasWebhookTokens() {
+  const tokens: Partial<Record<AsaasEnvironment, string>> = {};
+  for (const environment of ["sandbox", "production"] as const)
+    if (asaasWebhookReady(environment)) tokens[environment] = asaasWebhookToken(environment);
+  return tokens;
 }
 export class AsaasApiError extends Error {
   readonly status: number;
@@ -27,8 +56,13 @@ export class AsaasApiError extends Error {
     this.status = status;
   }
 }
-export async function asaasRequest(path: string, method = "GET", body?: unknown): Promise<unknown> {
-  const config = asaasConfig();
+export async function asaasRequest(
+  path: string,
+  method = "GET",
+  body?: unknown,
+  environment: AsaasEnvironment = "sandbox",
+): Promise<unknown> {
+  const config = asaasConfig(environment);
   if (!path.startsWith("/") || path.startsWith("//")) throw new Error("Recurso Asaas inválido.");
   let response: Response;
   try {
@@ -74,29 +108,39 @@ export const asaasPaymentSchema = z.object({
 });
 export type AsaasPayment = z.infer<typeof asaasPaymentSchema>;
 export const billingTypes = { pix: "PIX", boleto: "BOLETO", cartao: "CREDIT_CARD" } as const;
-export function asaasInvoiceUrl(value: string) {
+export function asaasInvoiceUrl(value: string, environment: AsaasEnvironment = "sandbox") {
   const url = new URL(value);
-  if (url.origin !== "https://sandbox.asaas.com" || url.username || url.password)
-    throw new Error("A URL da fatura não pertence ao sandbox do Asaas.");
+  if (url.origin !== HOSTS[environment].invoice || url.username || url.password)
+    throw new Error(
+      environment === "production"
+        ? "A URL da fatura não pertence ao Asaas."
+        : "A URL da fatura não pertence ao sandbox do Asaas.",
+    );
   return url.href;
 }
-export async function asaasWallet() {
+export async function asaasWallet(environment: AsaasEnvironment = "sandbox") {
   const list = z
     .object({ data: z.array(z.object({ id: z.string().uuid() })).length(1) })
-    .parse(await asaasRequest("/wallets/"));
+    .parse(await asaasRequest("/wallets/", "GET", undefined, environment));
   return list.data[0].id;
 }
-export async function asaasCustomer(input: {
-  reference: string;
-  name: string;
-  cpfCnpj: string;
-  email: string;
-}) {
+export async function asaasCustomer(
+  input: {
+    reference: string;
+    name: string;
+    cpfCnpj: string;
+    email: string;
+  },
+  environment: AsaasEnvironment = "sandbox",
+) {
   const list = z
     .object({ data: z.array(customerSchema), hasMore: z.boolean() })
     .parse(
       await asaasRequest(
         `/customers?externalReference=${encodeURIComponent(input.reference)}&limit=2`,
+        "GET",
+        undefined,
+        environment,
       ),
     );
   if (list.hasMore || list.data.length > 1)
@@ -107,31 +151,44 @@ export async function asaasCustomer(input: {
     return list.data[0].id;
   }
   return customerSchema.parse(
-    await asaasRequest("/customers", "POST", {
-      name: input.name,
-      cpfCnpj: input.cpfCnpj,
-      email: input.email,
-      externalReference: input.reference,
-      notificationDisabled: true,
-    }),
+    await asaasRequest(
+      "/customers",
+      "POST",
+      {
+        name: input.name,
+        cpfCnpj: input.cpfCnpj,
+        email: input.email,
+        externalReference: input.reference,
+        notificationDisabled: true,
+      },
+      environment,
+    ),
   ).id;
 }
-export async function asaasCreatePayment(input: {
-  reference: string;
-  customer: string;
-  cents: number;
-  method: keyof typeof billingTypes;
-  dueDate: string;
-}) {
+export async function asaasCreatePayment(
+  input: {
+    reference: string;
+    customer: string;
+    cents: number;
+    method: keyof typeof billingTypes;
+    dueDate: string;
+  },
+  environment: AsaasEnvironment = "sandbox",
+) {
   const payment = asaasPaymentSchema.parse(
-    await asaasRequest("/payments", "POST", {
-      customer: input.customer,
-      billingType: billingTypes[input.method],
-      value: input.cents / 100,
-      dueDate: input.dueDate,
-      externalReference: input.reference,
-      description: "TiNutri · adesão ao plano",
-    }),
+    await asaasRequest(
+      "/payments",
+      "POST",
+      {
+        customer: input.customer,
+        billingType: billingTypes[input.method],
+        value: input.cents / 100,
+        dueDate: input.dueDate,
+        externalReference: input.reference,
+        description: "TiNutri · adesão ao plano",
+      },
+      environment,
+    ),
   );
   if (
     payment.externalReference !== input.reference ||
@@ -142,10 +199,12 @@ export async function asaasCreatePayment(input: {
   )
     throw new Error("A cobrança retornada pelo Asaas diverge da contratação.");
   if (!payment.invoiceUrl) throw new Error("O Asaas não retornou a fatura para pagamento.");
-  asaasInvoiceUrl(payment.invoiceUrl);
+  asaasInvoiceUrl(payment.invoiceUrl, environment);
   return { ...payment, invoiceUrl: payment.invoiceUrl };
 }
-export async function asaasGetPayment(id: string) {
+export async function asaasGetPayment(id: string, environment: AsaasEnvironment = "sandbox") {
   resourceId.parse(id);
-  return asaasPaymentSchema.parse(await asaasRequest(`/payments/${encodeURIComponent(id)}`));
+  return asaasPaymentSchema.parse(
+    await asaasRequest(`/payments/${encodeURIComponent(id)}`, "GET", undefined, environment),
+  );
 }

@@ -34,6 +34,7 @@ export const NOTIFICATION_RESULT: Record<string, string> = {
   invalidated: "Pagamento invalidado conforme a conferência no Asaas.",
   waiting: "O pagamento ainda não foi confirmado no Asaas.",
   confirmed_sandbox: "Pagamento de teste confirmado. Nenhum acesso real liberado.",
+  confirmed: "Pagamento confirmado. A liberação do acesso segue a ativação da contratação.",
   signature_required: "A assinatura precisa ser concluída e conferida.",
   retry: "A conferência não terminou. Tente retomar após verificar a disponibilidade.",
 };

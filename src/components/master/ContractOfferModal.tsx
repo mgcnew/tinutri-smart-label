@@ -138,9 +138,13 @@ export function ContractOfferModal({
               {listing.signatureAvailable
                 ? "Assinatura configurada. O cliente poderá continuar pela página do contrato."
                 : "A assinatura ainda precisa ser configurada. O link permite revisar o contrato, mas não assinar."}{" "}
-              {listing.paymentAvailable
-                ? "Pagamento de teste configurado para contratos com renovação manual. Nenhum acesso real será liberado pelo sandbox."
-                : "Pagamento online ainda indisponível."}
+              {!listing.paymentAvailable
+                ? "Pagamento online ainda indisponível."
+                : listing.environment === "sandbox"
+                  ? "Pagamento de teste configurado para contratos com renovação manual. Nenhum acesso real será liberado pelo sandbox."
+                  : listing.activationAvailable
+                    ? "Pagamento de produção configurado para contratos com renovação manual. O pagamento confirmado libera o acesso automaticamente."
+                    : "Pagamento de produção configurado para contratos com renovação manual. A liberação automática está desligada: após o pagamento, use Retomar ativação quando ela for habilitada."}
             </p>
           </div>
         )}
@@ -471,9 +475,10 @@ export function ContractOfferModal({
                   </p>
                 )}
                 {offer.checkout.status === "ready" &&
-                  listing.paymentCheckAvailable &&
                   !offer.revoked_at &&
-                  offer.signature_environment === "sandbox" && (
+                  (listing.paymentCheckEnvironments ?? []).some(
+                    (environment) => environment === offer.signature_environment,
+                  ) && (
                     <Button
                       className="mt-3"
                       variant="outline"
@@ -485,11 +490,13 @@ export function ContractOfferModal({
                           setNotice(
                             result.state === "confirmed_sandbox"
                               ? "Pagamento de teste confirmado no Asaas. Nenhum acesso real foi liberado."
-                              : result.state === "invalidated"
-                                ? "Pagamento invalidado conforme a situação consultada no Asaas."
-                                : result.state === "waiting"
-                                  ? "O Asaas ainda não confirmou o pagamento."
-                                  : "Conferência concluída. A contratação precisa de revisão antes de continuar.",
+                              : result.state === "confirmed"
+                                ? "Pagamento confirmado no Asaas. A ativação do acesso foi colocada na fila."
+                                : result.state === "invalidated"
+                                  ? "Pagamento invalidado conforme a situação consultada no Asaas."
+                                  : result.state === "waiting"
+                                    ? "O Asaas ainda não confirmou o pagamento."
+                                    : "Conferência concluída. A contratação precisa de revisão antes de continuar.",
                           );
                         })
                       }

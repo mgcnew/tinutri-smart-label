@@ -185,6 +185,7 @@ export async function listOffers() {
     environment: scenario === "master-blocked" ? "production" : "sandbox",
     paymentAvailable: false,
     paymentCheckAvailable: true,
+    paymentCheckEnvironments: ["sandbox"],
   };
 }
 export async function publishOffer() {

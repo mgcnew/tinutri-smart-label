@@ -311,14 +311,19 @@ export function ContractJourney({
                       {offer.payment_status === "refunded"
                         ? "O pagamento foi invalidado ou estornado. Fale com a TiNutri para revisar a contratação."
                         : offer.paymentAvailable
-                          ? "Ambiente de teste: a fatura será aberta no sandbox do Asaas. Este pagamento não libera acesso real ao sistema."
+                          ? offer.signature_environment === "sandbox"
+                            ? "Ambiente de teste: a fatura será aberta no sandbox do Asaas. Este pagamento não libera acesso real ao sistema."
+                            : "Seu contrato foi formalizado. Pague a fatura no Asaas; após a confirmação, o acesso é preparado para o e-mail informado na contratação."
                           : "Seu contrato foi formalizado. O pagamento online ainda não está disponível. A TiNutri informará quando você puder continuar por este mesmo link."}
                     </p>
                     {offer.paymentAvailable && offer.payment_status !== "refunded" ? (
                       checkoutUrl ? (
                         <Button asChild className="mt-4">
                           <a href={checkoutUrl} target="_blank" rel="noopener noreferrer">
-                            Abrir fatura de teste <ArrowRight />
+                            {offer.signature_environment === "sandbox"
+                              ? "Abrir fatura de teste"
+                              : "Abrir fatura"}{" "}
+                            <ArrowRight />
                           </a>
                         </Button>
                       ) : (
@@ -333,7 +338,11 @@ export function ContractJourney({
                             })
                           }
                         >
-                          {busy ? "Preparando fatura…" : "Preparar pagamento de teste"}
+                          {busy
+                            ? "Preparando fatura…"
+                            : offer.signature_environment === "sandbox"
+                              ? "Preparar pagamento de teste"
+                              : "Preparar pagamento"}
                           <ArrowRight />
                         </Button>
                       )

@@ -18,7 +18,7 @@ export interface CheckoutPorts {
 }
 export async function prepareContractPayment(offer: Offer, ports: CheckoutPorts) {
   if (
-    offer.signature_environment !== "sandbox" ||
+    (offer.signature_environment !== "sandbox" && offer.signature_environment !== "production") ||
     offer.signature_status !== "signed" ||
     !offer.signed_file_path ||
     offer.signature_issue ||
@@ -28,7 +28,7 @@ export async function prepareContractPayment(offer: Offer, ports: CheckoutPorts)
     offer.payment_status === "refunded" ||
     Date.parse(offer.expires_at) <= Date.now()
   )
-    throw new Error("Esta contratação não está disponível para pagamento de teste.");
+    throw new Error("Esta contratação não está disponível para pagamento.");
   const claim = await ports.claim(await ports.wallet());
   if (claim.state === "ready") return { checkoutUrl: ports.invoice(claim.invoice_url) };
   if (claim.state !== "claimed")

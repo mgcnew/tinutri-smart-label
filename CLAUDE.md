@@ -1,6 +1,6 @@
 # Continuidade do TiNutri Smart Label
 
-**Estado atual — 24/10/2026:** assinatura própria implementada localmente, seguindo a proposta aprovada. Ler primeiro `docs/29-assinatura-propria-implementacao.md`. O usuário escolheu Gmail da TiNutri e pediu para configurar a senha de app depois. Não pedir conta Clicksign/Autentique como pré-requisito e não retomar essas integrações para contratos novos.
+**Estado atual — 24/10/2026:** assinatura própria implementada localmente, seguindo a proposta aprovada. Ler primeiro `docs/29-assinatura-propria-implementacao.md`. O usuário configurou a senha de app do Gmail em 26/10/2026; `signature:mail:check` aprovou a conexão (sem envio). Não pedir conta Clicksign/Autentique como pré-requisito e não retomar essas integrações para contratos novos.
 
 SQLs 22–26 aplicados no projeto Supabase `ylkiyncsqubuxrtwyxwv` (também é o `project_id` de `supabase/config.toml`); em 26/10/2026 o usuário aplicou o 26 manualmente e a conferência pela API passou em 37/37. A conferência 99 completa (RLS/permissões) no SQL Editor ainda não foi registrada. O código não aplica DDL remoto automaticamente. Os SQLs 27 (desempenho do `master_summary`) e 28 (RLS com `(select auth.uid())` e índices de chaves estrangeiras) foram aplicados e conferidos em 26/10/2026 (registro em `docs/sql/README.md`); as funções da Vercel passaram a ser publicadas em `gru1` via `vite.config.ts`. Não declarar entrega Gmail ou homologação real com base nos testes isolados.
 
@@ -10,6 +10,7 @@ Produção Asaas da conta do cliente permanece como etapa final. Sandbox não co
 
 Leitura complementar:
 
+1. `docs/30-asaas-producao-e-ativacao.md` — Asaas de produção e pagamento → ativação (26/10/2026), tudo desligado; SQL 29 pendente de aplicação.
 1. `docs/28-assinatura-propria-proposta.md` — proposta aprovada; implementação no documento 29.
 2. `docs/27-fila-e-estornos-asaas.md` — fila durável, SQL 25, retomada e limites.
 3. `docs/26-publicacao-e-conferencia-asaas.md` — histórico de publicação e webhook.
