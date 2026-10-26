@@ -3,7 +3,7 @@ import { FixedCompany } from "@/components/FixedCompany";
 import { SystemSelect } from "@/components/ui/system-select";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { addDays, format, isValid } from "date-fns";
-import { AlertTriangle, Building2, CalendarClock, CheckCircle2, ClipboardList, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, UserCog, Trash2, Users, X } from "lucide-react";
+import { AlertTriangle, Building2, CalendarClock, CheckCircle2, ClipboardList, HeartPulse, History, LayoutDashboard, ListPlus, LogOut, Menu, PackagePlus, Pencil, Printer, Search, Settings2, ShieldCheck, UserCog, Trash2, Users, X } from "lucide-react";
 import { cloneElement, lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ const HistoryPanel = lazy(() => import("@/components/HistoryPanel").then((m) => 
 const TeamAccessPanel = lazy(() => import("@/components/TeamAccessPanel").then((m) => ({ default: m.TeamAccessPanel })));
 const SettingsPanel = lazy(() => import("@/components/SettingsPanel").then((m) => ({ default: m.SettingsPanel })));
 const ValidadesPanel = lazy(() => import("@/components/ValidadesPanel").then((m) => ({ default: m.ValidadesPanel })));
+const PortfolioPanel = lazy(() => import("@/components/PortfolioPanel").then((m) => ({ default: m.PortfolioPanel })));
 
 
 // A rota "/" valida a busca e carrega esta área sob demanda, só para quem tem sessão salva.
@@ -349,6 +350,10 @@ export function Workspace() {
   const activeClients = useMemo(() => clients.filter(c => c.active), [clients]);
   // Login de empresa pertence a uma só: o seletor da emissão vira nome fixo.
   const singleCompany = role !== "admin_master" && activeClients.length === 1 ? activeClients[0] : null;
+  useEffect(() => {
+    if (role && !availableTabs.includes(tab)) setTab("dashboard");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- availableTabs deriva de role e permissions
+  }, [role, permissions, tab]);
   // Com uma única empresa no acesso (ex.: nutricionista com uma empresa na carteira), ela já fica selecionada.
   useEffect(() => {
     if (singleCompany && selectedClient !== singleCompany.id) selectClient(singleCompany.id);
@@ -870,7 +875,7 @@ export function Workspace() {
           {entryError && <p role="alert" className="clients-error mb-5">{entryError}</p>}
           {entryCompany && <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3 text-sm"><span>Empresa selecionada: <strong>{clients.find(item => item.id === entryCompany)?.name ?? "Carregando…"}</strong></span><Button variant="ghost" size="sm" onClick={() => { setEntryCompany(""); setDashboardClient(""); }}>Limpar seleção</Button></div>}
           {activityWarning && <div role="alert" className="mb-5 flex items-center gap-3 rounded-xl border border-accent bg-card p-4 text-sm"><p className="flex-1">{activityWarning}</p><Button variant="ghost" size="icon" aria-label="Fechar aviso" onClick={() => setActivityWarning(null)}><X /></Button></div>}
-          {tab === "dashboard" && <OperationalDashboard overview={overview} clients={clients} userName={userName} canViewHistory={permissions.ver_historico} clientId={dashboardClient} onClientChange={setDashboardClient} onNavigate={navigateTab} onWindow={(window) => { setValidityWindow(window); setTab("validades"); }} onLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} onAction={(action) => { setDetailAction(action); setDetailLabelId(action.source === "activity" ? null : action.label_id); }} />}
+          {tab === "dashboard" && <OperationalDashboard canEmit={permissions.emitir} overview={overview} clients={clients} userName={userName} canViewHistory={permissions.ver_historico} clientId={dashboardClient} onClientChange={setDashboardClient} onNavigate={navigateTab} onWindow={(window) => { setValidityWindow(window); setTab("validades"); }} onLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} onAction={(action) => { setDetailAction(action); setDetailLabelId(action.source === "activity" ? null : action.label_id); }} />}
           {isLabelTab(tab) && <LabelWorkspaceNav tab={tab} allowed={availableTabs} onNavigate={navigateTab} />}
           {tab === "emit" && <section className="emission-page space-y-6">
             <EmissionPrinterPicker clientId={selectedClient} connection={printerSettings.connection} printerId={printerSettings.printerId} onSelect={(printerId) => updateSettings({ printerId })} />
@@ -993,6 +998,7 @@ export function Workspace() {
           {tab === "clients" && role === "nutricionista" && <ClientsPanel scope={carteira} revision={overviewRevision} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
           {tab === "products" && <ProductsPanel clients={clients} scope={role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : []} revision={overviewRevision} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} initialClient={entryCompany} />}
           {tab === "team" && <TeamPanel scope={accessScope} clients={clients} collaborators={collaborators} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
+          {tab === "carteira" && (role === "admin_master" || role === "nutricionista") && <PortfolioPanel onOpenValidities={(id) => { setDashboardClient(id); setValidityWindow("all"); setTab("validades"); }} />}
           {tab === "validades" && <ValidadesPanel embedded canDiscard={permissions.descartar} scope={overviewScope} revision={overviewRevision} alertDays={alertDays} onOpenAlertSettings={() => { setSettingsTab("alertas"); navigateTab("settings"); }} onSettle={settleLabel} window={validityWindow} onWindowChange={setValidityWindow} clientName={clients.find((item) => item.id === (overviewScope?.length === 1 ? overviewScope[0] : dashboardClient))?.name ?? "Todas as empresas acessíveis"} onOpenLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} />}
           {tab === "acompanhamento" && (role === "admin_master" || role === "nutricionista") && <CarePanel scope={role === "admin_master" ? null : carteira} revision={overviewRevision} initialClient={entryCompany} focusedId={focusedEntityId} />}
           {tab === "history" && <HistoryPanel embedded scope={historyScope} clientName={clients.find((item) => historyScope?.length === 1 && item.id === historyScope[0])?.name} revision={overviewRevision} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
@@ -1023,6 +1029,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "carteira", label: "Carteira", icon: HeartPulse },
   { id: "clients", label: "Clientes", icon: Building2 },
   { id: "products", label: "Produtos", icon: PackagePlus },
   { id: "team", label: "Colaboradores", icon: Users },
@@ -1036,10 +1043,12 @@ const navItems = [
 function tabsFor(role: AppRole, permissions: Permissions): AppTab[] {
   const staff = role === "admin_master" || role === "nutricionista";
   const tabs: AppTab[] = ["dashboard"];
+  if (staff) tabs.push("carteira");
   if (role === "nutricionista") tabs.push("clients");
   if (permissions.gerir_produtos) tabs.push("products");
   if (permissions.gerir_colaboradores) tabs.push("team");
-  tabs.push("emit", "validades");
+  if (permissions.emitir) tabs.push("emit");
+  tabs.push("validades");
   if (staff) tabs.push("acompanhamento");
   if (permissions.ver_historico) tabs.push("history");
   if (!staff && permissions.gerir_acessos) tabs.push("access");

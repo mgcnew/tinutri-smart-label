@@ -8,11 +8,17 @@ export type Permission =
   | "gerir_colaboradores"
   | "gerir_impressoras"
   | "gerir_acessos"
+  | "emitir"
   | "descartar"
   | "ver_historico";
 export type Permissions = Record<Permission, boolean>;
 
 export const PERMISSIONS: { id: Permission; label: string; description: string }[] = [
+  {
+    id: "emitir",
+    label: "Emitir etiquetas",
+    description: "Preparar e imprimir etiquetas da empresa.",
+  },
   {
     id: "descartar",
     label: "Descartar etiquetas",
@@ -57,6 +63,7 @@ const NONE: Permissions = {
   gerir_colaboradores: false,
   gerir_impressoras: false,
   gerir_acessos: false,
+  emitir: false,
   descartar: false,
   ver_historico: false,
 };
@@ -70,7 +77,9 @@ export function defaultPermissions(role: AppRole | null): Permissions {
     gerir_colaboradores: rank >= 2,
     gerir_impressoras: rank >= 2,
     gerir_acessos: rank === 2 || rank === 3 || rank === 5,
-    descartar: true,
+    // A nutricionista acompanha a carteira; emitir e descartar são da operação da empresa (o Master pode liberar).
+    emitir: rank !== 4,
+    descartar: rank !== 4,
     ver_historico: true,
   };
 }

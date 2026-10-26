@@ -1,5 +1,6 @@
 export type WorkspaceTab =
   | "dashboard"
+  | "carteira"
   | "clients"
   | "products"
   | "team"
@@ -11,6 +12,7 @@ export type WorkspaceTab =
   | "access";
 const panels: WorkspaceTab[] = [
   "dashboard",
+  "carteira",
   "clients",
   "products",
   "team",

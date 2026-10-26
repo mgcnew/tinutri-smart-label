@@ -39,6 +39,8 @@ type Props = {
   onLabel: (id: string) => void;
   onAction: (event: RecentAction) => void;
   canViewHistory: boolean;
+  /** Sem permissão de emissão (ex.: nutricionista), o atalho de emitir não aparece. */
+  canEmit?: boolean;
 };
 
 export function OperationalDashboard({
@@ -52,6 +54,7 @@ export function OperationalDashboard({
   onLabel,
   onAction,
   canViewHistory,
+  canEmit = true,
 }: Props) {
   const [listWindow, setListWindow] = useState<ExpiryWindow>("all");
   const { labels, actions, loading, labelsError, actionsError, now, updatedAt, reload } = overview;
@@ -79,12 +82,14 @@ export function OperationalDashboard({
             Veja o que precisa de atenção e acompanhe sua equipe.
           </p>
         </div>
-        <Button
-          className="dashboard-primary h-11 rounded-xl shadow-none"
-          onClick={() => onNavigate("emit")}
-        >
-          <Printer /> Emitir etiquetas
-        </Button>
+        {canEmit && (
+          <Button
+            className="dashboard-primary h-11 rounded-xl shadow-none"
+            onClick={() => onNavigate("emit")}
+          >
+            <Printer /> Emitir etiquetas
+          </Button>
+        )}
       </header>
 
       <div className="dashboard-context flex flex-col items-stretch gap-3 rounded-xl border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">

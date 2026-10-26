@@ -29,7 +29,8 @@
     "signature:setup": "node scripts/setup-own-signature.mjs",
     "signature:mail:check": "node --experimental-strip-types scripts/check-signature-mail.mjs",
     "signature:evidence:verify": "node --experimental-strip-types scripts/verify-own-signature-evidence.mjs",
-    "test:traceability": "node --test tests/label-traceability-sql.test.mjs"
+    "test:traceability": "node --test tests/label-traceability-sql.test.mjs",
+    "test:portfolio": "node --experimental-strip-types --test tests/portfolio.test.ts tests/portfolio-sql.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
