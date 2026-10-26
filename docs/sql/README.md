@@ -89,3 +89,7 @@ Aplicado em 26/10/2026 no projeto `ylkiyncsqubuxrtwyxwv` pela conexão Supabase 
 ## Conferência 99 registrada
 
 Em 26/10/2026, com os SQLs 22–29 aplicados no projeto `ylkiyncsqubuxrtwyxwv`, a conferência 99 foi executada pela conexão Supabase em uma consulta somente leitura: **42/42 OK** (12 tabelas com RLS, 3 colunas, 24 rotinas exclusivas de servidor, 2 índices únicos e o bucket privado `contract-documents`). O arquivo `99-conferir-contratacao.sql` passou a aceitar a fila de 5 ou 6 argumentos e confere `invalidate_contract_payment` (SQL 29).
+
+## Rastreabilidade pelo QR (SQL 30)
+
+`30-rastreabilidade-qr.sql` cria `label_lookup(token)` e `register_label_check(token)` sem apagar nem alterar funções existentes. A consulta pública do QR passa a trazer os **alérgenos**: no projeto remoto, `get_label_by_token` ainda está na versão anterior à migração `20261006140000_label_lookup_allergens`, que nunca foi aplicada. Ela também traz a **linha do tempo** da etiqueta: visitantes veem só os marcos, sem nomes; a equipe da empresa vê todos os eventos e quem os registrou. Quando alguém da equipe, logado, lê o QR de uma etiqueta ativa, a conferência é registrada no máximo uma vez a cada 10 minutos por pessoa. A página continua funcionando com a consulta antiga enquanto o SQL 30 não for aplicado. Testes: `npm run test:traceability` (PGlite).

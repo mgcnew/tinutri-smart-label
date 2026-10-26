@@ -34,6 +34,7 @@ export const EVENT_NAMES: Record<string, string> = {
   emissao: "preparou a etiqueta",
   impressao_confirmada: "confirmou a impressão",
   falha_impressao: "registrou uma falha de impressão",
+  conferencia: "conferiu a etiqueta",
   reimpressao: "solicitou uma reimpressão",
   baixa_utilizada: "registrou a utilização",
   baixa_consumida: "registrou o consumo",

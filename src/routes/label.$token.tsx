@@ -10,6 +10,38 @@ import { allergenText } from "@/lib/allergens";
 import { formatCloseReason, type Settlement } from "@/lib/settlement";
 import { kindLabel, resolveStatus, STATUS_TEXT, type LabelKind, type LabelLifecycle, type LabelStatus } from "@/lib/label";
 
+/** Funções do SQL 30 ainda fora dos tipos gerados do Supabase. */
+type UntypedRpc = (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string } | null }>;
+const rpc = (fn: string, args: Record<string, unknown>) => (supabase.rpc as unknown as UntypedRpc).call(supabase, fn, args);
+
+type TimelineEvent = { type: string; at: string; by: string | null };
+type Lookup = { label: LabelRow; events: TimelineEvent[] | null; staff: boolean };
+type CheckState = "registered" | "recent" | null;
+
+const TIMELINE_NAMES: Record<string, string> = {
+  emissao: "Etiqueta emitida",
+  impressao_confirmada: "Impressão confirmada",
+  falha_impressao: "Falha de impressão registrada",
+  reimpressao: "Reimpressão solicitada",
+  conferencia: "Conferida pela equipe",
+  baixa_utilizada: "Baixa: utilizada",
+  baixa_consumida: "Baixa: consumida",
+  baixa_descartada: "Baixa: descartada",
+};
+
+/** Consulta com linha do tempo (SQL 30); sem ela, a consulta antiga mantém a página funcionando. */
+async function lookupLabel(token: string): Promise<Lookup | null> {
+  const current = await rpc("label_lookup", { _token: token });
+  if (!current.error) {
+    const data = current.data as { label: LabelRow; events: TimelineEvent[]; staff: boolean } | null;
+    return data?.label ? { label: data.label, events: data.events ?? [], staff: Boolean(data.staff) } : null;
+  }
+  if (current.error.code !== "PGRST202") return null;
+  const { data, error } = await supabase.rpc("get_label_by_token", { _token: token });
+  const found = (data as LabelRow[] | null)?.[0] ?? null;
+  return error || !found ? null : { label: found, events: null, staff: false };
+}
+
 export const Route = createFileRoute("/label/$token")({
   head: () => ({
     meta: [
@@ -62,6 +94,9 @@ function fmt(value: string | null | undefined) {
 function LabelLookup() {
   const { token } = Route.useParams();
   const [row, setRow] = useState<LabelRow | null>(null);
+  const [events, setEvents] = useState<TimelineEvent[] | null>(null);
+  const [staff, setStaff] = useState(false);
+  const [checkState, setCheckState] = useState<CheckState>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing">("loading");
   // Só aparece para quem está logado e tem acesso à etiqueta (a política do banco decide).
   const [actor, setActor] = useState<{ id: string; clientId: string; userId: string; userName: string; canSettle: boolean } | null>(null);
@@ -74,12 +109,25 @@ function LabelLookup() {
   useEffect(() => {
     let alive = true;
     void (async () => {
-      const { data, error } = await supabase.rpc("get_label_by_token", { _token: token });
+      const found = await lookupLabel(token);
       if (!alive) return;
-      const found = (data as LabelRow[] | null)?.[0] ?? null;
-      if (error || !found) { setState("missing"); return; }
-      setRow(found);
+      if (!found) { setState("missing"); return; }
+      setRow(found.label);
+      setEvents(found.events);
+      setStaff(found.staff);
       setState("ready");
+      // Leitura pela equipe com acesso à empresa conta como conferência, registrada uma vez a cada 10 minutos.
+      if (found.staff && found.events !== null && found.label.label_status === "ativa") {
+        // Falha no registro não impede a consulta nem a baixa.
+        const check = await rpc("register_label_check", { _token: token });
+        const result = check.error ? null : (check.data as { state?: string } | null)?.state;
+        if (!alive) return;
+        if (result === "registered" || result === "recent") setCheckState(result);
+        if (result === "registered") {
+          const refreshed = await lookupLabel(token);
+          if (alive && refreshed) setEvents(refreshed.events);
+        }
+      }
       const { data: auth } = await supabase.auth.getUser();
       const user = auth.user;
       if (!user || !alive) return;
@@ -124,6 +172,8 @@ function LabelLookup() {
     setActor({ ...actor, canSettle: false });
     setDiscarding(false);
     setFeedback(`Baixa registrada: ${choice}.`);
+    const refreshed = await lookupLabel(token);
+    if (refreshed) setEvents(refreshed.events);
   };
 
   return (
@@ -176,6 +226,39 @@ function LabelLookup() {
           </section>
         )}
         {feedback && <p role="status" className="mt-3 text-center text-sm font-semibold">{feedback}</p>}
+
+        {events && (
+          <section className="mt-4 rounded-3xl border bg-card p-5 shadow-sm" aria-labelledby="timeline-title">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 id="timeline-title" className="text-sm font-bold">Histórico desta etiqueta</h2>
+              {checkState && (
+                <span role="status" className="text-xs font-semibold text-primary">
+                  {checkState === "registered" ? "Sua conferência foi registrada" : "Você conferiu há poucos minutos"}
+                </span>
+              )}
+            </div>
+            {events.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">Nenhum registro além da emissão.</p>
+            ) : (
+              <ol className="mt-4 space-y-0">
+                {events.map((event, index) => (
+                  <li key={`${event.type}-${event.at}-${index}`} className="relative flex gap-3 pb-4 last:pb-0">
+                    {index < events.length - 1 && <span aria-hidden="true" className="absolute left-[5px] top-4 h-full w-px bg-border" />}
+                    <span aria-hidden="true" className={`relative mt-1.5 size-[11px] shrink-0 rounded-full border-2 ${event.type.startsWith("baixa_") ? "border-muted-foreground bg-muted" : event.type === "falha_impressao" ? "border-destructive bg-card" : "border-primary bg-card"}`} />
+                    <div className="min-w-0 text-sm">
+                      <p className="font-semibold">{TIMELINE_NAMES[event.type] ?? "Registro da etiqueta"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {fmt(event.at)}
+                        {staff && event.by ? ` · ${event.by}` : ""}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {!staff && <p className="mt-4 text-xs text-muted-foreground">A equipe do estabelecimento vê também quem realizou cada registro.</p>}
+          </section>
+        )}
 
         <p className="mt-4 text-center text-xs text-muted-foreground">
           Situação calculada com base na validade registrada. Código {row.public_token.slice(0, 8)}…
