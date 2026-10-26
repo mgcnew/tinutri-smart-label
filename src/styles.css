@@ -621,3 +621,7 @@ a, button, summary, select, [role="button"], [role="tab"], label { touch-action:
 .system-select-option { min-height: 40px; padding: 10px 34px 10px 12px; border-radius: 8px; white-space: normal; overflow-wrap: anywhere; cursor: pointer; font-size: 14px; }
 .system-select-option[data-highlighted], .system-select-option[data-state="checked"] { background: var(--tint-green); color: var(--brand-ink); }
 @media (max-width: 640px) { .system-select-trigger { font-size: 16px; } }
+/* Sessão salva neste navegador (marca do script do <head>): a apresentação some antes da primeira pintura e a estação carrega no lugar. */
+.session-boot { display: none; }
+html[data-session] .session-boot { display: grid; }
+html[data-session] .session-landing { display: none; }

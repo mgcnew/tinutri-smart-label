@@ -11,6 +11,7 @@ import { useEffect, useMemo, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { THEME_BOOT_SCRIPT } from "../hooks/use-theme";
+import { SESSION_BOOT_SCRIPT } from "../lib/session-hint";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
 function NotFoundComponent() {
@@ -118,6 +119,7 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: SESSION_BOOT_SCRIPT }} />
         <HeadContent />
       </head>
       <body>
