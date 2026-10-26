@@ -7,7 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { THEME_BOOT_SCRIPT } from "../hooks/use-theme";
@@ -36,7 +36,10 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error: raised, reset }: { error: unknown; reset: () => void }) {
-  const error = raised instanceof Error ? raised : new Error(String(raised));
+  const error = useMemo(
+    () => (raised instanceof Error ? raised : new Error(String(raised))),
+    [raised],
+  );
   console.error(error);
   const router = useRouter();
   useEffect(() => {

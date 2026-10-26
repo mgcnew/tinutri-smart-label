@@ -99,7 +99,8 @@ export async function list(contractId: string, db: SupabaseClient, userId: strin
   const { data, error } = result;
   if (error)
     throw new Error("Contratação por link indisponível. Confira a aplicação dos SQLs 22 e 23.");
-  const rows = (data ?? []) as Pick<
+  // The select string is built at runtime, so the client cannot infer the row type.
+  const rows = (data ?? []) as unknown as Pick<
     Offer,
     | "id"
     | "created_at"

@@ -16,7 +16,7 @@ const inviteSchema = z.object({
  */
 export const inviteTeamMember = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => inviteSchema.parse(input))
+  .validator((input) => inviteSchema.parse(input))
   .handler(async ({ data, context }) => {
     const allowed = await (
       context.supabase as unknown as {

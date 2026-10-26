@@ -87,7 +87,7 @@ export const claimFirstAdmin = createServerFn({ method: "POST" })
 
 export const inviteOperator = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => createUserSchema.parse({ ...(input as object), role: "operator" }))
+  .validator((input) => createUserSchema.parse({ ...(input as object), role: "operator" }))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId, context.supabase);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -117,7 +117,7 @@ export const inviteOperator = createServerFn({ method: "POST" })
 
 export const createUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => createUserSchema.parse(input))
+  .validator((input) => createUserSchema.parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId, context.supabase);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -189,7 +189,7 @@ export const createUser = createServerFn({ method: "POST" })
 
 export const resetUserPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => resetPasswordSchema.parse(input))
+  .validator((input) => resetPasswordSchema.parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId, context.supabase);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -218,7 +218,7 @@ export const listAllClients = createServerFn({ method: "GET" })
 
 export const upsertClient = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => upsertClientSchema.parse(input))
+  .validator((input) => upsertClientSchema.parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId, context.supabase);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -252,7 +252,7 @@ export const upsertClient = createServerFn({ method: "POST" })
 
 export const setClientStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => setStatusSchema.parse(input))
+  .validator((input) => setStatusSchema.parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId, context.supabase);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -280,7 +280,7 @@ export const listAllUsers = createServerFn({ method: "GET" })
 
 export const assignNutritionistClient = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => carteiraSchema.parse(input))
+  .validator((input) => carteiraSchema.parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId, context.supabase);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -304,7 +304,7 @@ export const assignNutritionistClient = createServerFn({ method: "POST" })
 
 export const removeNutritionistClient = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => carteiraSchema.parse(input))
+  .validator((input) => carteiraSchema.parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId, context.supabase);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

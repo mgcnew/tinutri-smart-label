@@ -18,7 +18,7 @@ const listSchema = z.object({
 
 export const logActivity = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => logSchema.parse(input))
+  .validator((input) => logSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: profile } = await supabase.from("profiles").select("name").eq("user_id", userId).maybeSingle();
@@ -36,7 +36,7 @@ export const logActivity = createServerFn({ method: "POST" })
 
 export const listActivity = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => listSchema.parse(input))
+  .validator((input) => listSchema.parse(input))
   .handler(async ({ data, context }) => {
     let query = context.supabase
       .from("activity_logs")
