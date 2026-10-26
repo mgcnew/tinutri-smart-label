@@ -1,6 +1,6 @@
 # Asaas de produção e ativação automática
 
-Atualizado em **26/10/2026**. Implementação local da Fase 2: cobrança Asaas de produção ao lado do sandbox e ligação do pagamento verificado à ativação do acesso. **Tudo começa desligado.** Nenhuma cobrança real, convite ou ativação foi feito nesta etapa, e o SQL 29 ainda não foi aplicado no Supabase.
+Atualizado em **26/10/2026**. Implementação local da Fase 2: cobrança Asaas de produção ao lado do sandbox e ligação do pagamento verificado à ativação do acesso. **Tudo começa desligado.** Nenhuma cobrança real, convite ou ativação foi feito nesta etapa. O SQL 29 foi aplicado e conferido no Supabase em 26/10/2026 (registro em `docs/sql/README.md`).
 
 ## O que mudou
 
@@ -23,7 +23,7 @@ Atualizado em **26/10/2026**. Implementação local da Fase 2: cobrança Asaas d
 
 ## Ordem para ligar em produção
 
-1. Aplicar o SQL 29 e conferir.
+1. ~~Aplicar o SQL 29 e conferir.~~ Feito em 26/10/2026.
 2. Conta Asaas de produção aprovada; gerar a chave e configurar o webhook de produção com token próprio e os mesmos eventos do sandbox, envio sequencial.
 3. Na Vercel: `ASAAS_PRODUCTION_API_KEY`, `ASAAS_PRODUCTION_WEBHOOK_TOKEN`, `ASAAS_PRODUCTION_ENABLED=true`, `CONTRACT_SIGNATURE_ENVIRONMENT=production`, `OWN_SIGNATURE_PRODUCTION_ENABLED=true`, mantendo `CONTRACT_ACTIVATION_ENABLED=false`. Novo deploy.
 4. Contratação real de homologação (empresa e valor da TiNutri): assinar, pagar e conferir confirmação + job `pending`, sem convite.
