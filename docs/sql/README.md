@@ -67,3 +67,11 @@ Esta integração exige novas variáveis de servidor e configuração Gmail. O r
 Independente do pacote de contratação. Em 26/10/2026, `public.master_summary` levava ~510 ms por chamada no projeto `ylkiyncsqubuxrtwyxwv`: a validação do fuso consultava `pg_catalog.pg_timezone_names`, que custou 522 ms isoladamente; a validação por `AT TIME ZONE` custou ~2 ms. Executar integralmente `27-master-summary-fuso.sql` no SQL Editor. Ele só substitui essa função, mantém as permissões e continua recusando fuso inválido ou vazio com "Período inválido.". O `15-area-master.sql` já traz a mesma correção; se o 15 for reaplicado, o 27 é desnecessário.
 
 Validado localmente em PGlite (aplicado duas vezes, fuso válido, inválido e nulo). Após a aplicação remota, conferir com `select prosrc not ilike '%pg_timezone_names%' from pg_proc where proname='master_summary';`, que deve retornar `true`.
+
+## Regras RLS e índices (SQL 28)
+
+Também independente do pacote de contratação. O advisor de desempenho do Supabase apontou 50 regras RLS que recalculam `auth.uid()` para cada linha e 17 chaves estrangeiras sem índice. `28-rls-e-indices.sql` troca `auth.uid()` por `(select auth.uid())` e calcula uma vez por consulta as funções que dependem só do usuário (`is_admin_master`, `tinutri_master`, `has_permission`, `has_role`). Também cria os índices `*_fk_idx`. A lógica de acesso não muda. O arquivo termina com uma conferência que aborta a transação se sobrar alguma regra com `auth.uid()` por linha.
+
+As expressões foram geradas em 26/10/2026 a partir das regras do projeto `ylkiyncsqubuxrtwyxwv`. Se alguma das regras listadas mudar antes da aplicação, gerar o arquivo novamente, para não restaurar uma versão antiga.
+
+Validação local em 26/10/2026 (PGlite): uma réplica com as colunas reais das tabelas, as 50 regras originais (texto idêntico ao remoto, conferido por hash) e funções `private` simuladas. Comparou 285 cenários de leitura e escrita para Master, operador, gerente, nutricionista e usuário anônimo, em duas empresas, antes e depois do SQL 28: sem diferenças. O arquivo foi aplicado duas vezes. Depois da aplicação remota, os avisos `auth_rls_initplan` e `unindexed_foreign_keys` do advisor devem zerar. Aplicar fora do horário de uso: `alter policy` e `create index` bloqueiam rapidamente as tabelas envolvidas.
