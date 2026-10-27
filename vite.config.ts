@@ -29,7 +29,8 @@ export default defineConfig({
     optimizeDeps: {
       ignoreOutdatedRequests: true,
       noDiscovery: true,
-      include: ["qrcode"],
+      // Sem pré-empacotar, o date-fns (com todos os idiomas) e os ícones viram milhares de requisições no dev.
+      include: ["qrcode", "date-fns", "date-fns/locale", "lucide-react"],
     },
   },
   nitro: vercelRegion,
