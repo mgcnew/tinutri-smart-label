@@ -30,7 +30,10 @@ export function ownMailTransport() {
       ? undefined
       : {
           user: process.env.SIGNATURE_SMTP_USER!,
-          pass: c.host.toLowerCase() === "smtp.gmail.com" ? process.env.SIGNATURE_SMTP_PASSWORD!.replace(/\s/g, "") : process.env.SIGNATURE_SMTP_PASSWORD!,
+          pass:
+            c.host.toLowerCase() === "smtp.gmail.com"
+              ? process.env.SIGNATURE_SMTP_PASSWORD!.replace(/\s/g, "")
+              : process.env.SIGNATURE_SMTP_PASSWORD!,
         },
     tls: { rejectUnauthorized: true, minVersion: "TLSv1.2" },
     connectionTimeout: 8_000,

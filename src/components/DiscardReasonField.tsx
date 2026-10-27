@@ -19,7 +19,12 @@ export function DiscardReasonField({
     <div className="mt-4 space-y-2">
       <label className="block text-xs font-medium">
         Motivo do descarte
-        <SystemSelect className="mt-1" value={code} disabled={disabled} onChange={(e) => onCode(e.target.value)}>
+        <SystemSelect
+          className="mt-1"
+          value={code}
+          disabled={disabled}
+          onChange={(e) => onCode(e.target.value)}
+        >
           <option value="">Selecione o motivo</option>
           {DISCARD_REASONS.map((r) => (
             <option key={r.code} value={r.code}>

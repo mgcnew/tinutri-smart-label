@@ -3,7 +3,10 @@ import { test } from "node:test";
 
 import { normalizeShelfByStorage, shelfDaysFor } from "../src/lib/shelf-life.ts";
 
-const product = { shelf_life_days: 3, shelf_life_by_storage: { "CONGELADO ≤ -18 °C": 90, "TEMPERATURA AMBIENTE": 0 } };
+const product = {
+  shelf_life_days: 3,
+  shelf_life_by_storage: { "CONGELADO ≤ -18 °C": 90, "TEMPERATURA AMBIENTE": 0 },
+};
 
 test("usa o prazo da conservação quando existe", () => {
   assert.equal(shelfDaysFor(product, "CONGELADO ≤ -18 °C"), 90);

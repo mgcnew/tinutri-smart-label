@@ -35,6 +35,9 @@ export function useTheme() {
     setTheme(next);
   }, []);
 
-  const toggle = useCallback(() => apply(document.documentElement.classList.contains("dark") ? "light" : "dark"), [apply]);
+  const toggle = useCallback(
+    () => apply(document.documentElement.classList.contains("dark") ? "light" : "dark"),
+    [apply],
+  );
   return { theme, toggle };
 }

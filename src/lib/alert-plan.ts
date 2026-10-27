@@ -10,7 +10,12 @@ export type LastPlayed = { urgent: number; today: number };
  * Decide qual som tocar, se algum. Piora (mais vencidas, mais vencendo hoje, mais por vencer) toca na hora;
  * sem novidade, só repete as pendências graves no intervalo.
  */
-export function planSound(prev: AlertCounts | null, next: AlertCounts, last: LastPlayed, now: number): SoundLevel | null {
+export function planSound(
+  prev: AlertCounts | null,
+  next: AlertCounts,
+  last: LastPlayed,
+  now: number,
+): SoundLevel | null {
   if (!prev) {
     if (next.expired > 0) return "urgent";
     if (next.today > 0) return "today";

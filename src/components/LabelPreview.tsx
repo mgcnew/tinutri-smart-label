@@ -6,7 +6,17 @@ import { labelMarkup, labelStyles, logoUrl, type PrintableLabel } from "@/lib/la
  * Pré-visualização fiel: usa exatamente a mesma marcação e o mesmo CSS da impressão,
  * isolada em um iframe com o tamanho físico real da etiqueta.
  */
-export function LabelPreview({ label, widthMm, heightMm, scale = 1 }: { label: PrintableLabel; widthMm: number; heightMm: number; scale?: number }) {
+export function LabelPreview({
+  label,
+  widthMm,
+  heightMm,
+  scale = 1,
+}: {
+  label: PrintableLabel;
+  widthMm: number;
+  heightMm: number;
+  scale?: number;
+}) {
   const srcDoc = useMemo(
     () =>
       `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><style>${labelStyles(widthMm, heightMm, scale)}html,body{overflow:hidden}.tl{border:0}</style></head><body>${labelMarkup(label, logoUrl())}</body></html>`,

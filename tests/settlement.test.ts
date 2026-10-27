@@ -30,6 +30,9 @@ test("resumo conta por motivo e produto, ordenado", () => {
   ]);
   assert.equal(s.total, 4);
   assert.deepEqual(s.byReason[0], { name: "Vencido", count: 2 });
-  assert.deepEqual(s.byProduct, [{ name: "Presunto", count: 2 }, { name: "Queijo", count: 2 }]);
+  assert.deepEqual(s.byProduct, [
+    { name: "Presunto", count: 2 },
+    { name: "Queijo", count: 2 },
+  ]);
   assert.ok(s.byReason.some((r) => r.name === "Não informado" && r.count === 1));
 });

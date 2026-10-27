@@ -35,7 +35,10 @@ export const getCurrentUserContext = createServerFn({ method: "GET" })
     let clientStatus: ClientStatus | null = null;
     if (profile?.client_id) {
       const { data: c } = await supabase
-        .from("clients").select("name,status").eq("id", profile.client_id).maybeSingle();
+        .from("clients")
+        .select("name,status")
+        .eq("id", profile.client_id)
+        .maybeSingle();
       clientName = c?.name ?? null;
       clientStatus = (c?.status as unknown as ClientStatus | undefined) ?? null;
     }
@@ -43,13 +46,16 @@ export const getCurrentUserContext = createServerFn({ method: "GET" })
     let carteira: string[] = [];
     if (role === "nutricionista") {
       const { data } = await supabase
-        .from("nutritionist_clients").select("client_id").eq("nutritionist_user_id", userId);
+        .from("nutritionist_clients")
+        .select("client_id")
+        .eq("nutritionist_user_id", userId);
       carteira = (data ?? []).map((row) => row.client_id as string);
     }
 
     return {
       userId,
-      email: profile?.email ?? (typeof context.claims.email === "string" ? context.claims.email : null),
+      email:
+        profile?.email ?? (typeof context.claims.email === "string" ? context.claims.email : null),
       name: profile?.name ?? null,
       role,
       clientId: profile?.client_id ?? null,

@@ -7,7 +7,11 @@ const KEY = "tinutri.alert-sound";
 const TICK_MS = 30_000;
 
 const readPreference = () => {
-  try { return window.localStorage.getItem(KEY) === "1"; } catch { return false; }
+  try {
+    return window.localStorage.getItem(KEY) === "1";
+  } catch {
+    return false;
+  }
 };
 
 /**
@@ -34,7 +38,10 @@ export function useAlertSound(counts: AlertCounts | null) {
     const level = planSound(previous.current, next, last.current, Date.now());
     previous.current = next;
     if (!level) return;
-    if (!playAlert(level)) { setBlocked(true); return; }
+    if (!playAlert(level)) {
+      setBlocked(true);
+      return;
+    }
     if (level === "urgent") last.current.urgent = Date.now();
     if (level === "urgent" || level === "today") last.current.today = Date.now();
   }, []);
@@ -59,11 +66,18 @@ export function useAlertSound(counts: AlertCounts | null) {
       try {
         if (document.visibilityState === "visible" && !wakeLock.current) {
           const lock = await navigator.wakeLock.request("screen");
-          if (!alive) { void lock.release(); return; }
+          if (!alive) {
+            void lock.release();
+            return;
+          }
           wakeLock.current = lock;
-          lock.addEventListener("release", () => { wakeLock.current = null; });
+          lock.addEventListener("release", () => {
+            wakeLock.current = null;
+          });
         }
-      } catch { /* Sem suporte ou sem permissão: o som continua funcionando. */ }
+      } catch {
+        /* Sem suporte ou sem permissão: o som continua funcionando. */
+      }
     };
     void acquire();
     const onVisible = () => void acquire();
@@ -81,7 +95,11 @@ export function useAlertSound(counts: AlertCounts | null) {
     const ok = await unlockAudio();
     setBlocked(!ok);
     setEnabled(true);
-    try { window.localStorage.setItem(KEY, "1"); } catch { /* Preferência local opcional. */ }
+    try {
+      window.localStorage.setItem(KEY, "1");
+    } catch {
+      /* Preferência local opcional. */
+    }
     if (!ok) return;
     // Já há pendência? Toca o som dela agora, para o usuário saber que o aviso está funcionando.
     const now = latest.current;
@@ -94,7 +112,11 @@ export function useAlertSound(counts: AlertCounts | null) {
 
   const disable = useCallback(() => {
     setEnabled(false);
-    try { window.localStorage.setItem(KEY, "0"); } catch { /* Preferência local opcional. */ }
+    try {
+      window.localStorage.setItem(KEY, "0");
+    } catch {
+      /* Preferência local opcional. */
+    }
   }, []);
 
   return { enabled, blocked, enable, disable };

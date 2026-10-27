@@ -15,7 +15,12 @@ export async function settleLabelRecord(input: {
 }): Promise<{ result: "ok" | "ja-baixada" | "erro"; eventLogged: boolean }> {
   const { data, error } = await supabase
     .from("issued_labels")
-    .update({ label_status: input.status, closed_at: new Date().toISOString(), closed_by: input.userId, closed_reason: input.reason ?? null } as never)
+    .update({
+      label_status: input.status,
+      closed_at: new Date().toISOString(),
+      closed_by: input.userId,
+      closed_reason: input.reason ?? null,
+    } as never)
     .eq("id", input.id)
     .eq("label_status", "ativa")
     .eq("print_status", "confirmada")

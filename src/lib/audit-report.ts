@@ -1,19 +1,44 @@
-export const AUDIT_HEADER = ["Empresa", "Produto", "Lote", "Emitida em", "Validade", "Responsável", "Situação", "Impressão", "Motivo do descarte"];
+export const AUDIT_HEADER = [
+  "Empresa",
+  "Produto",
+  "Lote",
+  "Emitida em",
+  "Validade",
+  "Responsável",
+  "Situação",
+  "Impressão",
+  "Motivo do descarte",
+];
 
 const escapeHtml = (value: string) =>
-  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
 /** Contagem por situação da etiqueta, para o resumo no topo do relatório. */
 export function countByStatus(rows: string[][], statusIndex = 6) {
   const counts = new Map<string, number>();
-  for (const row of rows) counts.set(row[statusIndex] ?? "", (counts.get(row[statusIndex] ?? "") ?? 0) + 1);
+  for (const row of rows)
+    counts.set(row[statusIndex] ?? "", (counts.get(row[statusIndex] ?? "") ?? 0) + 1);
   return [...counts.entries()].sort((a, b) => b[1] - a[1]);
 }
 
 /** Documento HTML do relatório de auditoria, pronto para imprimir ou salvar em PDF. Todo texto é escapado. */
-export function buildAuditReportHtml(input: { title: string; filters: string[]; generatedAt: string; rows: string[][]; truncated?: boolean }) {
+export function buildAuditReportHtml(input: {
+  title: string;
+  filters: string[];
+  generatedAt: string;
+  rows: string[][];
+  truncated?: boolean;
+}) {
   const summary = countByStatus(input.rows)
-    .map(([status, count]) => `<li><strong>${count}</strong> ${escapeHtml(status || "sem situação")}</li>`)
+    .map(
+      ([status, count]) =>
+        `<li><strong>${count}</strong> ${escapeHtml(status || "sem situação")}</li>`,
+    )
     .join("");
   const body = input.rows
     .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`)

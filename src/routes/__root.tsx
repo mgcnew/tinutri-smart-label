@@ -85,23 +85,52 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "theme-color", content: "#007a46" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "TiNutri Smart Label® | Etiquetas de Validade para Alimentos" },
-      { name: "description", content: "Emita etiquetas térmicas padronizadas de identificação e validade de alimentos em poucos segundos. Solução prática para restaurantes, padarias, supermercados e" },
+      {
+        name: "description",
+        content:
+          "Emita etiquetas térmicas padronizadas de identificação e validade de alimentos em poucos segundos. Solução prática para restaurantes, padarias, supermercados e",
+      },
       { name: "author", content: "TiNutri" },
-      { property: "og:title", content: "TiNutri Smart Label® | Etiquetas de Validade para Alimentos" },
-      { property: "og:description", content: "Emita etiquetas térmicas padronizadas de identificação e validade de alimentos em poucos segundos. Solução prática para restaurantes, padarias, supermercados e" },
+      {
+        property: "og:title",
+        content: "TiNutri Smart Label® | Etiquetas de Validade para Alimentos",
+      },
+      {
+        property: "og:description",
+        content:
+          "Emita etiquetas térmicas padronizadas de identificação e validade de alimentos em poucos segundos. Solução prática para restaurantes, padarias, supermercados e",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "TiNutri Smart Label® | Etiquetas de Validade para Alimentos" },
-      { name: "twitter:description", content: "Emita etiquetas térmicas padronizadas de identificação e validade de alimentos em poucos segundos. Solução prática para restaurantes, padarias, supermercados e" },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/Gg5v2NjEbPXyIT0FQdEJfHuKC4n2/social-images/social-1782232984564-ChatGPT_Image_23_de_jun._de_2026,_13_37_23.webp" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/Gg5v2NjEbPXyIT0FQdEJfHuKC4n2/social-images/social-1782232984564-ChatGPT_Image_23_de_jun._de_2026,_13_37_23.webp" },
+      {
+        name: "twitter:title",
+        content: "TiNutri Smart Label® | Etiquetas de Validade para Alimentos",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "Emita etiquetas térmicas padronizadas de identificação e validade de alimentos em poucos segundos. Solução prática para restaurantes, padarias, supermercados e",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/Gg5v2NjEbPXyIT0FQdEJfHuKC4n2/social-images/social-1782232984564-ChatGPT_Image_23_de_jun._de_2026,_13_37_23.webp",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/Gg5v2NjEbPXyIT0FQdEJfHuKC4n2/social-images/social-1782232984564-ChatGPT_Image_23_de_jun._de_2026,_13_37_23.webp",
+      },
     ],
     links: [
       { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/icon-192.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@600;700&family=Manrope:wght@400;500;600;700;800&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@600;700&family=Manrope:wght@400;500;600;700;800&display=swap",
+      },
       {
         rel: "stylesheet",
         href: appCss,
@@ -137,7 +166,9 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <div className="flex min-h-screen flex-col">
-        <div className="flex-1"><Outlet /></div>
+        <div className="flex-1">
+          <Outlet />
+        </div>
         <AppFooter />
       </div>
     </QueryClientProvider>

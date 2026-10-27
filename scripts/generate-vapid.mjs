@@ -9,8 +9,14 @@ const pub = publicKey.export({ format: "jwk" });
 const priv = privateKey.export({ format: "jwk" });
 const b64url = (buffer) => Buffer.from(buffer).toString("base64url");
 // Chave pública no formato não comprimido: 0x04 || X || Y
-const publicBytes = Buffer.concat([Buffer.from([4]), Buffer.from(pub.x, "base64url"), Buffer.from(pub.y, "base64url")]);
+const publicBytes = Buffer.concat([
+  Buffer.from([4]),
+  Buffer.from(pub.x, "base64url"),
+  Buffer.from(pub.y, "base64url"),
+]);
 
 console.log("VAPID_PUBLIC_KEY=" + b64url(publicBytes));
 console.log("VAPID_PRIVATE_KEY=" + priv.d);
-console.log("\nGuarde a chave privada em local seguro: quem a tiver pode enviar notificações em nome do sistema.");
+console.log(
+  "\nGuarde a chave privada em local seguro: quem a tiver pode enviar notificações em nome do sistema.",
+);

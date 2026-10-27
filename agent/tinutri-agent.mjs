@@ -18,19 +18,29 @@ try {
   process.exit(1);
 }
 for (const key of ["supabaseUrl", "anonKey", "token"]) {
-  if (!config[key]) { console.error(`config.json: falta "${key}".`); process.exit(1); }
+  if (!config[key]) {
+    console.error(`config.json: falta "${key}".`);
+    process.exit(1);
+  }
 }
 
 const stamp = () => new Date().toLocaleString("pt-BR");
 const log = (message) => console.log(`[${stamp()}] ${message}`);
 const controller = new AbortController();
-for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { log("Encerrando agente…"); controller.abort(); });
+for (const sig of ["SIGINT", "SIGTERM"])
+  process.on(sig, () => {
+    log("Encerrando agente…");
+    controller.abort();
+  });
 
 log("Agente TiNutri iniciado. Aguardando etiquetas…");
 await run({
   rpc: createRpc(config),
   log,
   pollMs: config.pollMs ?? 2000,
-  policy: { allowedPorts: config.allowedPorts ?? [9100], allowPublic: config.allowPublicHosts === true },
+  policy: {
+    allowedPorts: config.allowedPorts ?? [9100],
+    allowPublic: config.allowPublicHosts === true,
+  },
   signal: controller.signal,
 });

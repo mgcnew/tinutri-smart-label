@@ -215,7 +215,9 @@ export function ProductsPanel({
       notes: product.notes ?? "",
       allergens: normalizeAllergens(product.allergens),
       by_storage: Object.fromEntries(
-        Object.entries(normalizeShelfByStorage(product.shelf_life_by_storage)).map(([key, value]) => [key, String(value)]),
+        Object.entries(normalizeShelfByStorage(product.shelf_life_by_storage)).map(
+          ([key, value]) => [key, String(value)],
+        ),
       ),
     });
     setEditingId(product.id);
@@ -250,7 +252,9 @@ export function ProductsPanel({
       if (!raw) continue;
       const value = Number(raw);
       if (!Number.isInteger(value) || value < 0 || value > MAX_SHELF_DAYS) {
-        setError(`Validade por conservação inválida em “${preset}”. Use de 0 a ${MAX_SHELF_DAYS} dias ou deixe em branco.`);
+        setError(
+          `Validade por conservação inválida em “${preset}”. Use de 0 a ${MAX_SHELF_DAYS} dias ou deixe em branco.`,
+        );
         return;
       }
       byStorage[preset] = value;
@@ -666,7 +670,9 @@ export function ProductsPanel({
                   )}
                 </FormSection>
                 <fieldset className="client-form-section rounded-xl border p-3">
-                  <legend className="px-1 text-sm font-semibold">Alérgenos (impressos na etiqueta)</legend>
+                  <legend className="px-1 text-sm font-semibold">
+                    Alérgenos (impressos na etiqueta)
+                  </legend>
                   <div className="mt-1 grid gap-2 sm:grid-cols-2">
                     {ALLERGENS.map((allergen) => (
                       <label key={allergen.code} className="flex items-center gap-2 text-sm">
@@ -687,9 +693,17 @@ export function ProductsPanel({
                     ))}
                   </div>
                 </fieldset>
-                <details className="client-form-section rounded-xl border p-3" open={Object.keys(form.by_storage).length > 0}>
-                  <summary className="cursor-pointer text-sm font-semibold">Validade por conservação (opcional)</summary>
-                  <p className="mt-2 text-xs text-muted-foreground">Quando a conservação escolhida na emissão tiver prazo aqui, ele substitui a validade padrão. Em branco, vale a validade padrão.</p>
+                <details
+                  className="client-form-section rounded-xl border p-3"
+                  open={Object.keys(form.by_storage).length > 0}
+                >
+                  <summary className="cursor-pointer text-sm font-semibold">
+                    Validade por conservação (opcional)
+                  </summary>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Quando a conservação escolhida na emissão tiver prazo aqui, ele substitui a
+                    validade padrão. Em branco, vale a validade padrão.
+                  </p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     {STORAGE_PRESETS.map((preset) => (
                       <FormField key={preset} label={preset}>
@@ -700,7 +714,12 @@ export function ProductsPanel({
                           inputMode="numeric"
                           placeholder="Padrão"
                           value={form.by_storage[preset] ?? ""}
-                          onChange={(event) => update("by_storage", { ...form.by_storage, [preset]: event.target.value })}
+                          onChange={(event) =>
+                            update("by_storage", {
+                              ...form.by_storage,
+                              [preset]: event.target.value,
+                            })
+                          }
                         />
                       </FormField>
                     ))}

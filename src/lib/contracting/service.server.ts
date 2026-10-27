@@ -50,7 +50,16 @@ export async function publish(input: PublishInput, db: SupabaseClient, userId: s
   const body = finalContractBody(contract.body);
   // Fail before publishing when PDF cannot faithfully render the frozen text.
   await contractPdf(contract.title, body);
-  if (signatureMethod() === "tinutri") await contractPdf("Representantes", [input.signer.name,input.signer.email,input.providerSigner.name,input.providerSigner.email].join("\n"));
+  if (signatureMethod() === "tinutri")
+    await contractPdf(
+      "Representantes",
+      [
+        input.signer.name,
+        input.signer.email,
+        input.providerSigner.name,
+        input.providerSigner.email,
+      ].join("\n"),
+    );
   const { data, error: failed } = await db.rpc("publish_contract_offer", {
     p_contract: input.contractId,
     p_updated: input.updatedAt,

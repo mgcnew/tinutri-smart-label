@@ -28,6 +28,11 @@ test("aviso antecipado não é urgente", () => {
 });
 
 test("nomes repetidos aparecem uma vez", () => {
-  const d = buildDigest({ expired: 3, today: 0, soon: 0, sample: ["Presunto", "Presunto ", "Presunto"] });
+  const d = buildDigest({
+    expired: 3,
+    today: 0,
+    soon: 0,
+    sample: ["Presunto", "Presunto ", "Presunto"],
+  });
   assert.equal(d.body, "3 vencidas\nPresunto +2");
 });

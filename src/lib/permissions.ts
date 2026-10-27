@@ -91,7 +91,10 @@ export function usePermissions(
   revision = 0,
 ): Permissions {
   // A tela de gestão de acessos só aparece depois que o banco confirma as permissões: sem a função, ela não funcionaria.
-  const [permissions, setPermissions] = useState<Permissions>(() => ({ ...defaultPermissions(role), gerir_acessos: false }));
+  const [permissions, setPermissions] = useState<Permissions>(() => ({
+    ...defaultPermissions(role),
+    gerir_acessos: false,
+  }));
 
   useEffect(() => {
     setPermissions({ ...defaultPermissions(role), gerir_acessos: false });

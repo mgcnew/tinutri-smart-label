@@ -6,11 +6,13 @@ const db = supabase as unknown as SupabaseClient;
 
 export type PushState = "unsupported" | "unconfigured" | "ios-install" | "denied" | "off" | "on";
 
-const VAPID_PUBLIC_KEY = (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined)?.trim() ?? "";
+const VAPID_PUBLIC_KEY =
+  (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined)?.trim() ?? "";
 
 const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
 const isStandalone = () =>
-  window.matchMedia?.("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
+  window.matchMedia?.("(display-mode: standalone)").matches ||
+  (navigator as unknown as { standalone?: boolean }).standalone === true;
 
 /** A chave pública VAPID vem em base64 url-safe; o navegador quer bytes. */
 function keyToBytes(base64: string) {
@@ -29,9 +31,16 @@ export async function registerServiceWorker() {
 }
 
 export async function getPushState(): Promise<PushState> {
-  if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+  if (
+    typeof window === "undefined" ||
+    !("serviceWorker" in navigator) ||
+    !("PushManager" in window) ||
+    !("Notification" in window)
+  ) {
     // iPhone fora do app instalado esconde essas APIs: explica o caminho em vez de dizer "sem suporte".
-    return typeof navigator !== "undefined" && isIos() && !isStandalone() ? "ios-install" : "unsupported";
+    return typeof navigator !== "undefined" && isIos() && !isStandalone()
+      ? "ios-install"
+      : "unsupported";
   }
   if (!VAPID_PUBLIC_KEY) return "unconfigured";
   if (Notification.permission === "denied") return "denied";
@@ -52,9 +61,13 @@ export async function enablePush(userId: string): Promise<PushState> {
   const registration = await navigator.serviceWorker.ready;
   const subscription =
     (await registration.pushManager.getSubscription()) ??
-    (await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToBytes(VAPID_PUBLIC_KEY) }));
+    (await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: keyToBytes(VAPID_PUBLIC_KEY),
+    }));
   const json = subscription.toJSON();
-  if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) throw new Error("Inscrição de push incompleta.");
+  if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth)
+    throw new Error("Inscrição de push incompleta.");
   const { error } = await db.rpc("register_push_subscription", {
     _endpoint: json.endpoint,
     _p256dh: json.keys.p256dh,

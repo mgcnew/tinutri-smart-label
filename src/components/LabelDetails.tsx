@@ -55,7 +55,15 @@ const discardLabel = (value: string | null) => {
   return code ? `${discardReasonName(code)}${note ? ` — ${note}` : ""}` : "Não informado";
 };
 
-export function LabelDetails({ labelId, action, revision, onClose, onSettle, onReprint, canDiscard = true }: Props) {
+export function LabelDetails({
+  labelId,
+  action,
+  revision,
+  onClose,
+  onSettle,
+  onReprint,
+  canDiscard = true,
+}: Props) {
   const [label, setLabel] = useState<OperationalLabel | null>(null);
   const [events, setEvents] = useState<LabelEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -265,7 +273,10 @@ export function LabelDetails({ labelId, action, revision, onClose, onSettle, onR
                 <div>
                   <p className="mb-2 text-sm font-semibold">Registrar destino do produto</p>
                   <div className="flex flex-wrap gap-2">
-                    {(canDiscard ? (["utilizada", "consumida", "descartada"] as const) : (["utilizada", "consumida"] as const)).map((status) => (
+                    {(canDiscard
+                      ? (["utilizada", "consumida", "descartada"] as const)
+                      : (["utilizada", "consumida"] as const)
+                    ).map((status) => (
                       <Button
                         key={status}
                         variant="outline"

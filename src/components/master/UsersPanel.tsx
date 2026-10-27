@@ -134,11 +134,7 @@ export function UsersPanel({
             name: form.name.trim(),
             email: form.email.trim(),
             role: form.role as
-              | "admin_master"
-              | "nutricionista"
-              | "admin_cliente"
-              | "gerente"
-              | "operator",
+              "admin_master" | "nutricionista" | "admin_cliente" | "gerente" | "operator",
             clientId: needsClient ? form.client_id : null,
             password: form.password || undefined,
           },

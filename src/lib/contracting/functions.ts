@@ -191,11 +191,9 @@ export const downloadOwnContract = createServerFn({ method: "POST" })
     } else if (offer.signature_status !== "signed")
       throw new Error("O comprovante ainda não foi finalizado.");
     if (!path) throw new Error("Documento indisponível.");
-    const result = await offerDb.storage
-      .from("contract-documents")
-      .createSignedUrl(path, 60, {
-        download: data.signed ? "contrato-tinutri-assinado.pdf" : "contrato-tinutri-original.pdf",
-      });
+    const result = await offerDb.storage.from("contract-documents").createSignedUrl(path, 60, {
+      download: data.signed ? "contrato-tinutri-assinado.pdf" : "contrato-tinutri-original.pdf",
+    });
     if (result.error || !result.data)
       throw new Error("Não foi possível abrir o documento preservado.");
     return { url: result.data.signedUrl };

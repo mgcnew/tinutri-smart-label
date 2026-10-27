@@ -9,11 +9,22 @@ import { LabelMovePanel, type MoveOption } from "@/components/LabelMovePanel";
 import { settleLabelRecord } from "@/lib/settlement-actions";
 import { allergenText } from "@/lib/allergens";
 import { formatCloseReason, type Settlement } from "@/lib/settlement";
-import { kindLabel, resolveStatus, STATUS_TEXT, type LabelKind, type LabelLifecycle, type LabelStatus } from "@/lib/label";
+import {
+  kindLabel,
+  resolveStatus,
+  STATUS_TEXT,
+  type LabelKind,
+  type LabelLifecycle,
+  type LabelStatus,
+} from "@/lib/label";
 
 /** Funções do SQL 30 ainda fora dos tipos gerados do Supabase. */
-type UntypedRpc = (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string } | null }>;
-const rpc = (fn: string, args: Record<string, unknown>) => (supabase.rpc as unknown as UntypedRpc).call(supabase, fn, args);
+type UntypedRpc = (
+  fn: string,
+  args: Record<string, unknown>,
+) => PromiseLike<{ data: unknown; error: { code?: string } | null }>;
+const rpc = (fn: string, args: Record<string, unknown>) =>
+  (supabase.rpc as unknown as UntypedRpc).call(supabase, fn, args);
 
 type TimelineEvent = { type: string; at: string; by: string | null };
 type Lookup = {
@@ -74,9 +85,16 @@ export const Route = createFileRoute("/label/$token")({
   head: () => ({
     meta: [
       { title: "Consulta de etiqueta | TiNutri Smart Label®" },
-      { name: "description", content: "Consulte produto, validade, conservação e situação atual da etiqueta de alimento emitida no TiNutri Smart Label®." },
+      {
+        name: "description",
+        content:
+          "Consulte produto, validade, conservação e situação atual da etiqueta de alimento emitida no TiNutri Smart Label®.",
+      },
       { property: "og:title", content: "Consulta de etiqueta | TiNutri Smart Label®" },
-      { property: "og:description", content: "Produto, validade, conservação e situação atual da etiqueta." },
+      {
+        property: "og:description",
+        content: "Produto, validade, conservação e situação atual da etiqueta.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -125,10 +143,18 @@ function LabelLookup() {
   const [events, setEvents] = useState<TimelineEvent[] | null>(null);
   const [staff, setStaff] = useState(false);
   const [checkState, setCheckState] = useState<CheckState>(null);
-  const [lineage, setLineage] = useState<Pick<Lookup, "moveOptions" | "sourceToken" | "replacedByToken">>({});
+  const [lineage, setLineage] = useState<
+    Pick<Lookup, "moveOptions" | "sourceToken" | "replacedByToken">
+  >({});
   const [state, setState] = useState<"loading" | "ready" | "missing">("loading");
   // Só aparece para quem está logado e tem acesso à etiqueta (a política do banco decide).
-  const [actor, setActor] = useState<{ id: string; clientId: string; userId: string; userName: string; canSettle: boolean } | null>(null);
+  const [actor, setActor] = useState<{
+    id: string;
+    clientId: string;
+    userId: string;
+    userName: string;
+    canSettle: boolean;
+  } | null>(null);
   const [discarding, setDiscarding] = useState(false);
   const [reasonCode, setReasonCode] = useState("");
   const [reasonNote, setReasonNote] = useState("");
@@ -140,7 +166,10 @@ function LabelLookup() {
     void (async () => {
       const found = await lookupLabel(token);
       if (!alive) return;
-      if (!found) { setState("missing"); return; }
+      if (!found) {
+        setState("missing");
+        return;
+      }
       setRow(found.label);
       setEvents(found.events);
       setStaff(found.staff);
@@ -162,26 +191,50 @@ function LabelLookup() {
       const user = auth.user;
       if (!user || !alive) return;
       const [{ data: own }, { data: profile }] = await Promise.all([
-        supabase.from("issued_labels").select("id,client_id,label_status,print_status").eq("public_token", token).maybeSingle(),
+        supabase
+          .from("issued_labels")
+          .select("id,client_id,label_status,print_status")
+          .eq("public_token", token)
+          .maybeSingle(),
         supabase.from("profiles").select("name,email").eq("user_id", user.id).maybeSingle(),
       ]);
       if (!alive || !own) return;
-      setActor({ id: own.id, clientId: own.client_id, userId: user.id, userName: profile?.name ?? profile?.email ?? "", canSettle: own.label_status === "ativa" && own.print_status === "confirmada" });
+      setActor({
+        id: own.id,
+        clientId: own.client_id,
+        userId: user.id,
+        userName: profile?.name ?? profile?.email ?? "",
+        canSettle: own.label_status === "ativa" && own.print_status === "confirmada",
+      });
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [token]);
 
   if (state === "loading") {
-    return <main className="grid min-h-screen place-items-center bg-background p-6"><p className="font-semibold text-muted-foreground">Consultando etiqueta…</p></main>;
+    return (
+      <main className="grid min-h-screen place-items-center bg-background p-6">
+        <p className="font-semibold text-muted-foreground">Consultando etiqueta…</p>
+      </main>
+    );
   }
 
   if (state === "missing" || !row) {
     return (
       <main className="grid min-h-screen place-items-center bg-background p-6 text-center">
         <div>
-          <img src={tinutriLogo} alt="TiNutri" width={56} height={56} className="mx-auto size-14 object-contain" />
+          <img
+            src={tinutriLogo}
+            alt="TiNutri"
+            width={56}
+            height={56}
+            className="mx-auto size-14 object-contain"
+          />
           <h1 className="mt-4 text-xl font-bold">Etiqueta não encontrada</h1>
-          <p className="mt-2 text-sm text-muted-foreground">O código lido não corresponde a nenhuma etiqueta emitida.</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            O código lido não corresponde a nenhuma etiqueta emitida.
+          </p>
         </div>
       </main>
     );
@@ -200,12 +253,30 @@ function LabelLookup() {
   const settle = async (choice: Settlement) => {
     if (!actor || busy) return;
     const reason = choice === "descartada" ? formatCloseReason(reasonCode, reasonNote) : null;
-    if (choice === "descartada" && !reason) { setFeedback("Informe o motivo do descarte."); return; }
-    setBusy(true); setFeedback("");
-    const { result } = await settleLabelRecord({ id: actor.id, clientId: actor.clientId, userId: actor.userId, userName: actor.userName, status: choice, reason });
+    if (choice === "descartada" && !reason) {
+      setFeedback("Informe o motivo do descarte.");
+      return;
+    }
+    setBusy(true);
+    setFeedback("");
+    const { result } = await settleLabelRecord({
+      id: actor.id,
+      clientId: actor.clientId,
+      userId: actor.userId,
+      userName: actor.userName,
+      status: choice,
+      reason,
+    });
     setBusy(false);
-    if (result === "erro") { setFeedback("Não foi possível registrar a baixa. Tente novamente."); return; }
-    if (result === "ja-baixada") { setFeedback("Esta etiqueta já recebeu baixa."); setActor({ ...actor, canSettle: false }); return; }
+    if (result === "erro") {
+      setFeedback("Não foi possível registrar a baixa. Tente novamente.");
+      return;
+    }
+    if (result === "ja-baixada") {
+      setFeedback("Esta etiqueta já recebeu baixa.");
+      setActor({ ...actor, canSettle: false });
+      return;
+    }
     setRow({ ...row, label_status: choice });
     setActor({ ...actor, canSettle: false });
     setDiscarding(false);
@@ -218,17 +289,29 @@ function LabelLookup() {
     <main className="min-h-screen bg-background px-4 py-8">
       <article className="mx-auto w-full max-w-md">
         <header className="flex items-center gap-3">
-          <img src={tinutriLogo} alt="TiNutri" width={44} height={44} className="size-11 shrink-0 object-contain" />
+          <img
+            src={tinutriLogo}
+            alt="TiNutri"
+            width={44}
+            height={44}
+            className="size-11 shrink-0 object-contain"
+          />
           <div className="min-w-0">
-            <strong className="block font-display text-base leading-tight">TiNutri Smart Label®</strong>
+            <strong className="block font-display text-base leading-tight">
+              TiNutri Smart Label®
+            </strong>
             <span className="text-xs text-muted-foreground">Consulta de rastreabilidade</span>
           </div>
         </header>
 
         <section className="mt-5 rounded-3xl border bg-card p-5 shadow-sm">
-          <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">{kindLabel(row.label_kind)}</p>
+          <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">
+            {kindLabel(row.label_kind)}
+          </p>
           <h1 className="mt-1 text-2xl font-bold uppercase leading-tight">{row.product_name}</h1>
-          <p className={`mt-4 inline-flex rounded-full px-4 py-2 text-sm font-extrabold uppercase tracking-wide ${STATUS_STYLE[status]}`}>
+          <p
+            className={`mt-4 inline-flex rounded-full px-4 py-2 text-sm font-extrabold uppercase tracking-wide ${STATUS_STYLE[status]}`}
+          >
             {STATUS_TEXT[status]}
           </p>
 
@@ -236,11 +319,24 @@ function LabelLookup() {
             <Row term="Estabelecimento" value={row.client_name} />
             <Row term="Setor" value={row.sector ?? "—"} />
             <Row term="Manipulação / abertura" value={fmt(row.opened_at)} />
-            <Row term="Validade" value={fmt(row.expires_at)} strong tone={status === "vencido" ? "text-destructive" : status === "proximo" ? "text-[var(--warn-ink)]" : undefined} />
+            <Row
+              term="Validade"
+              value={fmt(row.expires_at)}
+              strong
+              tone={
+                status === "vencido"
+                  ? "text-destructive"
+                  : status === "proximo"
+                    ? "text-[var(--warn-ink)]"
+                    : undefined
+              }
+            />
             <Row term="Conservação" value={row.storage_condition ?? "—"} />
             <Row term="Lote" value={row.lot_number ?? "—"} />
             {row.inspection_label && <Row term="Inspeção" value={row.inspection_label} />}
-            {allergenText(row.allergens) && <Row term="Alérgenos" value={allergenText(row.allergens)!} strong />}
+            {allergenText(row.allergens) && (
+              <Row term="Alérgenos" value={allergenText(row.allergens)!} strong />
+            )}
             <Row term="Responsável" value={row.responsible_name} />
             <Row term="Localização atual" value={row.location ?? "Não informada"} />
             <Row term="Emitida em" value={fmt(row.issued_at)} />
@@ -251,24 +347,65 @@ function LabelLookup() {
           <section className="mt-4 rounded-3xl border bg-card p-5 shadow-sm">
             <h2 className="text-sm font-bold">Dar baixa nesta etiqueta</h2>
             <div className="mt-3 grid grid-cols-3 gap-2">
-              <button type="button" disabled={busy} className="min-h-12 rounded-xl border text-sm font-semibold" onClick={() => void settle("utilizada")}>Utilizada</button>
-              <button type="button" disabled={busy} className="min-h-12 rounded-xl border text-sm font-semibold" onClick={() => void settle("consumida")}>Consumida</button>
-              <button type="button" disabled={busy} className="min-h-12 rounded-xl border text-sm font-semibold" onClick={() => setDiscarding(true)}>Descartada</button>
+              <button
+                type="button"
+                disabled={busy}
+                className="min-h-12 rounded-xl border text-sm font-semibold"
+                onClick={() => void settle("utilizada")}
+              >
+                Utilizada
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                className="min-h-12 rounded-xl border text-sm font-semibold"
+                onClick={() => void settle("consumida")}
+              >
+                Consumida
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                className="min-h-12 rounded-xl border text-sm font-semibold"
+                onClick={() => setDiscarding(true)}
+              >
+                Descartada
+              </button>
             </div>
             {discarding && (
               <div>
-                <DiscardReasonField code={reasonCode} note={reasonNote} onCode={setReasonCode} onNote={setReasonNote} disabled={busy} />
-                <button type="button" disabled={busy || !formatCloseReason(reasonCode, reasonNote)} className="mt-3 min-h-12 w-full rounded-xl bg-destructive text-sm font-bold text-destructive-foreground disabled:opacity-50" onClick={() => void settle("descartada")}>Confirmar descarte</button>
+                <DiscardReasonField
+                  code={reasonCode}
+                  note={reasonNote}
+                  onCode={setReasonCode}
+                  onNote={setReasonNote}
+                  disabled={busy}
+                />
+                <button
+                  type="button"
+                  disabled={busy || !formatCloseReason(reasonCode, reasonNote)}
+                  className="mt-3 min-h-12 w-full rounded-xl bg-destructive text-sm font-bold text-destructive-foreground disabled:opacity-50"
+                  onClick={() => void settle("descartada")}
+                >
+                  Confirmar descarte
+                </button>
               </div>
             )}
           </section>
         )}
-        {feedback && <p role="status" className="mt-3 text-center text-sm font-semibold">{feedback}</p>}
+        {feedback && (
+          <p role="status" className="mt-3 text-center text-sm font-semibold">
+            {feedback}
+          </p>
+        )}
 
         {lineage.replacedByToken && (
           <p className="mt-4 rounded-2xl border bg-card p-4 text-sm">
             Esta etiqueta foi substituída após mudança de conservação.{" "}
-            <a className="font-bold text-primary underline underline-offset-4" href={`/label/${lineage.replacedByToken}`}>
+            <a
+              className="font-bold text-primary underline underline-offset-4"
+              href={`/label/${lineage.replacedByToken}`}
+            >
               Ver a etiqueta nova
             </a>
           </p>
@@ -276,7 +413,10 @@ function LabelLookup() {
         {lineage.sourceToken && (
           <p className="mt-4 rounded-2xl border bg-card p-4 text-sm">
             Gerada a partir de outra etiqueta, após mudança de conservação.{" "}
-            <a className="font-bold text-primary underline underline-offset-4" href={`/label/${lineage.sourceToken}`}>
+            <a
+              className="font-bold text-primary underline underline-offset-4"
+              href={`/label/${lineage.sourceToken}`}
+            >
               Ver a etiqueta de origem
             </a>
           </p>
@@ -295,12 +435,19 @@ function LabelLookup() {
         )}
 
         {events && (
-          <section className="mt-4 rounded-3xl border bg-card p-5 shadow-sm" aria-labelledby="timeline-title">
+          <section
+            className="mt-4 rounded-3xl border bg-card p-5 shadow-sm"
+            aria-labelledby="timeline-title"
+          >
             <div className="flex items-baseline justify-between gap-3">
-              <h2 id="timeline-title" className="text-sm font-bold">Histórico desta etiqueta</h2>
+              <h2 id="timeline-title" className="text-sm font-bold">
+                Histórico desta etiqueta
+              </h2>
               {checkState && (
                 <span role="status" className="text-xs font-semibold text-primary">
-                  {checkState === "registered" ? "Sua conferência foi registrada" : "Você conferiu há poucos minutos"}
+                  {checkState === "registered"
+                    ? "Sua conferência foi registrada"
+                    : "Você conferiu há poucos minutos"}
                 </span>
               )}
             </div>
@@ -309,11 +456,24 @@ function LabelLookup() {
             ) : (
               <ol className="mt-4 space-y-0">
                 {events.map((event, index) => (
-                  <li key={`${event.type}-${event.at}-${index}`} className="relative flex gap-3 pb-4 last:pb-0">
-                    {index < events.length - 1 && <span aria-hidden="true" className="absolute left-[5px] top-4 h-full w-px bg-border" />}
-                    <span aria-hidden="true" className={`relative mt-1.5 size-[11px] shrink-0 rounded-full border-2 ${event.type.startsWith("baixa_") ? "border-muted-foreground bg-muted" : event.type === "falha_impressao" ? "border-destructive bg-card" : "border-primary bg-card"}`} />
+                  <li
+                    key={`${event.type}-${event.at}-${index}`}
+                    className="relative flex gap-3 pb-4 last:pb-0"
+                  >
+                    {index < events.length - 1 && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute left-[5px] top-4 h-full w-px bg-border"
+                      />
+                    )}
+                    <span
+                      aria-hidden="true"
+                      className={`relative mt-1.5 size-[11px] shrink-0 rounded-full border-2 ${event.type.startsWith("baixa_") ? "border-muted-foreground bg-muted" : event.type === "falha_impressao" ? "border-destructive bg-card" : "border-primary bg-card"}`}
+                    />
                     <div className="min-w-0 text-sm">
-                      <p className="font-semibold">{TIMELINE_NAMES[event.type] ?? "Registro da etiqueta"}</p>
+                      <p className="font-semibold">
+                        {TIMELINE_NAMES[event.type] ?? "Registro da etiqueta"}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {fmt(event.at)}
                         {staff && event.by ? ` · ${event.by}` : ""}
@@ -323,7 +483,11 @@ function LabelLookup() {
                 ))}
               </ol>
             )}
-            {!staff && <p className="mt-4 text-xs text-muted-foreground">A equipe do estabelecimento vê também quem realizou cada registro.</p>}
+            {!staff && (
+              <p className="mt-4 text-xs text-muted-foreground">
+                A equipe do estabelecimento vê também quem realizou cada registro.
+              </p>
+            )}
           </section>
         )}
 
@@ -335,11 +499,27 @@ function LabelLookup() {
   );
 }
 
-function Row({ term, value, strong = false, tone }: { term: string; value: string; strong?: boolean; tone?: string }) {
+function Row({
+  term,
+  value,
+  strong = false,
+  tone,
+}: {
+  term: string;
+  value: string;
+  strong?: boolean;
+  tone?: string;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border/60 pb-2 last:border-0">
-      <dt className="shrink-0 text-xs font-bold uppercase tracking-wide text-muted-foreground">{term}</dt>
-      <dd className={`min-w-0 text-right ${strong ? `text-lg font-extrabold ${tone ?? "text-primary"}` : "font-semibold"}`}>{value}</dd>
+      <dt className="shrink-0 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+        {term}
+      </dt>
+      <dd
+        className={`min-w-0 text-right ${strong ? `text-lg font-extrabold ${tone ?? "text-primary"}` : "font-semibold"}`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

@@ -21,7 +21,11 @@ export const logActivity = createServerFn({ method: "POST" })
   .validator((input) => logSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: profile } = await supabase.from("profiles").select("name").eq("user_id", userId).maybeSingle();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("name")
+      .eq("user_id", userId)
+      .maybeSingle();
     await supabase.from("activity_logs").insert({
       user_id: userId,
       user_name: profile?.name ?? null,

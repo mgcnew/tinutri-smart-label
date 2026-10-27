@@ -15,7 +15,12 @@ export function buildDigest({ expired, today, soon, sample }: DigestInput): Dige
   const names = [...new Set(sample.map((name) => name.trim()).filter(Boolean))].slice(0, 3);
   const rest = total - names.length;
   const list = names.length ? `${names.join(", ")}${rest > 0 ? ` +${rest}` : ""}` : "";
-  const title = expired > 0 ? `${count(expired, "etiqueta vencida", "etiquetas vencidas")}` : today > 0 ? `${count(today, "etiqueta vence", "etiquetas vencem")} hoje` : `${count(soon, "etiqueta vence", "etiquetas vencem")} em breve`;
+  const title =
+    expired > 0
+      ? `${count(expired, "etiqueta vencida", "etiquetas vencidas")}`
+      : today > 0
+        ? `${count(today, "etiqueta vence", "etiquetas vencem")} hoje`
+        : `${count(soon, "etiqueta vence", "etiquetas vencem")} em breve`;
   const window = expired > 0 ? "expired" : today > 0 ? "today" : "all";
   return {
     title,

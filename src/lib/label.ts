@@ -1,4 +1,3 @@
-
 import tinutriLogo from "@/assets/tinutri-logo-print.png";
 
 export type LabelKind = "manipulado" | "aberto" | "fracionado" | "recebido";
@@ -44,7 +43,8 @@ export type PrintableLabel = {
   qrDataUrl?: string;
 };
 
-export type LabelStatus = "no_prazo" | "proximo" | "vencido" | "utilizada" | "consumida" | "descartada" | "cancelada";
+export type LabelStatus =
+  "no_prazo" | "proximo" | "vencido" | "utilizada" | "consumida" | "descartada" | "cancelada";
 
 export const STATUS_TEXT: Record<LabelStatus, string> = {
   no_prazo: "NO PRAZO",
@@ -57,7 +57,11 @@ export const STATUS_TEXT: Record<LabelStatus, string> = {
 };
 
 /** Status calculado a partir da validade registrada no banco. */
-export function resolveStatus(lifecycle: LabelLifecycle, expiresAt: string | Date, now = new Date()): LabelStatus {
+export function resolveStatus(
+  lifecycle: LabelLifecycle,
+  expiresAt: string | Date,
+  now = new Date(),
+): LabelStatus {
   if (lifecycle !== "ativa") return lifecycle;
   const expires = typeof expiresAt === "string" ? new Date(expiresAt) : expiresAt;
   const diffH = (expires.getTime() - now.getTime()) / 3_600_000;
@@ -80,11 +84,19 @@ export function newLabelToken() {
 export async function qrFor(token: string) {
   // Carregado sob demanda: a biblioteca de QR não entra no primeiro carregamento da página.
   const { toDataURL } = await import("qrcode");
-  return toDataURL(labelUrl(token), { width: 320, margin: 0, errorCorrectionLevel: "M", color: { dark: "#000000", light: "#FFFFFF" } });
+  return toDataURL(labelUrl(token), {
+    width: 320,
+    margin: 0,
+    errorCorrectionLevel: "M",
+    color: { dark: "#000000", light: "#FFFFFF" },
+  });
 }
 
 const escapeHtml = (value: string) =>
-  value.replace(/[&<>'"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[c] ?? c);
+  value.replace(
+    /[&<>'"]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[c] ?? c,
+  );
 
 export function labelStyles(w: number, h: number, scale: number) {
   const f = (pt: number) => +(pt * scale).toFixed(2);
@@ -140,7 +152,9 @@ export function labelMarkup(label: PrintableLabel, logoUrl: string) {
 }
 
 export function logoUrl() {
-  return typeof window === "undefined" ? tinutriLogo : new URL(tinutriLogo, window.location.origin).toString();
+  return typeof window === "undefined"
+    ? tinutriLogo
+    : new URL(tinutriLogo, window.location.origin).toString();
 }
 
 /** Documento completo pronto para impressão térmica monocromática. */

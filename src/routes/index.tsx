@@ -7,16 +7,24 @@ import { workspaceSearch } from "@/lib/workspace-search";
 
 // Visitantes recebem a apresentação já renderizada no servidor; a estação (emissão, impressão,
 // painéis) vira um arquivo à parte, baixado só por quem tem sessão salva neste navegador.
-const Workspace = lazy(() => import("@/components/workspace/Workspace").then((m) => ({ default: m.Workspace })));
+const Workspace = lazy(() =>
+  import("@/components/workspace/Workspace").then((m) => ({ default: m.Workspace })),
+);
 
 export const Route = createFileRoute("/")({
   validateSearch: workspaceSearch,
   head: () => ({
     meta: [
       { title: "TiNutri Smart Label® | Emitir Etiqueta" },
-      { name: "description", content: "Emita etiquetas térmicas padronizadas de identificação e validade de alimentos." },
+      {
+        name: "description",
+        content: "Emita etiquetas térmicas padronizadas de identificação e validade de alimentos.",
+      },
       { property: "og:title", content: "TiNutri Smart Label®" },
-      { property: "og:description", content: "Identificação e validade de alimentos em poucos toques." },
+      {
+        property: "og:description",
+        content: "Identificação e validade de alimentos em poucos toques.",
+      },
     ],
   }),
   component: Index,
