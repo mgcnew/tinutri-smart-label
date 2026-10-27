@@ -10,7 +10,7 @@ export const AUDIT_HEADER = [
   "Motivo do descarte",
 ];
 
-const escapeHtml = (value: string) =>
+export const escapeHtml = (value: string) =>
   value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

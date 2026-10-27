@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { SystemSelect } from "@/components/ui/system-select";
 import { supabase } from "@/integrations/supabase/client";
 import { management } from "@/lib/management";
+import { buildPortfolioReportHtml, type CareEntry } from "@/lib/portfolio-report";
+import { printHtml } from "@/lib/print-html";
 import {
   careDraft,
   PORTFOLIO_CARE_PREFIX,
@@ -60,6 +62,10 @@ export function PortfolioPanel({
   const [openCare, setOpenCare] = useState<Record<string, string>>({});
   const [registering, setRegistering] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
+  // Relatório do período: empresa aberta para escrever as recomendações antes de gerar o PDF.
+  const [reportFor, setReportFor] = useState<string | null>(null);
+  const [recommendations, setRecommendations] = useState("");
+  const [reporting, setReporting] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -123,6 +129,50 @@ export function PortfolioPanel({
       text: `Ocorrência registrada para ${row.name}. Acompanhe e conclua no Acompanhamento.`,
       error: false,
     });
+  };
+  const printReport = async (
+    row: PortfolioRow,
+    health: ReturnType<typeof rankPortfolio>[number]["health"],
+  ) => {
+    setReporting(true);
+    setNotice(null);
+    const generatedAt = new Date();
+    const since = new Date(generatedAt.getTime() - days * 86_400_000).toISOString();
+    const [care, auth] = await Promise.all([
+      management
+        .from("care_records")
+        .select("kind,title,status,created_at,resolution")
+        .eq("client_id", row.id)
+        .gte("created_at", since)
+        .order("created_at", { ascending: true })
+        .limit(100),
+      supabase.auth.getUser(),
+    ]);
+    const profile = auth.data.user
+      ? await supabase
+          .from("profiles")
+          .select("name")
+          .eq("user_id", auth.data.user.id)
+          .maybeSingle()
+      : null;
+    setReporting(false);
+    if (care.error) {
+      setNotice({ text: "Não foi possível montar o relatório. Tente novamente.", error: true });
+      return;
+    }
+    printHtml(
+      buildPortfolioReportHtml({
+        row,
+        health,
+        days,
+        generatedAt,
+        consultant: profile?.data?.name ?? "",
+        care: (care.data ?? []) as CareEntry[],
+        recommendations,
+      }),
+    );
+    setReportFor(null);
+    setRecommendations("");
   };
   const counts = useMemo(() => {
     const total: Record<HealthLevel, number> = { critical: 0, attention: 0, ok: 0, suspended: 0 };
@@ -239,8 +289,43 @@ export function PortfolioPanel({
                     <Button variant="outline" onClick={() => onOpenValidities(row.id)}>
                       Ver validades
                     </Button>
+                    <Button
+                      variant="outline"
+                      aria-expanded={reportFor === row.id}
+                      onClick={() => {
+                        setReportFor(reportFor === row.id ? null : row.id);
+                        setRecommendations("");
+                      }}
+                    >
+                      Relatório do período
+                    </Button>
                   </div>
                 </div>
+
+                {reportFor === row.id && (
+                  <div className="portfolio-report">
+                    <label htmlFor={`report-${row.id}`} className="text-xs font-semibold">
+                      Recomendações para o cliente (opcional)
+                    </label>
+                    <textarea
+                      id={`report-${row.id}`}
+                      value={recommendations}
+                      maxLength={2000}
+                      rows={4}
+                      onChange={(event) => setRecommendations(event.target.value)}
+                      placeholder="Ex.: conferir as etiquetas da geladeira 2 toda manhã e dar baixa no que vencer."
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-xs text-muted-foreground">
+                        Abre a impressão do navegador: escolha &quot;Salvar como PDF&quot; para
+                        enviar ao cliente.
+                      </p>
+                      <Button disabled={reporting} onClick={() => void printReport(row, health)}>
+                        {reporting ? "Montando…" : "Gerar relatório"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 <dl className="portfolio-metrics">
                   <Metric

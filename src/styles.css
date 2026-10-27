@@ -1016,6 +1016,25 @@ input.company-fixed:focus-visible {
   text-underline-offset: 3px;
   cursor: pointer;
 }
+.portfolio-report {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+.portfolio-report textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-input);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+}
 @media (max-width: 640px) {
   .portfolio-row {
     padding: 16px;
