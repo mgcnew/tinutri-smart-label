@@ -37,6 +37,17 @@ type Lookup = {
   replacedByToken?: string | null;
 };
 type CheckState = "registered" | "recent" | null;
+type SameLotLabel = {
+  id: string;
+  public_token: string;
+  product_name: string;
+  label_status: LabelLifecycle;
+  print_status: string;
+  expires_at: string | null;
+  expires_on: string;
+  location: string | null;
+  storage_condition: string | null;
+};
 
 const TIMELINE_NAMES: Record<string, string> = {
   emissao: "Etiqueta emitida",
@@ -143,6 +154,8 @@ function LabelLookup() {
   const [events, setEvents] = useState<TimelineEvent[] | null>(null);
   const [staff, setStaff] = useState(false);
   const [checkState, setCheckState] = useState<CheckState>(null);
+  // Rastreio reverso: outras etiquetas do mesmo lote na empresa (só para a equipe, pelas regras de acesso).
+  const [sameLot, setSameLot] = useState<SameLotLabel[] | null>(null);
   const [lineage, setLineage] = useState<
     Pick<Lookup, "moveOptions" | "sourceToken" | "replacedByToken">
   >({});
@@ -193,12 +206,26 @@ function LabelLookup() {
       const [{ data: own }, { data: profile }] = await Promise.all([
         supabase
           .from("issued_labels")
-          .select("id,client_id,label_status,print_status")
+          .select("id,client_id,label_status,print_status,lot_number")
           .eq("public_token", token)
           .maybeSingle(),
         supabase.from("profiles").select("name,email").eq("user_id", user.id).maybeSingle(),
       ]);
       if (!alive || !own) return;
+      const lot = own.lot_number?.trim();
+      if (lot) {
+        const { data: siblings } = await supabase
+          .from("issued_labels")
+          .select(
+            "id,public_token,product_name,label_status,print_status,expires_at,expires_on,location,storage_condition",
+          )
+          .eq("client_id", own.client_id)
+          .eq("lot_number", lot)
+          .neq("id", own.id)
+          .order("issued_at", { ascending: false })
+          .limit(50);
+        if (alive) setSameLot((siblings ?? []) as SameLotLabel[]);
+      }
       setActor({
         id: own.id,
         clientId: own.client_id,
@@ -397,6 +424,53 @@ function LabelLookup() {
           <p role="status" className="mt-3 text-center text-sm font-semibold">
             {feedback}
           </p>
+        )}
+
+        {sameLot && row.lot_number && (
+          <section
+            className="mt-4 rounded-3xl border bg-card p-5 shadow-sm"
+            aria-labelledby="same-lot-title"
+          >
+            <h2 id="same-lot-title" className="text-sm font-bold">
+              Mesmo lote ({row.lot_number}): {sameLot.length}{" "}
+              {sameLot.length === 1 ? "outra etiqueta" : "outras etiquetas"}
+            </h2>
+            {sameLot.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Nenhuma outra etiqueta da empresa usa este lote.
+              </p>
+            ) : (
+              <ul className="mt-3 divide-y text-sm">
+                {sameLot.map((item) => {
+                  const itemStatus = resolveStatus(
+                    item.label_status,
+                    item.expires_at ?? `${item.expires_on}T23:59:59`,
+                  );
+                  return (
+                    <li key={item.id}>
+                      <a
+                        href={`/label/${item.public_token}`}
+                        className="flex items-center justify-between gap-3 py-2.5"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-semibold">{item.product_name}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            Validade {fmt(item.expires_at ?? `${item.expires_on}T23:59:59`)}
+                            {item.location ? ` · ${item.location}` : ""}
+                          </span>
+                        </span>
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase ${STATUS_STYLE[itemStatus]}`}
+                        >
+                          {STATUS_TEXT[itemStatus]}
+                        </span>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
         )}
 
         {lineage.replacedByToken && (
