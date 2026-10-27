@@ -13,7 +13,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SystemSelect } from "@/components/ui/system-select";
 import { supabase } from "@/integrations/supabase/client";
-import { rankPortfolio, type HealthLevel, type PortfolioRow } from "@/lib/portfolio";
+import { management } from "@/lib/management";
+import {
+  careDraft,
+  PORTFOLIO_CARE_PREFIX,
+  rankPortfolio,
+  type HealthLevel,
+  type PortfolioRow,
+} from "@/lib/portfolio";
 
 /** Função do SQL 31 ainda fora dos tipos gerados do Supabase. */
 type UntypedRpc = (
@@ -38,8 +45,10 @@ const LEVEL: Record<HealthLevel, { label: string; icon: typeof AlertTriangle }> 
 
 export function PortfolioPanel({
   onOpenValidities,
+  onOpenCare,
 }: {
   onOpenValidities: (clientId: string) => void;
+  onOpenCare: () => void;
 }) {
   const [days, setDays] = useState<number>(30);
   const [rows, setRows] = useState<PortfolioRow[] | null>(null);
@@ -47,6 +56,10 @@ export function PortfolioPanel({
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  // Ocorrências da carteira ainda abertas, por empresa: evitam registrar o mesmo alerta duas vezes.
+  const [openCare, setOpenCare] = useState<Record<string, string>>({});
+  const [registering, setRegistering] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -66,6 +79,16 @@ export function PortfolioPanel({
       }
       setRows((data as PortfolioRow[] | null) ?? []);
       setUpdatedAt(new Date());
+      const care = await management
+        .from("care_records")
+        .select("client_id,created_at")
+        .neq("status", "concluida")
+        .like("title", `${PORTFOLIO_CARE_PREFIX}%`)
+        .order("created_at", { ascending: true });
+      if (!alive || care.error) return;
+      const open: Record<string, string> = {};
+      for (const item of care.data ?? []) open[item.client_id] ??= item.created_at;
+      setOpenCare(open);
     })();
     return () => {
       alive = false;
@@ -73,6 +96,34 @@ export function PortfolioPanel({
   }, [days, attempt]);
 
   const ranked = useMemo(() => (rows ? rankPortfolio(rows) : []), [rows]);
+
+  const registerCare = async (
+    row: PortfolioRow,
+    health: ReturnType<typeof rankPortfolio>[number]["health"],
+  ) => {
+    const draft = careDraft(row, health, days);
+    if (!draft || registering) return;
+    setRegistering(row.id);
+    setNotice(null);
+    const { error: failure } = await management
+      .from("care_records")
+      .insert(draft)
+      .select("id")
+      .single();
+    setRegistering(null);
+    if (failure) {
+      setNotice({
+        text: `Não foi possível registrar a ocorrência de ${row.name}. Tente novamente.`,
+        error: true,
+      });
+      return;
+    }
+    setOpenCare((current) => ({ ...current, [row.id]: new Date().toISOString() }));
+    setNotice({
+      text: `Ocorrência registrada para ${row.name}. Acompanhe e conclua no Acompanhamento.`,
+      error: false,
+    });
+  };
   const counts = useMemo(() => {
     const total: Record<HealthLevel, number> = { critical: 0, attention: 0, ok: 0, suspended: 0 };
     for (const item of ranked) total[item.health.level] += 1;
@@ -123,6 +174,20 @@ export function PortfolioPanel({
         )}
       </div>
 
+      {notice && (
+        <p
+          role={notice.error ? "alert" : "status"}
+          className={`portfolio-notice ${notice.error ? "is-error" : ""}`}
+        >
+          {notice.text}{" "}
+          {!notice.error && (
+            <button type="button" className="portfolio-link" onClick={onOpenCare}>
+              Abrir o Acompanhamento
+            </button>
+          )}
+        </p>
+      )}
+
       {loading && !rows ? (
         <p className="rounded-xl border bg-card px-5 py-8 text-center text-sm text-muted-foreground">
           Calculando os indicadores da carteira…
@@ -156,13 +221,25 @@ export function PortfolioPanel({
                       {level.label}
                     </p>
                   </div>
-                  <Button
-                    variant="outline"
-                    className="shrink-0"
-                    onClick={() => onOpenValidities(row.id)}
-                  >
-                    Ver validades
-                  </Button>
+                  <div className="portfolio-actions">
+                    {(health.level === "critical" || health.level === "attention") &&
+                      (openCare[row.id] ? (
+                        <Button variant="ghost" onClick={onOpenCare}>
+                          Ocorrência aberta desde {format(new Date(openCare[row.id]), "dd/MM")}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          disabled={registering !== null}
+                          onClick={() => void registerCare(row, health)}
+                        >
+                          {registering === row.id ? "Registrando…" : "Registrar ocorrência"}
+                        </Button>
+                      ))}
+                    <Button variant="outline" onClick={() => onOpenValidities(row.id)}>
+                      Ver validades
+                    </Button>
+                  </div>
                 </div>
 
                 <dl className="portfolio-metrics">

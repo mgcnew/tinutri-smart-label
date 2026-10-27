@@ -442,10 +442,15 @@ input.company-fixed:focus-visible { border-color: var(--line-input); box-shadow:
 .portfolio-reasons li::before { content: ""; position: absolute; left: 2px; top: .6em; width: 6px; height: 6px; border-radius: 50%; background: var(--warn-ink); }
 .portfolio-row[data-level="critical"] .portfolio-reasons li:first-child::before { background: var(--bad-ink); }
 .portfolio-row[data-level="suspended"] { color: var(--ink-soft); }
+.portfolio-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.portfolio-notice { padding: 12px 14px; border: 1px solid var(--line-green); border-radius: 10px; background: var(--ok-bg); color: var(--ok-ink); font-size: 13px; }
+.portfolio-notice.is-error { border-color: var(--bad-line); background: var(--bad-bg); color: var(--bad-ink); }
+.portfolio-link { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 @media (max-width: 640px) {
   .portfolio-row { padding: 16px; }
   .portfolio-head { flex-direction: column; }
-  .portfolio-head > button { width: 100%; }
+  .portfolio-actions { justify-content: stretch; width: 100%; }
+  .portfolio-actions > button { flex: 1 1 100%; }
 }
 .dashboard-section-label > span { font-size: 12px; color: var(--muted-foreground); }
 .dashboard-metric { position: relative; overflow: hidden; box-shadow: 0 3px 12px rgb(27 65 44 / 2%); transition: border-color .18s, box-shadow .18s, background-color .18s; }

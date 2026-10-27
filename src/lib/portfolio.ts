@@ -121,3 +121,48 @@ export function rankPortfolio(rows: PortfolioRow[], now = new Date()) {
         a.row.name.localeCompare(b.row.name, "pt-BR"),
     );
 }
+
+/** Prefixo das ocorrências criadas pela carteira: identifica as que ainda estão abertas e evita duplicar. */
+export const PORTFOLIO_CARE_PREFIX = "Carteira:";
+
+export type CareDraft = {
+  client_id: string;
+  kind: "ocorrencia";
+  status: "aberta";
+  priority: "alta" | "normal";
+  title: string;
+  description: string;
+  reason: "descarte" | "processo" | "orientacao";
+  product_name: string | null;
+};
+
+/** Ocorrência preenchida a partir dos motivos do semáforo, para a nutricionista registrar o que viu e agir. */
+export function careDraft(row: PortfolioRow, health: Health, days: number): CareDraft | null {
+  if (health.level !== "critical" && health.level !== "attention") return null;
+  const [first] = health.reasons;
+  const reason = first.startsWith("Descarte")
+    ? "descarte"
+    : first.startsWith("Sem emitir") || first.startsWith("Ainda não emitiu")
+      ? "orientacao"
+      : "processo";
+  const products = row.top_products
+    .map((product) => `${product.name} (${product.count})`)
+    .join(", ");
+  const description = [
+    `Pontos identificados pelo painel da carteira nos últimos ${days} dias:`,
+    ...health.reasons.map((item) => `- ${item}`),
+    products ? `Produtos que mais vencem ou são descartados: ${products}.` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return {
+    client_id: row.id,
+    kind: "ocorrencia",
+    status: "aberta",
+    priority: health.level === "critical" ? "alta" : "normal",
+    title: `${PORTFOLIO_CARE_PREFIX} ${first}`.slice(0, 160),
+    description: description.slice(0, 5000),
+    reason,
+    product_name: row.top_products[0]?.name.slice(0, 120) ?? null,
+  };
+}

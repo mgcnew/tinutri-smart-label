@@ -91,3 +91,27 @@ test("empresa suspensa sai do semáforo e vai para o fim da lista", () => {
   );
   assert.equal(ranked.at(-1)?.health.level, "suspended");
 });
+
+test("alerta da carteira vira ocorrência preenchida, com prioridade pela gravidade", async () => {
+  const { careDraft, assessHealth: assess } = await import("../src/lib/portfolio.ts");
+  const critical = row({
+    expired_open: 5,
+    checks: 0,
+    issued: 24,
+    top_products: [{ name: "Açúcar união", count: 5 }],
+  });
+  const draft = careDraft(critical, assess(critical, now), 30);
+  assert.equal(draft?.priority, "alta");
+  assert.equal(draft?.title, "Carteira: 5 produtos vencidos sem baixa na cozinha");
+  assert.equal(draft?.reason, "processo");
+  assert.equal(draft?.product_name, "Açúcar união");
+  assert.match(
+    draft?.description ?? "",
+    /últimos 30 dias:\n- 5 produtos vencidos sem baixa na cozinha\n- Nenhuma conferência pelo QR Code no período\nProdutos que mais vencem ou são descartados: Açúcar união \(5\)\./,
+  );
+  const idle = row({ last_issued_at: null, issued: 0 });
+  const idleDraft = careDraft(idle, assess(idle, now), 30);
+  assert.equal(idleDraft?.priority, "normal");
+  assert.equal(idleDraft?.reason, "orientacao");
+  assert.equal(careDraft(row(), assess(row(), now), 30), null);
+});

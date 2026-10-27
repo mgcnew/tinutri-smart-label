@@ -38,6 +38,7 @@ import { uploadLabelPhoto } from "@/lib/photos";
 import { allergenText, normalizeAllergens } from "@/lib/allergens";
 import { shelfDaysFor } from "@/lib/shelf-life";
 import { settleLabelRecord } from "@/lib/settlement-actions";
+import { rankPortfolio, type PortfolioRow } from "@/lib/portfolio";
 
 // Cada painel vira um arquivo à parte: quem abre o dashboard não baixa clientes, produtos, histórico etc.
 const CarePanel = lazy(() => import("@/components/master/CarePanel").then((m) => ({ default: m.CarePanel })));
@@ -350,6 +351,18 @@ export function Workspace() {
   const activeClients = useMemo(() => clients.filter(c => c.active), [clients]);
   // Login de empresa pertence a uma só: o seletor da emissão vira nome fixo.
   const singleCompany = role !== "admin_master" && activeClients.length === 1 ? activeClients[0] : null;
+  // Quantas empresas da carteira estão críticas: contador da aba Carteira para a consultoria.
+  const [criticalCompanies, setCriticalCompanies] = useState(0);
+  useEffect(() => {
+    if (!userId || (role !== "admin_master" && role !== "nutricionista")) { setCriticalCompanies(0); return; }
+    let alive = true;
+    void (async () => {
+      const { data, error } = await (supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }>).call(supabase, "portfolio_health", { p_days: 30 });
+      if (!alive || error || !Array.isArray(data)) return;
+      setCriticalCompanies(rankPortfolio(data as PortfolioRow[]).filter((item) => item.health.level === "critical").length);
+    })();
+    return () => { alive = false; };
+  }, [userId, role, overviewRevision]);
   useEffect(() => {
     if (role && !availableTabs.includes(tab)) setTab("dashboard");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- availableTabs deriva de role e permissions
@@ -851,7 +864,7 @@ export function Workspace() {
               <SheetContent side="left" className="flex w-[86%] max-w-xs flex-col gap-0 p-5">
                 <SheetHeader className="border-b pb-4 text-left"><SheetTitle><Brand /></SheetTitle></SheetHeader>
                 {role && <div className="mt-4 flex items-center gap-3 rounded-xl bg-secondary px-3 py-2.5"><span className="workspace-avatar shrink-0" aria-hidden="true">{(userName || "U").slice(0, 1).toUpperCase()}</span><div className="min-w-0"><strong className="block truncate text-sm font-semibold">{userName || "Sua conta"}</strong><span className="block truncate text-xs text-muted-foreground">{ROLE_LABEL[role]}{profileClientId ? ` · ${clients.find((c) => c.id === profileClientId)?.name ?? ""}` : ""}</span></div></div>}
-                <nav aria-label="Menu principal" className="thin-scroll mt-6 min-h-0 flex-1 space-y-2 thin-scroll overflow-y-auto"><Nav tabs={availableTabs} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount }} closeOnSelect /></nav>
+                <nav aria-label="Menu principal" className="thin-scroll mt-6 min-h-0 flex-1 space-y-2 thin-scroll overflow-y-auto"><Nav tabs={availableTabs} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount, carteira: criticalCompanies }} closeOnSelect /></nav>
                 <WorkspaceActions role={role} closeOnSelect />
               </SheetContent>
             </Sheet>
@@ -865,7 +878,7 @@ export function Workspace() {
           <div className="workspace-sidebar-content flex flex-col">
             <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Navegação</p>
             <nav aria-label="Menu principal" className="thin-scroll min-h-0 flex-1 space-y-2 thin-scroll overflow-y-auto">
-              <Nav tabs={availableTabs} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount }} />
+              <Nav tabs={availableTabs} tab={tab} setTab={navigateTab} badges={{ validades: urgentCount, carteira: criticalCompanies }} />
             </nav>
             <WorkspaceActions role={role} />
           </div>
@@ -998,7 +1011,7 @@ export function Workspace() {
           {tab === "clients" && role === "nutricionista" && <ClientsPanel scope={carteira} revision={overviewRevision} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
           {tab === "products" && <ProductsPanel clients={clients} scope={role === "admin_master" ? null : role === "nutricionista" ? carteira : profileClientId ? [profileClientId] : []} revision={overviewRevision} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} initialClient={entryCompany} />}
           {tab === "team" && <TeamPanel scope={accessScope} clients={clients} collaborators={collaborators} refresh={refresh} recordActivity={recordActivity} focusedId={focusedEntityId} />}
-          {tab === "carteira" && (role === "admin_master" || role === "nutricionista") && <PortfolioPanel onOpenValidities={(id) => { setDashboardClient(id); setValidityWindow("all"); setTab("validades"); }} />}
+          {tab === "carteira" && (role === "admin_master" || role === "nutricionista") && <PortfolioPanel onOpenValidities={(id) => { setDashboardClient(id); setValidityWindow("all"); setTab("validades"); }} onOpenCare={() => navigateTab("acompanhamento")} />}
           {tab === "validades" && <ValidadesPanel embedded canDiscard={permissions.descartar} scope={overviewScope} revision={overviewRevision} alertDays={alertDays} onOpenAlertSettings={() => { setSettingsTab("alertas"); navigateTab("settings"); }} onSettle={settleLabel} window={validityWindow} onWindowChange={setValidityWindow} clientName={clients.find((item) => item.id === (overviewScope?.length === 1 ? overviewScope[0] : dashboardClient))?.name ?? "Todas as empresas acessíveis"} onOpenLabel={(id) => { setDetailAction(null); setDetailLabelId(id); }} />}
           {tab === "acompanhamento" && (role === "admin_master" || role === "nutricionista") && <CarePanel scope={role === "admin_master" ? null : carteira} revision={overviewRevision} initialClient={entryCompany} focusedId={focusedEntityId} />}
           {tab === "history" && <HistoryPanel embedded scope={historyScope} clientName={clients.find((item) => historyScope?.length === 1 && item.id === historyScope[0])?.name} revision={overviewRevision} onReprint={reprintLabel} onDuplicate={duplicateLabel} />}
@@ -1060,7 +1073,7 @@ function Nav({ tabs, tab, setTab, badges = {}, closeOnSelect = false }: { tabs: 
   const allowed = new Set<AppTab>(tabs);
   return navItems.filter((item) => allowed.has(item.id)).map((item) => {
     const selected = tab === item.id || (item.id === "validades" && isLabelTab(tab));
-    const control = <Button key={item.id} variant={selected ? "secondary" : "ghost"} className="workspace-nav-item h-11 w-full justify-start" aria-current={selected ? "page" : undefined} onClick={() => setTab(item.id)}><item.icon />{item.label}{(badges[item.id] ?? 0) > 0 && <span className="ml-auto rounded-full bg-destructive px-2 py-0.5 text-xs font-bold text-destructive-foreground" aria-label={`${badges[item.id]} vencidas ou vencendo hoje`}>{badges[item.id]! > 99 ? "99+" : badges[item.id]}</span>}</Button>;
+    const control = <Button key={item.id} variant={selected ? "secondary" : "ghost"} className="workspace-nav-item h-11 w-full justify-start" aria-current={selected ? "page" : undefined} onClick={() => setTab(item.id)}><item.icon />{item.label}{(badges[item.id] ?? 0) > 0 && <span className="ml-auto rounded-full bg-destructive px-2 py-0.5 text-xs font-bold text-destructive-foreground" aria-label={item.id === "carteira" ? `${badges[item.id]} empresas em situação crítica` : `${badges[item.id]} vencidas ou vencendo hoje`}>{badges[item.id]! > 99 ? "99+" : badges[item.id]}</span>}</Button>;
     return closeOnSelect ? <SheetClose asChild key={item.id}>{control}</SheetClose> : control;
   });
 }
