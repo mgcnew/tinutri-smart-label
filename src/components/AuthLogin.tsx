@@ -73,7 +73,8 @@ export function AuthLogin({ modal = false }: { modal?: boolean }) {
   const Wrapper = modal ? "div" : "main";
   return (
     <Wrapper className={modal ? "auth-dialog-body" : "auth-page"}>
-      <section className="auth-card" aria-labelledby="login-title">
+      {/* No modal, o próprio Dialog liga o título ao diálogo; um id manual quebraria esse vínculo. */}
+      <section className="auth-card" aria-labelledby={modal ? undefined : "login-title"}>
         <header className="auth-brand">
           <img
             src={tinutriLogo}
@@ -90,7 +91,7 @@ export function AuthLogin({ modal = false }: { modal?: boolean }) {
         <div className="auth-heading">
           {modal ? (
             <DialogTitle asChild>
-              <h2 id="login-title">Bem-vindo de volta</h2>
+              <h2>Bem-vindo de volta</h2>
             </DialogTitle>
           ) : (
             <h1 id="login-title">Bem-vindo de volta</h1>
