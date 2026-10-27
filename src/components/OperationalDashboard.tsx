@@ -234,7 +234,7 @@ export function OperationalDashboard({
         </>
       )}
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <div className="dashboard-pair grid items-start gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <section className="dashboard-panel min-w-0 rounded-2xl border bg-card">
           <div className="dashboard-panel-heading border-b p-5">
             <h2 className="font-display text-lg font-semibold">Prioridades de validade</h2>
@@ -257,63 +257,65 @@ export function OperationalDashboard({
               </SystemSelect>
             </label>
           </div>
-          {loading ? (
-            <LoadingRows text="Consultando as validades…" />
-          ) : labelsError ? (
-            <p className="p-6 text-sm text-muted-foreground">
-              As prioridades estarão disponíveis quando a consulta for concluída.
-            </p>
-          ) : upcoming.length === 0 ? (
-            <div className="p-8 text-center">
-              <CheckCircle2 className="mx-auto size-7 text-primary" />
-              <p className="mt-3 text-sm font-semibold">Nenhuma pendência neste período</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                As próximas etiquetas aparecerão aqui.
+          <div className="dashboard-panel-body thin-scroll">
+            {loading ? (
+              <LoadingRows text="Consultando as validades…" />
+            ) : labelsError ? (
+              <p className="p-6 text-sm text-muted-foreground">
+                As prioridades estarão disponíveis quando a consulta for concluída.
               </p>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {upcoming.slice(0, 6).map((label) => (
-                <button
-                  type="button"
-                  key={label.id}
-                  onClick={() => onLabel(label.id)}
-                  className="dashboard-row flex w-full items-start gap-3 p-4 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                >
-                  <span
-                    className={`mt-1 grid size-8 shrink-0 place-items-center rounded-lg ${expiryWindow(label, now) === "expired" ? "bg-destructive/10 text-destructive" : "bg-secondary text-primary"}`}
+            ) : upcoming.length === 0 ? (
+              <div className="p-8 text-center">
+                <CheckCircle2 className="mx-auto size-7 text-primary" />
+                <p className="mt-3 text-sm font-semibold">Nenhuma pendência neste período</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  As próximas etiquetas aparecerão aqui.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {upcoming.slice(0, 6).map((label) => (
+                  <button
+                    type="button"
+                    key={label.id}
+                    onClick={() => onLabel(label.id)}
+                    className="dashboard-row flex w-full items-start gap-3 p-4 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   >
-                    <Package className="size-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <strong className="block break-words text-sm">{label.product_name}</strong>
-                    <span className="mt-1 block text-xs text-muted-foreground">
-                      {label.lot_number ? `Lote ${label.lot_number} · ` : ""}
-                      {label.storage_condition ?? "Conservação não informada"}
+                    <span
+                      className={`mt-1 grid size-8 shrink-0 place-items-center rounded-lg ${expiryWindow(label, now) === "expired" ? "bg-destructive/10 text-destructive" : "bg-secondary text-primary"}`}
+                    >
+                      <Package className="size-4" />
                     </span>
-                    <span className="mt-1 block text-xs text-muted-foreground">
-                      {label.client_name} · Resp.: {label.responsible_name}
-                    </span>
-                    <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium">
-                      {format(expiryOf(label), "dd/MM 'às' HH:mm")}{" "}
-                      <span
-                        className={
-                          expiryWindow(label, now) === "expired"
-                            ? "dashboard-badge dashboard-badge-expired"
-                            : expiryWindow(label, now) === "today"
-                              ? "dashboard-badge dashboard-badge-today"
-                              : "dashboard-badge"
-                        }
-                      >
-                        {remainingTime(label, now)}
+                    <span className="min-w-0 flex-1">
+                      <strong className="block break-words text-sm">{label.product_name}</strong>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {label.lot_number ? `Lote ${label.lot_number} · ` : ""}
+                        {label.storage_condition ?? "Conservação não informada"}
+                      </span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {label.client_name} · Resp.: {label.responsible_name}
+                      </span>
+                      <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium">
+                        {format(expiryOf(label), "dd/MM 'às' HH:mm")}{" "}
+                        <span
+                          className={
+                            expiryWindow(label, now) === "expired"
+                              ? "dashboard-badge dashboard-badge-expired"
+                              : expiryWindow(label, now) === "today"
+                                ? "dashboard-badge dashboard-badge-today"
+                                : "dashboard-badge"
+                          }
+                        >
+                          {remainingTime(label, now)}
+                        </span>
                       </span>
                     </span>
-                  </span>
-                  <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground" />
-                </button>
-              ))}
-            </div>
-          )}
+                    <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="border-t p-3">
             <Button
               variant="ghost"
@@ -332,84 +334,86 @@ export function OperationalDashboard({
               Registros da equipe. Toque para ver os detalhes de cada ação.
             </p>
           </div>
-          {loading ? (
-            <LoadingRows text="Consultando as ações…" />
-          ) : actionsError ? (
-            <div role="alert" className="p-6 text-sm">
-              <p className="font-semibold">Não foi possível consultar as ações</p>
-              <p className="mt-2 text-muted-foreground">{actionsError}</p>
-              <Button variant="outline" className="mt-4" onClick={reload}>
-                Tentar novamente
-              </Button>
-            </div>
-          ) : !recent.length ? (
-            <div className="p-8 text-center">
-              <History className="mx-auto size-7 text-muted-foreground" />
-              <p className="mt-3 text-sm font-semibold">Nenhuma ação registrada ainda</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Confirmações, reimpressões e baixas aparecerão aqui.
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {recent.map((action) => (
-                <button
-                  type="button"
-                  key={action.id}
-                  onClick={() => onAction(action)}
-                  className="dashboard-row flex w-full gap-3 p-4 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                >
-                  <span
-                    className={`mt-1 grid size-8 shrink-0 place-items-center rounded-lg ${action.event_type === "falha_impressao" ? "bg-destructive/10 text-destructive" : "bg-secondary text-primary"}`}
+          <div className="dashboard-panel-body thin-scroll">
+            {loading ? (
+              <LoadingRows text="Consultando as ações…" />
+            ) : actionsError ? (
+              <div role="alert" className="p-6 text-sm">
+                <p className="font-semibold">Não foi possível consultar as ações</p>
+                <p className="mt-2 text-muted-foreground">{actionsError}</p>
+                <Button variant="outline" className="mt-4" onClick={reload}>
+                  Tentar novamente
+                </Button>
+              </div>
+            ) : !recent.length ? (
+              <div className="p-8 text-center">
+                <History className="mx-auto size-7 text-muted-foreground" />
+                <p className="mt-3 text-sm font-semibold">Nenhuma ação registrada ainda</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Confirmações, reimpressões e baixas aparecerão aqui.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {recent.map((action) => (
+                  <button
+                    type="button"
+                    key={action.id}
+                    onClick={() => onAction(action)}
+                    className="dashboard-row flex w-full gap-3 p-4 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   >
-                    {action.event_type === "falha_impressao" ? (
-                      <AlertTriangle className="size-4" />
-                    ) : (
-                      <History className="size-4" />
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm leading-relaxed">
-                      <strong>{action.user_name ?? "Usuário não identificado"}</strong>{" "}
-                      {EVENT_NAMES[action.event_type] ?? "registrou uma ação"}
-                      {action.label ? (
-                        <>
-                          {" "}
-                          de <strong>{action.label.product_name}</strong>
-                        </>
-                      ) : action.entity_name ? (
-                        <>
-                          {" "}
-                          <strong>{action.entity_name}</strong>
-                        </>
-                      ) : action.source === "activity" ? (
-                        ""
-                      ) : (
-                        " de uma etiqueta"
-                      )}
-                      .
-                    </span>
-                    <span className="mt-1 block text-xs text-muted-foreground">
-                      {action.label?.client_name ??
-                        clients.find((client) => client.id === action.client_id)?.name ??
-                        "Estabelecimento"}
-                      {action.label?.lot_number ? ` · Lote ${action.label.lot_number}` : ""}
-                    </span>
-                    <time
-                      className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"
-                      dateTime={action.created_at}
+                    <span
+                      className={`mt-1 grid size-8 shrink-0 place-items-center rounded-lg ${action.event_type === "falha_impressao" ? "bg-destructive/10 text-destructive" : "bg-secondary text-primary"}`}
                     >
-                      <Clock3 className="size-3" />
-                      {format(new Date(action.created_at), "dd/MM/yyyy 'às' HH:mm", {
-                        locale: ptBR,
-                      })}
-                    </time>
-                  </span>
-                  <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground" />
-                </button>
-              ))}
-            </div>
-          )}
+                      {action.event_type === "falha_impressao" ? (
+                        <AlertTriangle className="size-4" />
+                      ) : (
+                        <History className="size-4" />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm leading-relaxed">
+                        <strong>{action.user_name ?? "Usuário não identificado"}</strong>{" "}
+                        {EVENT_NAMES[action.event_type] ?? "registrou uma ação"}
+                        {action.label ? (
+                          <>
+                            {" "}
+                            de <strong>{action.label.product_name}</strong>
+                          </>
+                        ) : action.entity_name ? (
+                          <>
+                            {" "}
+                            <strong>{action.entity_name}</strong>
+                          </>
+                        ) : action.source === "activity" ? (
+                          ""
+                        ) : (
+                          " de uma etiqueta"
+                        )}
+                        .
+                      </span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {action.label?.client_name ??
+                          clients.find((client) => client.id === action.client_id)?.name ??
+                          "Estabelecimento"}
+                        {action.label?.lot_number ? ` · Lote ${action.label.lot_number}` : ""}
+                      </span>
+                      <time
+                        className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"
+                        dateTime={action.created_at}
+                      >
+                        <Clock3 className="size-3" />
+                        {format(new Date(action.created_at), "dd/MM/yyyy 'às' HH:mm", {
+                          locale: ptBR,
+                        })}
+                      </time>
+                    </span>
+                    <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {canViewHistory && (
             <div className="border-t p-3">
               <Button
