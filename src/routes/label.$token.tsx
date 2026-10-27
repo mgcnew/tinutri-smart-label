@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import tinutriLogo from "@/assets/tinutri-logo-ui.webp";
 import { supabase } from "@/integrations/supabase/client";
 import { DiscardReasonField } from "@/components/DiscardReasonField";
+import { LabelMovePanel, type MoveOption } from "@/components/LabelMovePanel";
 import { settleLabelRecord } from "@/lib/settlement-actions";
 import { allergenText } from "@/lib/allergens";
 import { formatCloseReason, type Settlement } from "@/lib/settlement";
@@ -15,7 +16,15 @@ type UntypedRpc = (fn: string, args: Record<string, unknown>) => PromiseLike<{ d
 const rpc = (fn: string, args: Record<string, unknown>) => (supabase.rpc as unknown as UntypedRpc).call(supabase, fn, args);
 
 type TimelineEvent = { type: string; at: string; by: string | null };
-type Lookup = { label: LabelRow; events: TimelineEvent[] | null; staff: boolean };
+type Lookup = {
+  label: LabelRow;
+  events: TimelineEvent[] | null;
+  staff: boolean;
+  /** Ausentes antes do SQL 32: sem eles, as ações de mover não aparecem. */
+  moveOptions?: MoveOption[];
+  sourceToken?: string | null;
+  replacedByToken?: string | null;
+};
 type CheckState = "registered" | "recent" | null;
 
 const TIMELINE_NAMES: Record<string, string> = {
@@ -27,14 +36,33 @@ const TIMELINE_NAMES: Record<string, string> = {
   baixa_utilizada: "Baixa: utilizada",
   baixa_consumida: "Baixa: consumida",
   baixa_descartada: "Baixa: descartada",
+  movimentacao: "Mudou de local",
+  mudanca_conservacao: "Mudança de conservação: etiqueta nova gerada",
+  substituida: "Substituída pela etiqueta nova",
 };
 
 /** Consulta com linha do tempo (SQL 30); sem ela, a consulta antiga mantém a página funcionando. */
 async function lookupLabel(token: string): Promise<Lookup | null> {
   const current = await rpc("label_lookup", { _token: token });
   if (!current.error) {
-    const data = current.data as { label: LabelRow; events: TimelineEvent[]; staff: boolean } | null;
-    return data?.label ? { label: data.label, events: data.events ?? [], staff: Boolean(data.staff) } : null;
+    const data = current.data as {
+      label: LabelRow;
+      events: TimelineEvent[];
+      staff: boolean;
+      move_options?: MoveOption[];
+      source_token?: string | null;
+      replaced_by_token?: string | null;
+    } | null;
+    return data?.label
+      ? {
+          label: data.label,
+          events: data.events ?? [],
+          staff: Boolean(data.staff),
+          moveOptions: data.move_options,
+          sourceToken: data.source_token,
+          replacedByToken: data.replaced_by_token,
+        }
+      : null;
   }
   if (current.error.code !== "PGRST202") return null;
   const { data, error } = await supabase.rpc("get_label_by_token", { _token: token });
@@ -97,6 +125,7 @@ function LabelLookup() {
   const [events, setEvents] = useState<TimelineEvent[] | null>(null);
   const [staff, setStaff] = useState(false);
   const [checkState, setCheckState] = useState<CheckState>(null);
+  const [lineage, setLineage] = useState<Pick<Lookup, "moveOptions" | "sourceToken" | "replacedByToken">>({});
   const [state, setState] = useState<"loading" | "ready" | "missing">("loading");
   // Só aparece para quem está logado e tem acesso à etiqueta (a política do banco decide).
   const [actor, setActor] = useState<{ id: string; clientId: string; userId: string; userName: string; canSettle: boolean } | null>(null);
@@ -115,6 +144,7 @@ function LabelLookup() {
       setRow(found.label);
       setEvents(found.events);
       setStaff(found.staff);
+      setLineage(found);
       setState("ready");
       // Leitura pela equipe com acesso à empresa conta como conferência, registrada uma vez a cada 10 minutos.
       if (found.staff && found.events !== null && found.label.label_status === "ativa") {
@@ -158,6 +188,14 @@ function LabelLookup() {
   }
 
   const status = resolveStatus(row.label_status, row.expires_at);
+
+  const reload = async () => {
+    const refreshed = await lookupLabel(token);
+    if (!refreshed) return;
+    setRow(refreshed.label);
+    setEvents(refreshed.events);
+    setLineage(refreshed);
+  };
 
   const settle = async (choice: Settlement) => {
     if (!actor || busy) return;
@@ -226,6 +264,34 @@ function LabelLookup() {
           </section>
         )}
         {feedback && <p role="status" className="mt-3 text-center text-sm font-semibold">{feedback}</p>}
+
+        {lineage.replacedByToken && (
+          <p className="mt-4 rounded-2xl border bg-card p-4 text-sm">
+            Esta etiqueta foi substituída após mudança de conservação.{" "}
+            <a className="font-bold text-primary underline underline-offset-4" href={`/label/${lineage.replacedByToken}`}>
+              Ver a etiqueta nova
+            </a>
+          </p>
+        )}
+        {lineage.sourceToken && (
+          <p className="mt-4 rounded-2xl border bg-card p-4 text-sm">
+            Gerada a partir de outra etiqueta, após mudança de conservação.{" "}
+            <a className="font-bold text-primary underline underline-offset-4" href={`/label/${lineage.sourceToken}`}>
+              Ver a etiqueta de origem
+            </a>
+          </p>
+        )}
+
+        {staff && lineage.moveOptions && row.label_status === "ativa" && (
+          <LabelMovePanel
+            token={token}
+            location={row.location}
+            options={lineage.moveOptions}
+            onChanged={async () => {
+              await reload();
+            }}
+          />
+        )}
 
         {events && (
           <section className="mt-4 rounded-3xl border bg-card p-5 shadow-sm" aria-labelledby="timeline-title">
