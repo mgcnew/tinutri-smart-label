@@ -287,6 +287,7 @@ function LabelLookup() {
             token={token}
             location={row.location}
             options={lineage.moveOptions}
+            expired={status === "vencido"}
             onChanged={async () => {
               await reload();
             }}

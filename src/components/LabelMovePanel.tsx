@@ -56,11 +56,14 @@ export function LabelMovePanel({
   location,
   options,
   onChanged,
+  expired = false,
 }: {
   token: string;
   location: string | null;
   options: MoveOption[];
   onChanged: (replacementToken?: string) => Promise<void>;
+  /** Vencida não muda de conservação: a validade nunca aumenta, então o caminho é dar baixa. */
+  expired?: boolean;
 }) {
   const [place, setPlace] = useState(location ?? "");
   const [chosen, setChosen] = useState<MoveOption | null>(null);
@@ -189,7 +192,12 @@ export function LabelMovePanel({
             </button>
           </div>
 
-          {options.length > 0 && (
+          {expired && options.length > 0 && (
+            <p className="mt-5 text-sm text-muted-foreground">
+              A validade terminou: esta etiqueta não pode mudar de conservação. Dê baixa nela.
+            </p>
+          )}
+          {!expired && options.length > 0 && (
             <fieldset className="mt-5">
               <legend className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 Mudar a conservação
