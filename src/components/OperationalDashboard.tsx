@@ -78,13 +78,13 @@ export function OperationalDashboard({
           <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight">
             Olá{userName ? `, ${userName.split(" ")[0]}` : ""}.
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground max-sm:hidden">
             Veja o que precisa de atenção e acompanhe sua equipe.
           </p>
         </div>
         {canEmit && (
           <Button
-            className="dashboard-primary h-11 rounded-xl shadow-none"
+            className="dashboard-primary h-11 rounded-xl shadow-none max-lg:hidden"
             onClick={() => onNavigate("emit")}
           >
             <Printer /> Emitir etiquetas
@@ -92,10 +92,10 @@ export function OperationalDashboard({
         )}
       </header>
 
-      <div className="dashboard-context flex flex-col items-stretch gap-3 rounded-xl border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="dashboard-context flex flex-row items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 max-sm:px-3 max-sm:py-2">
         {clients.length > 1 ? (
           <label className="flex min-w-0 flex-1 items-center gap-3 text-xs font-semibold sm:max-w-sm">
-            Empresa
+            <span className="max-sm:sr-only">Empresa</span>
             <SystemSelect
               aria-label="Empresa"
               className="!min-w-0 !rounded-lg !py-2 text-sm"
@@ -116,7 +116,7 @@ export function OperationalDashboard({
           </p>
         )}
         <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span role="status" className="flex items-center gap-2">
+          <span role="status" className="flex items-center gap-2 max-sm:sr-only">
             <span
               aria-hidden="true"
               className={`dashboard-status-dot ${loading ? "is-loading" : labelsError || actionsError ? "is-error" : ""}`}
@@ -183,17 +183,19 @@ export function OperationalDashboard({
           <div className="grid gap-3 sm:grid-cols-3" aria-busy={loading}>
             {windows.map((window, index) => {
               const items = visible.filter((label) => expiryWindow(label, now) === window);
+              // O tom de alerta só aparece quando há de fato algo vencendo hoje.
+              const urgentToday = index === 0 && items.length > 0;
               return (
                 <button
                   key={window}
                   type="button"
                   disabled={loading}
                   onClick={() => onWindow(window)}
-                  className={`dashboard-metric ${index === 0 ? "dashboard-metric-today" : ""} group min-w-0 rounded-2xl border bg-card p-5 text-left transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait`}
+                  className={`dashboard-metric ${urgentToday ? "dashboard-metric-today" : ""} group min-w-0 rounded-2xl border bg-card p-5 text-left transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span
-                      className={`grid size-9 place-items-center rounded-xl ${index === 0 ? "bg-orange-50 text-orange-700" : index === 1 ? "bg-secondary text-primary" : "bg-muted text-muted-foreground"}`}
+                      className={`grid size-9 place-items-center rounded-xl ${urgentToday ? "bg-[var(--warn-bg)] text-[var(--warn-ink)]" : index <= 1 ? "bg-secondary text-primary" : "bg-muted text-muted-foreground"}`}
                     >
                       <CalendarClock className="size-4" />
                     </span>

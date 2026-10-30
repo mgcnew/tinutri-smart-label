@@ -1,0 +1,29 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "createdAt": "2026-10-30T01:09:39.939Z",
+        "reason": "Arial é a fonte das etiquetas térmicas impressas (.thermal-label), escolhida por estar presente em todas as impressoras/navegadores; não é fonte de interface"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "arial",
+        "createdAt": "2026-10-30T01:09:39.952Z",
+        "reason": "Fonte da etiqueta térmica impressa, fora da interface"
+      },
+      {
+        "rule": "kicker-above-heading",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/model-pick.html"
+        ],
+        "createdAt": "2026-10-30T01:11:16.756Z",
+        "reason": "Esboço descartável da rodada de direção (opção não escolhida); não é página entregue"
+      }
+    ]
+  }
+}

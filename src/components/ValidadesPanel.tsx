@@ -23,6 +23,7 @@ import {
   Package,
   RefreshCw,
   Search,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -90,6 +91,8 @@ export function ValidadesPanel({
   const [clientQuery, setClientQuery] = useState("");
   const [productQuery, setProductQuery] = useState("");
   const [lotQuery, setLotQuery] = useState("");
+  // No celular, só a busca por produto fica à mostra; os demais filtros abrem sob demanda.
+  const [moreFilters, setMoreFilters] = useState(false);
   const [urgency, setUrgency] = useState("all");
   const [now, setNow] = useState(() => new Date());
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
@@ -201,6 +204,7 @@ export function ValidadesPanel({
     {
       key: "expired",
       title: "Vencidas",
+      short: "Vencidas",
       description: "Verifique o destino destes produtos.",
       tone: "expired",
       icon: AlertTriangle,
@@ -209,6 +213,7 @@ export function ValidadesPanel({
     {
       key: "today",
       title: "Vencem hoje",
+      short: "Hoje",
       description: "Priorize o uso durante a operação de hoje.",
       tone: "today",
       icon: CalendarClock,
@@ -219,6 +224,7 @@ export function ValidadesPanel({
     {
       key: "soon",
       title: "Próximas de vencer",
+      short: "Próximas",
       description: `Vencimentos após hoje, até ${alertDays} dia${alertDays === 1 ? "" : "s"} de antecedência.`,
       tone: "soon",
       icon: Clock3,
@@ -229,6 +235,7 @@ export function ValidadesPanel({
     {
       key: "later",
       title: "Dentro do prazo",
+      short: "No prazo",
       description: "Vencimentos após o período de aviso.",
       tone: "later",
       icon: CheckCircle2,
@@ -240,6 +247,7 @@ export function ValidadesPanel({
   const hasFilters = Boolean(
     clientQuery || productQuery || lotQuery || window !== "all" || urgency !== "all",
   );
+  const extraFilters = [clientQuery, lotQuery, window !== "all"].filter(Boolean).length;
   const clearFilters = () => {
     setClientQuery("");
     setProductQuery("");
@@ -288,7 +296,7 @@ export function ValidadesPanel({
       <header
         className={
           embedded
-            ? "flex flex-wrap justify-end gap-4"
+            ? "validities-actions flex flex-wrap justify-end gap-4"
             : "dashboard-heading flex flex-wrap items-start justify-between gap-4"
         }
       >
@@ -302,7 +310,7 @@ export function ValidadesPanel({
         )}
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" className="min-h-11" onClick={() => setShowLosses(true)}>
-            Perdas e descartes
+            Perdas<span className="max-sm:hidden"> e descartes</span>
           </Button>
           <Button
             variant="outline"
@@ -311,7 +319,7 @@ export function ValidadesPanel({
             onClick={onRefresh}
           >
             <RefreshCw className={loading ? "animate-spin" : ""} />
-            {loading ? "Atualizando…" : "Atualizar"}
+            <span className="max-sm:sr-only">{loading ? "Atualizando…" : "Atualizar"}</span>
           </Button>
         </div>
       </header>
@@ -332,74 +340,95 @@ export function ValidadesPanel({
         </span>
       </div>
       <div className="validities-filters rounded-2xl border bg-card p-4 sm:p-5">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <FilterField label="Cliente">
-            {/* Quem acessa uma única empresa vê o nome dela fixo; a busca livre é para quem vê várias. */}
-            {scope?.length === 1 ? (
-              <FixedCompany name={clientName} />
-            ) : (
+        <div className="validities-search flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <FilterField label="Produto">
               <input
-                value={clientQuery}
-                onChange={(event) => setClientQuery(event.target.value)}
-                placeholder="Nome da empresa"
+                ref={filterInput}
+                type="search"
+                value={productQuery}
+                onChange={(event) => setProductQuery(event.target.value)}
+                placeholder="Nome do produto"
               />
-            )}
-          </FilterField>
-          <FilterField label="Produto">
-            <input
-              ref={filterInput}
-              type="search"
-              value={productQuery}
-              onChange={(event) => setProductQuery(event.target.value)}
-              placeholder="Nome do produto"
-            />
-          </FilterField>
-          <FilterField label="Lote">
-            <input
-              value={lotQuery}
-              onChange={(event) => setLotQuery(event.target.value)}
-              placeholder="Número do lote"
-            />
-          </FilterField>
-          <FilterField label="Período das validades">
-            <SystemSelect
-              value={window}
-              onChange={(event) => {
-                setUrgency("all");
-                onWindowChange(event.target.value as ExpiryWindow);
-              }}
-            >
-              {Object.entries(EXPIRY_WINDOW_NAMES).map(([value, name]) => (
-                <option key={value} value={value}>
-                  {name}
-                </option>
-              ))}
-            </SystemSelect>
-          </FilterField>
-        </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-          <p className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-            <span>
-              Aviso de “próximo de vencer”: {alertDays} dia{alertDays === 1 ? "" : "s"} de
-              antecedência.
-            </span>
-            <button
-              type="button"
-              className="min-h-11 font-semibold text-primary underline-offset-2 hover:underline"
-              onClick={onOpenAlertSettings}
-            >
-              Alterar
-            </button>
-          </p>
+            </FilterField>
+          </div>
           <Button
-            variant="ghost"
-            className="min-h-11 text-xs"
-            disabled={!hasFilters}
-            onClick={clearFilters}
+            type="button"
+            variant="outline"
+            className="validities-more-toggle min-h-[46px] sm:hidden"
+            aria-expanded={moreFilters}
+            aria-controls="validities-more"
+            onClick={() => setMoreFilters((open) => !open)}
           >
-            <X />
-            Limpar filtros
+            <SlidersHorizontal />
+            Filtros{extraFilters ? ` (${extraFilters})` : ""}
           </Button>
+        </div>
+        <div
+          id="validities-more"
+          className="validities-more mt-4"
+          data-open={moreFilters ? "" : undefined}
+        >
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <FilterField label="Cliente">
+              {/* Quem acessa uma única empresa vê o nome dela fixo; a busca livre é para quem vê várias. */}
+              {scope?.length === 1 ? (
+                <FixedCompany name={clientName} />
+              ) : (
+                <input
+                  value={clientQuery}
+                  onChange={(event) => setClientQuery(event.target.value)}
+                  placeholder="Nome da empresa"
+                />
+              )}
+            </FilterField>
+            <FilterField label="Lote">
+              <input
+                value={lotQuery}
+                onChange={(event) => setLotQuery(event.target.value)}
+                placeholder="Número do lote"
+              />
+            </FilterField>
+            <FilterField label="Período das validades">
+              <SystemSelect
+                value={window}
+                onChange={(event) => {
+                  setUrgency("all");
+                  onWindowChange(event.target.value as ExpiryWindow);
+                }}
+              >
+                {Object.entries(EXPIRY_WINDOW_NAMES).map(([value, name]) => (
+                  <option key={value} value={value}>
+                    {name}
+                  </option>
+                ))}
+              </SystemSelect>
+            </FilterField>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+            <p className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+              <span>
+                Aviso de “próximo de vencer”: {alertDays} dia{alertDays === 1 ? "" : "s"} de
+                antecedência.
+              </span>
+              <button
+                type="button"
+                className="min-h-11 font-semibold text-primary underline-offset-2 hover:underline"
+                onClick={onOpenAlertSettings}
+              >
+                Alterar
+              </button>
+            </p>
+            <Button
+              variant="ghost"
+              className="min-h-11 text-xs"
+              disabled={!hasFilters}
+              onClick={clearFilters}
+            >
+              <X />
+              Limpar filtros
+            </Button>
+          </div>
         </div>
       </div>
       {loadError && (
@@ -412,7 +441,7 @@ export function ValidadesPanel({
         </div>
       )}
       {!loadError && (
-        <div>
+        <div className="validities-overview">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Panorama deste filtro</h2>
             <p role="status" className="text-xs text-muted-foreground">
@@ -427,6 +456,7 @@ export function ValidadesPanel({
                 key={group.key}
                 type="button"
                 className={`validity-metric validity-${group.tone}`}
+                data-empty={counts[group.key as keyof typeof counts] ? undefined : ""}
                 aria-pressed={urgency === group.key}
                 disabled={loading || !counts[group.key as keyof typeof counts]}
                 aria-label={`Ver ${group.title.toLocaleLowerCase("pt-BR")}: ${counts[group.key as keyof typeof counts]} etiquetas`}
@@ -438,14 +468,17 @@ export function ValidadesPanel({
                   <group.icon className="size-4" />
                   {urgency === group.key && <CheckCircle2 className="size-3.5" />}
                 </div>
-                <p className="mt-3 text-xs font-medium">{group.title}</p>
+                <p className="mt-3 text-xs font-medium">
+                  <span className="max-sm:hidden">{group.title}</span>
+                  <span className="sm:hidden">{group.short}</span>
+                </p>
                 <strong className="mt-1 block text-3xl font-semibold tabular-nums">
                   {loading ? "—" : counts[group.key as keyof typeof counts]}
                 </strong>
               </button>
             ))}
           </div>
-          <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+          <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground max-sm:hidden">
             <CheckCircle2 className="size-3.5 shrink-0 text-primary" />
             Somente etiquetas ativas com impressão confirmada. Toque em um grupo para filtrar a
             lista.

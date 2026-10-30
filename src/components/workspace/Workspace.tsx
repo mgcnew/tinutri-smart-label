@@ -40,14 +40,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { EmissionProductPicker } from "@/components/EmissionProductPicker";
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { OperationalDashboard } from "@/components/OperationalDashboard";
 import { AuditActionDetails } from "@/components/AuditActionDetails";
 import { LabelDetails } from "@/components/LabelDetails";
@@ -242,6 +235,8 @@ export function Workspace() {
   const [role, setRole] = useState<AppRole | null>(null);
   const permissions = usePermissions(role, userId);
   const availableTabs = role ? tabsFor(role, permissions) : [];
+  // Menu lateral do celular: aberto pelo item "Menu" da barra inferior.
+  const [menuOpen, setMenuOpen] = useState(false);
   const [profileClientId, setProfileClientId] = useState<string | null>(null);
   const [carteira, setCarteira] = useState<string[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -1481,12 +1476,7 @@ export function Workspace() {
       <header className="workspace-header sticky top-0 z-30 border-b bg-card px-4 sm:px-6">
         <div className="workspace-topbar flex min-w-0 items-center gap-3">
           <div className="lg:hidden">
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Abrir menu">
-                  <Menu />
-                </Button>
-              </SheetTrigger>
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetContent side="left" className="flex w-[86%] max-w-xs flex-col gap-0 p-5">
                 <SheetHeader className="border-b pb-4 text-left">
                   <SheetTitle>
@@ -1540,9 +1530,6 @@ export function Workspace() {
       <div className="workspace-layout flex">
         <aside className="workspace-sidebar hidden w-60 shrink-0 lg:block">
           <div className="workspace-sidebar-content flex flex-col">
-            <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              Navegação
-            </p>
             <nav
               aria-label="Menu principal"
               className="thin-scroll min-h-0 flex-1 space-y-2 thin-scroll overflow-y-auto"
@@ -1559,14 +1546,17 @@ export function Workspace() {
         </aside>
         <main className="workspace-main min-w-0 flex-1">
           {tab !== "dashboard" && tab !== "validades" && (
-            <AlertBanner
-              counts={alertCounts}
-              soonDays={alertDays}
-              onOpen={(window) => {
-                setValidityWindow(window);
-                setTab("validades");
-              }}
-            />
+            // Na emissão pelo celular o selo de Validades já avisa; a tela fica só com a ação verde.
+            <div className={tab === "emit" ? "max-sm:hidden" : undefined}>
+              <AlertBanner
+                counts={alertCounts}
+                soonDays={alertDays}
+                onOpen={(window) => {
+                  setValidityWindow(window);
+                  setTab("validades");
+                }}
+              />
+            </div>
           )}
           {entryError && (
             <p role="alert" className="clients-error mb-5">
@@ -1961,7 +1951,7 @@ export function Workspace() {
                       )}
                     </div>
                   )}
-                  <div className="emit-actions mt-5 grid gap-2 border-t pt-5 sm:grid-cols-2">
+                  <div className="emit-actions mt-5 grid grid-cols-2 gap-2 border-t pt-5">
                     <Button
                       variant="outline"
                       className="min-h-12 w-full"
@@ -2219,6 +2209,14 @@ export function Workspace() {
           </Suspense>
         </main>
       </div>
+      <MobileTabBar
+        tabs={availableTabs}
+        tab={tab}
+        urgent={urgentCount}
+        menuOpen={menuOpen}
+        onNavigate={navigateTab}
+        onMenu={() => setMenuOpen(true)}
+      />
     </div>
   );
 }
@@ -2324,6 +2322,71 @@ function tabsFor(role: AppRole, permissions: Permissions): AppTab[] {
   return tabs;
 }
 
+/** Barra inferior do celular e da AR-SP5: as tarefas do dia a um toque, o resto no Menu. */
+function MobileTabBar({
+  tabs,
+  tab,
+  urgent,
+  menuOpen,
+  onNavigate,
+  onMenu,
+}: {
+  tabs: AppTab[];
+  tab: AppTab;
+  urgent: number;
+  menuOpen: boolean;
+  onNavigate: (id: AppTab) => void;
+  onMenu: () => void;
+}) {
+  const allowed = new Set<AppTab>(tabs);
+  const items = (
+    [
+      { id: "dashboard", label: "Início", icon: LayoutDashboard },
+      { id: "emit", label: "Emitir", icon: Printer },
+      { id: "validades", label: "Validades", icon: CalendarClock },
+      { id: "history", label: "Histórico", icon: History },
+    ] as const
+  ).filter((item) => allowed.has(item.id));
+  const onMenuTab = !menuOpen && !items.some((item) => item.id === tab);
+  return (
+    <nav aria-label="Atalhos" className="mobile-tabbar lg:hidden">
+      {items.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          className={item.id === "emit" ? "mobile-tab mobile-tab--emit" : "mobile-tab"}
+          aria-current={tab === item.id ? "page" : undefined}
+          onClick={() => onNavigate(item.id)}
+        >
+          <span className="mobile-tab__icon">
+            <item.icon aria-hidden="true" />
+            {item.id === "validades" && urgent > 0 && (
+              <span
+                className="mobile-tab__badge"
+                aria-label={`${urgent} vencidas ou vencendo hoje`}
+              >
+                {urgent > 99 ? "99+" : urgent}
+              </span>
+            )}
+          </span>
+          {item.label}
+        </button>
+      ))}
+      <button
+        type="button"
+        className="mobile-tab"
+        aria-current={onMenuTab ? "page" : undefined}
+        aria-expanded={menuOpen}
+        onClick={onMenu}
+      >
+        <span className="mobile-tab__icon">
+          <Menu aria-hidden="true" />
+        </span>
+        Menu
+      </button>
+    </nav>
+  );
+}
 function Nav({
   tabs,
   tab,

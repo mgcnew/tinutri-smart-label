@@ -134,7 +134,7 @@ type LabelRow = {
 
 const STATUS_STYLE: Record<LabelStatus, string> = {
   no_prazo: "bg-primary text-primary-foreground",
-  proximo: "bg-accent text-accent-foreground",
+  proximo: "bg-[var(--warn-bg)] text-[var(--warn-ink)]",
   vencido: "bg-destructive text-destructive-foreground",
   utilizada: "bg-muted text-muted-foreground",
   consumida: "bg-muted text-muted-foreground",
@@ -313,7 +313,7 @@ function LabelLookup() {
   };
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8">
+    <main className="label-page min-h-screen bg-background px-4 py-8">
       <article className="mx-auto w-full max-w-md">
         <header className="flex items-center gap-3">
           <img
@@ -332,32 +332,45 @@ function LabelLookup() {
         </header>
 
         <section className="mt-5 rounded-3xl border bg-card p-5 shadow-sm">
-          <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">
-            {kindLabel(row.label_kind)}
-          </p>
-          <h1 className="mt-1 text-2xl font-bold uppercase leading-tight">{row.product_name}</h1>
-          <p
-            className={`mt-4 inline-flex rounded-full px-4 py-2 text-sm font-extrabold uppercase tracking-wide ${STATUS_STYLE[status]}`}
+          <h1 className="text-2xl font-bold uppercase leading-tight">{row.product_name}</h1>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <p
+              className={`inline-flex rounded-full px-3 py-1.5 text-sm font-extrabold uppercase tracking-wide ${STATUS_STYLE[status]}`}
+            >
+              {STATUS_TEXT[status]}
+            </p>
+            <p className="text-sm font-semibold text-muted-foreground">
+              {kindLabel(row.label_kind)}
+            </p>
+          </div>
+          {/* A validade é a informação principal da etiqueta: vem antes de todo o resto, em destaque. */}
+          <div
+            className={`mt-5 rounded-2xl px-4 py-3 ${
+              status === "vencido"
+                ? "bg-[var(--bad-bg)]"
+                : status === "proximo"
+                  ? "bg-[var(--warn-bg)]"
+                  : "bg-muted"
+            }`}
           >
-            {STATUS_TEXT[status]}
-          </p>
+            <p className="text-xs font-semibold text-muted-foreground">Validade</p>
+            <p
+              className={`mt-0.5 text-[clamp(22px,7.2vw,30px)] font-bold tracking-tight tabular-nums ${
+                status === "vencido"
+                  ? "text-destructive"
+                  : status === "proximo"
+                    ? "text-[var(--warn-ink)]"
+                    : ""
+              }`}
+            >
+              {fmt(row.expires_at)}
+            </p>
+          </div>
 
           <dl className="mt-5 space-y-3 text-sm">
             <Row term="Estabelecimento" value={row.client_name} />
             <Row term="Setor" value={row.sector ?? "—"} />
             <Row term="Manipulação / abertura" value={fmt(row.opened_at)} />
-            <Row
-              term="Validade"
-              value={fmt(row.expires_at)}
-              strong
-              tone={
-                status === "vencido"
-                  ? "text-destructive"
-                  : status === "proximo"
-                    ? "text-[var(--warn-ink)]"
-                    : undefined
-              }
-            />
             <Row term="Conservação" value={row.storage_condition ?? "—"} />
             <Row term="Lote" value={row.lot_number ?? "—"} />
             {row.inspection_label && <Row term="Inspeção" value={row.inspection_label} />}
@@ -586,11 +599,11 @@ function Row({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border/60 pb-2 last:border-0">
-      <dt className="shrink-0 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+      <dt className="min-w-0 text-xs font-bold uppercase tracking-wide text-muted-foreground">
         {term}
       </dt>
       <dd
-        className={`min-w-0 text-right ${strong ? `text-lg font-extrabold ${tone ?? "text-primary"}` : "font-semibold"}`}
+        className={`shrink-0 text-right whitespace-nowrap ${strong ? `text-lg font-extrabold ${tone ?? "text-primary"}` : "font-semibold"}`}
       >
         {value}
       </dd>

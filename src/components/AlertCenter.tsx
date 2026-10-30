@@ -44,52 +44,46 @@ export function AlertBanner({
         </Button>
       </div>
     );
+  const expired = counts.expired > 0;
   return (
     <section
       role="alert"
-      className={`mb-5 rounded-xl border border-l-4 p-4 ${counts.expired > 0 ? "border-destructive/25 border-l-destructive bg-destructive/5" : "border-accent border-l-accent-foreground bg-accent/10"}`}
+      className={`alert-strip ${expired ? "alert-strip--bad" : "alert-strip--warn"}`}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
-        <div className="flex min-w-0 items-start gap-3">
-          <TriangleAlert
-            className={`mt-0.5 size-6 shrink-0 ${counts.expired > 0 ? "text-destructive" : "text-accent-foreground"}`}
-          />
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold tabular-nums">
-              {counts.expired > 0 &&
-                plural(counts.expired, "etiqueta vencida", "etiquetas vencidas")}
-              {counts.expired > 0 && counts.today > 0 && " · "}
-              {counts.today > 0 && `${plural(counts.today, "vence", "vencem")} hoje`}
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {counts.expired > 0
-                ? "Retire os produtos vencidos e registre a baixa em Validades."
-                : "Confira as etiquetas de hoje e registre a baixa após o uso."}
-            </p>
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
-          {counts.expired > 0 && (
-            <Button
-              className="min-h-11 flex-1 sm:flex-none"
-              size="sm"
-              variant="destructive"
-              onClick={() => onOpen("expired")}
-            >
-              Ver vencidas
-            </Button>
-          )}
-          {counts.today > 0 && (
-            <Button
-              className="min-h-11 flex-1 sm:flex-none"
-              size="sm"
-              variant="outline"
-              onClick={() => onOpen("today")}
-            >
-              Ver as de hoje
-            </Button>
-          )}
-        </div>
+      <TriangleAlert className="alert-strip__icon" aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <h2 className="text-sm font-semibold tabular-nums">
+          {expired && plural(counts.expired, "etiqueta vencida", "etiquetas vencidas")}
+          {expired && counts.today > 0 && " · "}
+          {counts.today > 0 && `${plural(counts.today, "vence", "vencem")} hoje`}
+        </h2>
+        <p className="alert-strip__note mt-0.5 text-xs">
+          {expired
+            ? "Retire os produtos vencidos e registre a baixa em Validades."
+            : "Confira as etiquetas de hoje e registre a baixa após o uso."}
+        </p>
+      </div>
+      <div className="flex shrink-0 gap-2">
+        {expired && (
+          <Button
+            className="min-h-11"
+            size="sm"
+            variant="destructive"
+            onClick={() => onOpen("expired")}
+          >
+            Ver vencidas
+          </Button>
+        )}
+        {counts.today > 0 && (
+          <Button
+            className={`min-h-11 ${expired ? "alert-strip__secondary" : ""}`}
+            size="sm"
+            variant="outline"
+            onClick={() => onOpen("today")}
+          >
+            Ver as de hoje
+          </Button>
+        )}
       </div>
     </section>
   );

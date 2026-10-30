@@ -1,360 +1,759 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-16T23:45:28.438515+00:00",
-  "title": "Design System: TiNutri Smart Label — Public Landing",
+  "generatedAt": "2026-10-30T01:23:46.316821+00:00",
+  "title": "Design System: TiNutri Smart Label",
   "extensions": {
     "colorMeta": {
-      "green": {
+      "brand-green": {
         "role": "primary",
-        "displayName": "Green",
+        "displayName": "TiNutri Green",
+        "canonical": "#007a46",
         "tonalRamp": [
-          "oklch(15% 0.12409 155.77)",
-          "oklch(26% 0.12409 155.77)",
-          "oklch(38% 0.12409 155.77)",
-          "oklch(49% 0.12409 155.77)",
-          "oklch(61% 0.12409 155.77)",
-          "oklch(72% 0.12409 155.77)",
-          "oklch(84% 0.12409 155.77)",
-          "oklch(95% 0.12409 155.77)"
-        ]
-      },
-      "green-dark": {
-        "role": "primary",
-        "displayName": "Green Dark",
-        "tonalRamp": [
-          "oklch(15% 0.10188 156.49)",
-          "oklch(26% 0.10188 156.49)",
-          "oklch(38% 0.10188 156.49)",
-          "oklch(49% 0.10188 156.49)",
-          "oklch(61% 0.10188 156.49)",
-          "oklch(72% 0.10188 156.49)",
-          "oklch(84% 0.10188 156.49)",
-          "oklch(95% 0.10188 156.49)"
-        ]
-      },
-      "ink": {
-        "role": "neutral",
-        "displayName": "Ink",
-        "tonalRamp": [
-          "oklch(15% 0.03224 163.37)",
-          "oklch(26% 0.03224 163.37)",
-          "oklch(38% 0.03224 163.37)",
-          "oklch(49% 0.03224 163.37)",
-          "oklch(61% 0.03224 163.37)",
-          "oklch(72% 0.03224 163.37)",
-          "oklch(84% 0.03224 163.37)",
-          "oklch(95% 0.03224 163.37)"
-        ]
-      },
-      "muted": {
-        "role": "neutral",
-        "displayName": "Muted",
-        "tonalRamp": [
-          "oklch(15% 0.02656 161.05)",
-          "oklch(26% 0.02656 161.05)",
-          "oklch(38% 0.02656 161.05)",
-          "oklch(49% 0.02656 161.05)",
-          "oklch(61% 0.02656 161.05)",
-          "oklch(72% 0.02656 161.05)",
-          "oklch(84% 0.02656 161.05)",
-          "oklch(95% 0.02656 161.05)"
-        ]
-      },
-      "line": {
-        "role": "neutral",
-        "displayName": "Line",
-        "tonalRamp": [
-          "oklch(15% 0.01083 158.83)",
-          "oklch(26% 0.01083 158.83)",
-          "oklch(38% 0.01083 158.83)",
-          "oklch(49% 0.01083 158.83)",
-          "oklch(61% 0.01083 158.83)",
-          "oklch(72% 0.01083 158.83)",
-          "oklch(84% 0.01083 158.83)",
-          "oklch(95% 0.01083 158.83)"
-        ]
+          "oklch(15% 0.1241 155.77)",
+          "oklch(26% 0.1241 155.77)",
+          "oklch(38% 0.1241 155.77)",
+          "oklch(49% 0.1241 155.77)",
+          "oklch(61% 0.1241 155.77)",
+          "oklch(72% 0.1241 155.77)",
+          "oklch(84% 0.1241 155.77)",
+          "oklch(95% 0.1241 155.77)"
+        ],
+        "darkText": "#4cc58a"
       },
       "page": {
         "role": "neutral",
-        "displayName": "Page",
+        "displayName": "Kitchen Ground",
+        "canonical": "#f3f5f4",
         "tonalRamp": [
-          "oklch(15% 0.00249 165.08)",
-          "oklch(26% 0.00249 165.08)",
-          "oklch(38% 0.00249 165.08)",
-          "oklch(49% 0.00249 165.08)",
-          "oklch(61% 0.00249 165.08)",
-          "oklch(72% 0.00249 165.08)",
-          "oklch(84% 0.00249 165.08)",
-          "oklch(95% 0.00249 165.08)"
-        ]
+          "oklch(15% 0.0025 165.08)",
+          "oklch(26% 0.0025 165.08)",
+          "oklch(38% 0.0025 165.08)",
+          "oklch(49% 0.0025 165.08)",
+          "oklch(61% 0.0025 165.08)",
+          "oklch(72% 0.0025 165.08)",
+          "oklch(84% 0.0025 165.08)",
+          "oklch(95% 0.0025 165.08)"
+        ],
+        "dark": "#0f1612"
       },
-      "tint": {
-        "role": "primary",
-        "displayName": "Tint",
-        "tonalRamp": [
-          "oklch(15% 0.01238 157.00)",
-          "oklch(26% 0.01238 157.00)",
-          "oklch(38% 0.01238 157.00)",
-          "oklch(49% 0.01238 157.00)",
-          "oklch(61% 0.01238 157.00)",
-          "oklch(72% 0.01238 157.00)",
-          "oklch(84% 0.01238 157.00)",
-          "oklch(95% 0.01238 157.00)"
-        ]
-      },
-      "white": {
+      "surface": {
         "role": "neutral",
         "displayName": "White",
+        "canonical": "#ffffff",
         "tonalRamp": [
-          "oklch(15% 0.00000 0.00)",
-          "oklch(26% 0.00000 0.00)",
-          "oklch(38% 0.00000 0.00)",
-          "oklch(49% 0.00000 0.00)",
-          "oklch(61% 0.00000 0.00)",
-          "oklch(72% 0.00000 0.00)",
-          "oklch(84% 0.00000 0.00)",
-          "oklch(95% 0.00000 0.00)"
-        ]
+          "oklch(15% 0.0000 89.88)",
+          "oklch(26% 0.0000 89.88)",
+          "oklch(38% 0.0000 89.88)",
+          "oklch(49% 0.0000 89.88)",
+          "oklch(61% 0.0000 89.88)",
+          "oklch(72% 0.0000 89.88)",
+          "oklch(84% 0.0000 89.88)",
+          "oklch(95% 0.0000 89.88)"
+        ],
+        "dark": "#17201b"
       },
-      "tab-track": {
+      "surface-soft": {
         "role": "neutral",
-        "displayName": "Tab Track",
+        "displayName": "Soft Surface",
+        "canonical": "#f4f7f5",
         "tonalRamp": [
-          "oklch(15% 0.00580 153.77)",
-          "oklch(26% 0.00580 153.77)",
-          "oklch(38% 0.00580 153.77)",
-          "oklch(49% 0.00580 153.77)",
-          "oklch(61% 0.00580 153.77)",
-          "oklch(72% 0.00580 153.77)",
-          "oklch(84% 0.00580 153.77)",
-          "oklch(95% 0.00580 153.77)"
-        ]
+          "oklch(15% 0.0041 157.18)",
+          "oklch(26% 0.0041 157.18)",
+          "oklch(38% 0.0041 157.18)",
+          "oklch(49% 0.0041 157.18)",
+          "oklch(61% 0.0041 157.18)",
+          "oklch(72% 0.0041 157.18)",
+          "oklch(84% 0.0041 157.18)",
+          "oklch(95% 0.0041 157.18)"
+        ],
+        "dark": "#1d2822"
       },
-      "preview-ground": {
+      "tint-green": {
+        "role": "primary",
+        "displayName": "Green Mist",
+        "canonical": "#edf6f0",
+        "tonalRamp": [
+          "oklch(15% 0.0124 157.00)",
+          "oklch(26% 0.0124 157.00)",
+          "oklch(38% 0.0124 157.00)",
+          "oklch(49% 0.0124 157.00)",
+          "oklch(61% 0.0124 157.00)",
+          "oklch(72% 0.0124 157.00)",
+          "oklch(84% 0.0124 157.00)",
+          "oklch(95% 0.0124 157.00)"
+        ],
+        "dark": "#1f3328"
+      },
+      "tint-neutral": {
         "role": "neutral",
-        "displayName": "Preview Ground",
+        "displayName": "Neutral Tint",
+        "canonical": "#f1f3f2",
         "tonalRamp": [
-          "oklch(15% 0.00579 153.78)",
-          "oklch(26% 0.00579 153.78)",
-          "oklch(38% 0.00579 153.78)",
-          "oklch(49% 0.00579 153.78)",
-          "oklch(61% 0.00579 153.78)",
-          "oklch(72% 0.00579 153.78)",
-          "oklch(84% 0.00579 153.78)",
-          "oklch(95% 0.00579 153.78)"
-        ]
+          "oklch(15% 0.0025 165.07)",
+          "oklch(26% 0.0025 165.07)",
+          "oklch(38% 0.0025 165.07)",
+          "oklch(49% 0.0025 165.07)",
+          "oklch(61% 0.0025 165.07)",
+          "oklch(72% 0.0025 165.07)",
+          "oklch(84% 0.0025 165.07)",
+          "oklch(95% 0.0025 165.07)"
+        ],
+        "dark": "#25302a"
       },
-      "status-ink": {
+      "ink": {
         "role": "neutral",
-        "displayName": "Status Ink",
+        "displayName": "Deep Ink",
+        "canonical": "#1d2b24",
         "tonalRamp": [
-          "oklch(15% 0.06063 160.37)",
-          "oklch(26% 0.06063 160.37)",
-          "oklch(38% 0.06063 160.37)",
-          "oklch(49% 0.06063 160.37)",
-          "oklch(61% 0.06063 160.37)",
-          "oklch(72% 0.06063 160.37)",
-          "oklch(84% 0.06063 160.37)",
-          "oklch(95% 0.06063 160.37)"
+          "oklch(15% 0.0231 162.69)",
+          "oklch(26% 0.0231 162.69)",
+          "oklch(38% 0.0231 162.69)",
+          "oklch(49% 0.0231 162.69)",
+          "oklch(61% 0.0231 162.69)",
+          "oklch(72% 0.0231 162.69)",
+          "oklch(84% 0.0231 162.69)",
+          "oklch(95% 0.0231 162.69)"
+        ],
+        "dark": "#e6efe9"
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Soft Ink",
+        "canonical": "#63736a",
+        "tonalRamp": [
+          "oklch(15% 0.0236 160.90)",
+          "oklch(26% 0.0236 160.90)",
+          "oklch(38% 0.0236 160.90)",
+          "oklch(49% 0.0236 160.90)",
+          "oklch(61% 0.0236 160.90)",
+          "oklch(72% 0.0236 160.90)",
+          "oklch(84% 0.0236 160.90)",
+          "oklch(95% 0.0236 160.90)"
+        ],
+        "dark": "#9db0a5"
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#e5ebe7",
+        "tonalRamp": [
+          "oklch(15% 0.0083 157.08)",
+          "oklch(26% 0.0083 157.08)",
+          "oklch(38% 0.0083 157.08)",
+          "oklch(49% 0.0083 157.08)",
+          "oklch(61% 0.0083 157.08)",
+          "oklch(72% 0.0083 157.08)",
+          "oklch(84% 0.0083 157.08)",
+          "oklch(95% 0.0083 157.08)"
+        ],
+        "dark": "#2a3830"
+      },
+      "line-input": {
+        "role": "neutral",
+        "displayName": "Field Line",
+        "canonical": "#dce4df",
+        "tonalRamp": [
+          "oklch(15% 0.0109 158.83)",
+          "oklch(26% 0.0109 158.83)",
+          "oklch(38% 0.0109 158.83)",
+          "oklch(49% 0.0109 158.83)",
+          "oklch(61% 0.0109 158.83)",
+          "oklch(72% 0.0109 158.83)",
+          "oklch(84% 0.0109 158.83)",
+          "oklch(95% 0.0109 158.83)"
+        ],
+        "dark": "#33443a"
+      },
+      "line-green": {
+        "role": "primary",
+        "displayName": "Green Hairline",
+        "canonical": "#d6e9dc",
+        "tonalRamp": [
+          "oklch(15% 0.0267 155.94)",
+          "oklch(26% 0.0267 155.94)",
+          "oklch(38% 0.0267 155.94)",
+          "oklch(49% 0.0267 155.94)",
+          "oklch(61% 0.0267 155.94)",
+          "oklch(72% 0.0267 155.94)",
+          "oklch(84% 0.0267 155.94)",
+          "oklch(95% 0.0267 155.94)"
+        ],
+        "dark": "#2c5039"
+      },
+      "line-green-strong": {
+        "role": "primary",
+        "displayName": "Green Edge",
+        "canonical": "#a2c6b0",
+        "tonalRamp": [
+          "oklch(15% 0.0494 158.24)",
+          "oklch(26% 0.0494 158.24)",
+          "oklch(38% 0.0494 158.24)",
+          "oklch(49% 0.0494 158.24)",
+          "oklch(61% 0.0494 158.24)",
+          "oklch(72% 0.0494 158.24)",
+          "oklch(84% 0.0494 158.24)",
+          "oklch(95% 0.0494 158.24)"
+        ],
+        "dark": "#3f7a58"
+      },
+      "ok-ink": {
+        "role": "state",
+        "displayName": "Within Window Ink",
+        "canonical": "#25623d",
+        "tonalRamp": [
+          "oklch(15% 0.0878 153.98)",
+          "oklch(26% 0.0878 153.98)",
+          "oklch(38% 0.0878 153.98)",
+          "oklch(49% 0.0878 153.98)",
+          "oklch(61% 0.0878 153.98)",
+          "oklch(72% 0.0878 153.98)",
+          "oklch(84% 0.0878 153.98)",
+          "oklch(95% 0.0878 153.98)"
+        ],
+        "dark": "#7fd4a0"
+      },
+      "ok-bg": {
+        "role": "state",
+        "displayName": "Within Window Ground",
+        "canonical": "#f3faf5",
+        "tonalRamp": [
+          "oklch(15% 0.0099 155.10)",
+          "oklch(26% 0.0099 155.10)",
+          "oklch(38% 0.0099 155.10)",
+          "oklch(49% 0.0099 155.10)",
+          "oklch(61% 0.0099 155.10)",
+          "oklch(72% 0.0099 155.10)",
+          "oklch(84% 0.0099 155.10)",
+          "oklch(95% 0.0099 155.10)"
+        ],
+        "dark": "#16291e"
+      },
+      "warn-ink": {
+        "role": "state",
+        "displayName": "Due Today Ink",
+        "canonical": "#934412",
+        "tonalRamp": [
+          "oklch(15% 0.1216 47.67)",
+          "oklch(26% 0.1216 47.67)",
+          "oklch(38% 0.1216 47.67)",
+          "oklch(49% 0.1216 47.67)",
+          "oklch(61% 0.1216 47.67)",
+          "oklch(72% 0.1216 47.67)",
+          "oklch(84% 0.1216 47.67)",
+          "oklch(95% 0.1216 47.67)"
+        ],
+        "dark": "#f3b27a"
+      },
+      "warn-bg": {
+        "role": "state",
+        "displayName": "Due Today Ground",
+        "canonical": "#fff4e9",
+        "tonalRamp": [
+          "oklch(15% 0.0188 67.60)",
+          "oklch(26% 0.0188 67.60)",
+          "oklch(38% 0.0188 67.60)",
+          "oklch(49% 0.0188 67.60)",
+          "oklch(61% 0.0188 67.60)",
+          "oklch(72% 0.0188 67.60)",
+          "oklch(84% 0.0188 67.60)",
+          "oklch(95% 0.0188 67.60)"
+        ],
+        "dark": "#33220f"
+      },
+      "bad-ink": {
+        "role": "state",
+        "displayName": "Expired Ink",
+        "canonical": "#a5322a",
+        "tonalRamp": [
+          "oklch(15% 0.1523 28.06)",
+          "oklch(26% 0.1523 28.06)",
+          "oklch(38% 0.1523 28.06)",
+          "oklch(49% 0.1523 28.06)",
+          "oklch(61% 0.1523 28.06)",
+          "oklch(72% 0.1523 28.06)",
+          "oklch(84% 0.1523 28.06)",
+          "oklch(95% 0.1523 28.06)"
+        ],
+        "dark": "#f29a92"
+      },
+      "bad-bg": {
+        "role": "state",
+        "displayName": "Expired Ground",
+        "canonical": "#fff6f5",
+        "tonalRamp": [
+          "oklch(15% 0.0098 25.07)",
+          "oklch(26% 0.0098 25.07)",
+          "oklch(38% 0.0098 25.07)",
+          "oklch(49% 0.0098 25.07)",
+          "oklch(61% 0.0098 25.07)",
+          "oklch(72% 0.0098 25.07)",
+          "oklch(84% 0.0098 25.07)",
+          "oklch(95% 0.0098 25.07)"
+        ],
+        "dark": "#351a18"
+      },
+      "bad-line": {
+        "role": "state",
+        "displayName": "Expired Border",
+        "canonical": "#f1d8d6",
+        "tonalRamp": [
+          "oklch(15% 0.0280 23.17)",
+          "oklch(26% 0.0280 23.17)",
+          "oklch(38% 0.0280 23.17)",
+          "oklch(49% 0.0280 23.17)",
+          "oklch(61% 0.0280 23.17)",
+          "oklch(72% 0.0280 23.17)",
+          "oklch(84% 0.0280 23.17)",
+          "oklch(95% 0.0280 23.17)"
+        ],
+        "dark": "#5a2b27"
+      },
+      "destructive": {
+        "role": "state",
+        "displayName": "Alarm Red",
+        "canonical": "#c0352b",
+        "tonalRamp": [
+          "oklch(15% 0.1775 28.60)",
+          "oklch(26% 0.1775 28.60)",
+          "oklch(38% 0.1775 28.60)",
+          "oklch(49% 0.1775 28.60)",
+          "oklch(61% 0.1775 28.60)",
+          "oklch(72% 0.1775 28.60)",
+          "oklch(84% 0.1775 28.60)",
+          "oklch(95% 0.1775 28.60)"
         ]
       },
-      "attention-ink": {
-        "role": "semantic",
-        "displayName": "Attention Ink",
+      "landing-green-dark": {
+        "role": "primary",
+        "displayName": "Landing Deep Green",
+        "canonical": "#005e36",
         "tonalRamp": [
-          "oklch(15% 0.12159 47.67)",
-          "oklch(26% 0.12159 47.67)",
-          "oklch(38% 0.12159 47.67)",
-          "oklch(49% 0.12159 47.67)",
-          "oklch(61% 0.12159 47.67)",
-          "oklch(72% 0.12159 47.67)",
-          "oklch(84% 0.12159 47.67)",
-          "oklch(95% 0.12159 47.67)"
+          "oklch(15% 0.1019 156.49)",
+          "oklch(26% 0.1019 156.49)",
+          "oklch(38% 0.1019 156.49)",
+          "oklch(49% 0.1019 156.49)",
+          "oklch(61% 0.1019 156.49)",
+          "oklch(72% 0.1019 156.49)",
+          "oklch(84% 0.1019 156.49)",
+          "oklch(95% 0.1019 156.49)"
         ]
       },
-      "attention-ground": {
-        "role": "semantic",
-        "displayName": "Attention Ground",
+      "landing-ink": {
+        "role": "neutral",
+        "displayName": "Landing Kitchen Ink",
+        "canonical": "#253a30",
         "tonalRamp": [
-          "oklch(15% 0.01880 67.60)",
-          "oklch(26% 0.01880 67.60)",
-          "oklch(38% 0.01880 67.60)",
-          "oklch(49% 0.01880 67.60)",
-          "oklch(61% 0.01880 67.60)",
-          "oklch(72% 0.01880 67.60)",
-          "oklch(84% 0.01880 67.60)",
-          "oklch(95% 0.01880 67.60)"
+          "oklch(15% 0.0322 163.37)",
+          "oklch(26% 0.0322 163.37)",
+          "oklch(38% 0.0322 163.37)",
+          "oklch(49% 0.0322 163.37)",
+          "oklch(61% 0.0322 163.37)",
+          "oklch(72% 0.0322 163.37)",
+          "oklch(84% 0.0322 163.37)",
+          "oklch(95% 0.0322 163.37)"
+        ]
+      },
+      "landing-muted": {
+        "role": "neutral",
+        "displayName": "Landing Muted Green Gray",
+        "canonical": "#5e7066",
+        "tonalRamp": [
+          "oklch(15% 0.0266 161.05)",
+          "oklch(26% 0.0266 161.05)",
+          "oklch(38% 0.0266 161.05)",
+          "oklch(49% 0.0266 161.05)",
+          "oklch(61% 0.0266 161.05)",
+          "oklch(72% 0.0266 161.05)",
+          "oklch(84% 0.0266 161.05)",
+          "oklch(95% 0.0266 161.05)"
+        ]
+      },
+      "landing-line": {
+        "role": "neutral",
+        "displayName": "Landing Fine Division",
+        "canonical": "#e2eae5",
+        "tonalRamp": [
+          "oklch(15% 0.0108 158.83)",
+          "oklch(26% 0.0108 158.83)",
+          "oklch(38% 0.0108 158.83)",
+          "oklch(49% 0.0108 158.83)",
+          "oklch(61% 0.0108 158.83)",
+          "oklch(72% 0.0108 158.83)",
+          "oklch(84% 0.0108 158.83)",
+          "oklch(95% 0.0108 158.83)"
+        ]
+      },
+      "landing-page": {
+        "role": "neutral",
+        "displayName": "Landing Pale Page",
+        "canonical": "#f7f9f8",
+        "tonalRamp": [
+          "oklch(15% 0.0025 165.08)",
+          "oklch(26% 0.0025 165.08)",
+          "oklch(38% 0.0025 165.08)",
+          "oklch(49% 0.0025 165.08)",
+          "oklch(61% 0.0025 165.08)",
+          "oklch(72% 0.0025 165.08)",
+          "oklch(84% 0.0025 165.08)",
+          "oklch(95% 0.0025 165.08)"
+        ]
+      },
+      "landing-tab-track": {
+        "role": "neutral",
+        "displayName": "Landing Tab Track",
+        "canonical": "#f0f4f1",
+        "tonalRamp": [
+          "oklch(15% 0.0058 153.77)",
+          "oklch(26% 0.0058 153.77)",
+          "oklch(38% 0.0058 153.77)",
+          "oklch(49% 0.0058 153.77)",
+          "oklch(61% 0.0058 153.77)",
+          "oklch(72% 0.0058 153.77)",
+          "oklch(84% 0.0058 153.77)",
+          "oklch(95% 0.0058 153.77)"
+        ]
+      },
+      "landing-preview-ground": {
+        "role": "neutral",
+        "displayName": "Landing Preview Ground",
+        "canonical": "#f3f7f4",
+        "tonalRamp": [
+          "oklch(15% 0.0058 153.78)",
+          "oklch(26% 0.0058 153.78)",
+          "oklch(38% 0.0058 153.78)",
+          "oklch(49% 0.0058 153.78)",
+          "oklch(61% 0.0058 153.78)",
+          "oklch(72% 0.0058 153.78)",
+          "oklch(84% 0.0058 153.78)",
+          "oklch(95% 0.0058 153.78)"
+        ]
+      },
+      "landing-status-ink": {
+        "role": "state",
+        "displayName": "Landing Status Ink",
+        "canonical": "#36614b",
+        "tonalRamp": [
+          "oklch(15% 0.0606 160.37)",
+          "oklch(26% 0.0606 160.37)",
+          "oklch(38% 0.0606 160.37)",
+          "oklch(49% 0.0606 160.37)",
+          "oklch(61% 0.0606 160.37)",
+          "oklch(72% 0.0606 160.37)",
+          "oklch(84% 0.0606 160.37)",
+          "oklch(95% 0.0606 160.37)"
         ]
       }
     },
     "typographyMeta": {
-      "display": {
-        "displayName": "Display",
-        "purpose": "Landing hero only; explicitly Manrope."
-      },
       "headline": {
-        "displayName": "Headline",
-        "purpose": "DM Sans section headings inherited from global styles."
+        "displayName": "Page Title",
+        "purpose": "One per view; 22px below 640px; QR product name 24px uppercase."
       },
-      "panel-title": {
+      "title": {
         "displayName": "Panel Title",
-        "purpose": "DM Sans operational demonstration headings."
+        "purpose": "Card and panel headings; emission groups at 16px."
+      },
+      "numeral": {
+        "displayName": "Metric Numeral",
+        "purpose": "Counts in tiles; 24px in the phone validity strip, up to 36px on the dashboard."
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Manrope base text."
+        "purpose": "App base text."
+      },
+      "data": {
+        "displayName": "Data",
+        "purpose": "Validity chips and dates, tabular."
       },
       "label": {
         "displayName": "Label",
-        "purpose": "Manrope field labels."
+        "purpose": "Field and tab labels, badges, metadata; 12px floor."
       },
-      "action": {
-        "displayName": "Action",
-        "purpose": "Primary action text."
+      "landing-display": {
+        "displayName": "Landing Display",
+        "purpose": "Landing hero only."
+      },
+      "landing-headline": {
+        "displayName": "Landing Headline",
+        "purpose": "Landing section headings (DM Sans)."
+      },
+      "landing-panel-title": {
+        "displayName": "Landing Panel Title",
+        "purpose": "Landing demonstration stages (DM Sans)."
+      },
+      "landing-body": {
+        "displayName": "Landing Body",
+        "purpose": "Landing base text."
+      },
+      "landing-label": {
+        "displayName": "Landing Label",
+        "purpose": "Landing fields."
+      },
+      "landing-action": {
+        "displayName": "Landing Action",
+        "purpose": "Landing primary buttons."
       }
     },
     "shadows": [
       {
-        "name": "tour",
+        "name": "card",
+        "value": "0 1px 2px rgb(16 40 28 / 5%), 0 8px 18px -12px rgb(16 40 28 / 16%)",
+        "purpose": "--shadow-card: emission form, validity groups, client cards."
+      },
+      {
+        "name": "tabbar",
+        "value": "0 -8px 20px -14px rgb(16 40 28 / 22%)",
+        "purpose": "Fixed bottom tab bar."
+      },
+      {
+        "name": "sticky-actions",
+        "value": "0 -8px 16px -8px rgb(27 65 44 / 10%)",
+        "purpose": "Sticky emission action bar on phones."
+      },
+      {
+        "name": "emit-tab",
+        "value": "0 4px 10px -4px rgb(0 94 54 / 45%)",
+        "purpose": "Raised green Emitir pill."
+      },
+      {
+        "name": "popover",
+        "value": "0 12px 32px rgb(20 50 35 / 16%)",
+        "purpose": "Select menus and floating lists."
+      },
+      {
+        "name": "login-card",
+        "value": "0 8px 32px rgb(27 65 44 / 4%)",
+        "purpose": "Floating login card; removed full screen."
+      },
+      {
+        "name": "focus-halo",
+        "value": "0 0 0 3px color-mix(in oklab, var(--ring) 22%, transparent)",
+        "purpose": "Input focus halo."
+      },
+      {
+        "name": "landing-tour",
         "value": "0 12px 40px -24px rgb(31 69 46 / 0.22)",
-        "purpose": "Main product container."
+        "purpose": "Landing product container."
       },
       {
-        "name": "selected-tab",
+        "name": "landing-selected-tab",
         "value": "0 2px 6px -2px rgb(31 69 46 / 0.16)",
-        "purpose": "Active tab."
+        "purpose": "Landing active tab."
       },
       {
-        "name": "label-paper",
+        "name": "landing-label-paper",
         "value": "0 8px 19px -12px rgb(31 69 46 / 0.3)",
-        "purpose": "Illustrative label paper."
+        "purpose": "Landing illustrative label."
       }
     ],
     "motion": [
       {
-        "name": "primary-background",
-        "value": "background 0.18s",
-        "purpose": "Primary action hover; removed with reduced motion."
+        "name": "state",
+        "value": "0.15s",
+        "purpose": "Color and background changes on tabs, rows, nav items."
       },
       {
-        "name": "disclosure-chevron",
-        "value": "transform 0.18s",
-        "purpose": "FAQ open-state chevron; removed with reduced motion."
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Tab icon pill and login arrow nudge (0.2–0.22s)."
+      },
+      {
+        "name": "landing-state",
+        "value": "0.18s",
+        "purpose": "Landing hover and FAQ chevron."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms",
+        "purpose": "All transitions and animations collapse under prefers-reduced-motion."
       }
     ],
     "breakpoints": [
       {
-        "name": "compact-desktop",
+        "name": "login-fullscreen",
+        "value": "480px",
+        "purpose": "Login dialog fills the screen at and below."
+      },
+      {
+        "name": "phone",
+        "value": "639px",
+        "purpose": "Phone layout: 16px inputs, compact header, four-number validity strip."
+      },
+      {
+        "name": "landing-mobile",
+        "value": "720px"
+      },
+      {
+        "name": "landing-stack",
         "value": "1000px"
       },
       {
-        "name": "mobile",
-        "value": "720px"
+        "name": "sidebar",
+        "value": "1024px",
+        "purpose": "Sidebar replaces the bottom tab bar at and above."
+      },
+      {
+        "name": "wide",
+        "value": "1280px",
+        "purpose": "Content max width; sticky emission preview."
       }
     ]
   },
   "components": [
     {
-      "name": "Primary action",
+      "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Main contact action.",
-      "html": "<button class=\"ds-primary\">Quero conhecer o sistema</button>",
-      "css": ".ds-primary{font-family:Manrope,sans-serif;display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:13px 22px;border:1px solid #007a46;border-radius:11px;background:#007a46;color:#fff;font-size:13px;font-weight:600;line-height:1.5;cursor:pointer;transition:background .18s}.ds-primary:hover{background:#005e36}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}}.ds-primary:focus-visible{outline:2px solid #007a46;outline-offset:4px;}"
+      "description": "The one primary action per view (Emitir, Imprimir agora, Entrar).",
+      "html": "<button class=\"ds-btn-primary\">Imprimir agora</button>",
+      "css": ".ds-btn-primary { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; border: 0; border-radius: 12px; background: var(--brand-green, #007a46); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: background-color 0.15s; } .ds-btn-primary:hover { background: color-mix(in oklab, #007a46 85%, black); } .ds-btn-primary:focus-visible { outline: 2px solid #007a46; outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }"
     },
     {
-      "name": "Login action",
+      "name": "Destructive Button",
       "kind": "button",
-      "refersTo": "button-login",
-      "description": "Secondary header action.",
-      "html": "<button class=\"ds-login\">Entrar</button>",
-      "css": ".ds-login{font-family:Manrope,sans-serif;min-height:44px;padding:8px 15px;border:1px solid #e2eae5;border-radius:10px;background:#fff;color:#253a30;font-size:13px;font-weight:600;cursor:pointer}.ds-login:hover{background:#f7f9f8}.ds-login:focus-visible{outline:2px solid #007a46;outline-offset:4px;}"
+      "refersTo": "button-destructive",
+      "description": "Acting on expired or discarded items only (Ver vencidas, Confirmar descarte).",
+      "html": "<button class=\"ds-btn-danger\">Ver vencidas</button>",
+      "css": ".ds-btn-danger { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; min-height: 44px; padding: 0 16px; border: 0; border-radius: 12px; background: var(--destructive, #c0352b); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: background-color 0.15s; } .ds-btn-danger:hover { background: color-mix(in oklab, #c0352b 90%, white); } .ds-btn-danger:focus-visible { outline: 2px solid #007a46; outline-offset: 2px; }"
     },
     {
-      "name": "Simulation action",
+      "name": "Outline Button",
       "kind": "button",
-      "refersTo": "button-small",
-      "description": "Small action with a completed disabled state.",
-      "html": "<button class=\"ds-small\">Simular baixa</button>",
-      "css": " .ds-small{font-family:Manrope,sans-serif;display:inline-flex;align-items:center;min-height:44px;padding:7px 11px;border:1px solid #d6e3da;border-radius:7px;background:#fff;color:#005e36;font-size:11px;cursor:pointer}.ds-small:disabled{border-color:transparent;color:#5e7066;cursor:default}.ds-small:focus-visible{outline:2px solid #007a46;outline-offset:4px;}"
+      "refersTo": "button-outline",
+      "description": "Secondary actions beside a primary one.",
+      "html": "<button class=\"ds-btn-outline\">Ver as de hoje</button>",
+      "css": ".ds-btn-outline { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; min-height: 44px; padding: 0 16px; border: 1px solid #dce4df; border-radius: 12px; background: #f3f5f4; color: #1d2b24; font-size: 14px; font-weight: 500; cursor: pointer; transition: background-color 0.15s; } .ds-btn-outline:hover { background: #f4f7f5; } .ds-btn-outline:focus-visible { outline: 2px solid #007a46; outline-offset: 2px; }"
     },
     {
-      "name": "Product select",
+      "name": "Text Field",
       "kind": "input",
-      "refersTo": "select",
-      "description": "Labeled native demonstration field.",
-      "html": "<label class=\"ds-field\">Produto<select class=\"ds-select\"><option>Molho de tomate</option><option>Frango desfiado</option><option>Salada de grãos</option></select></label>",
-      "css": ".ds-field{font-family:Manrope,sans-serif;display:block;color:#253a30;font-size:12px;font-weight:600;line-height:1.65}.ds-select{font-family:Manrope,sans-serif;display:block;width:100%;min-height:44px;margin-top:7px;padding:10px 13px;border:1px solid #dce4df;border-radius:9px;background:#fff;color:#253a30;font-size:13px;accent-color:#007a46}@media(max-width:720px){.ds-select{font-size:16px}}.ds-select:focus-visible{outline:2px solid #007a46;outline-offset:4px;}"
+      "refersTo": "input",
+      "description": "Inputs and select triggers; 16px text on phones.",
+      "html": "<label class=\"ds-field\"><span>Produto</span><input placeholder=\"Nome do produto\"></label>",
+      "css": ".ds-field { display: grid; gap: 8px; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; color: #1d2b24; } .ds-field span { font-size: 12px; font-weight: 600; } .ds-field input { min-height: 46px; padding: 12px 14px; border: 1px solid #dce4df; border-radius: 10px; background: #fff; color: #1d2b24; font: inherit; font-size: 16px; } .ds-field input:focus-visible { outline: none; border-color: #007a46; box-shadow: 0 0 0 3px color-mix(in oklab, #007a46 22%, transparent); }"
     },
     {
-      "name": "Section navigation",
-      "kind": "nav",
-      "description": "Header section links; hidden at the mobile breakpoint.",
-      "html": "<nav class=\"ds-nav\" aria-label=\"Seções da página\"><a href=\"#plataforma\">A plataforma</a><a href=\"#rotina\">Na sua rotina</a><a href=\"#duvidas\">Dúvidas</a></nav>",
-      "css": ".ds-nav{display:flex;gap:30px}.ds-nav a{font-family:Manrope,sans-serif;display:inline-flex;align-items:center;min-height:44px;font-size:13px;line-height:1.65;color:#5e7066;text-decoration:none}.ds-nav a:hover{color:#007a46}@media(max-width:720px){.ds-nav{display:none}}.ds-nav a:focus-visible{outline:2px solid #007a46;outline-offset:4px;}"
-    },
-    {
-      "name": "Validity status",
+      "name": "Validity Chip",
       "kind": "chip",
-      "refersTo": "status",
-      "description": "Status communicates its meaning with text.",
-      "html": "<span class=\"ds-status\">Dentro do prazo</span> <span class=\"ds-status ds-attention\">Vence hoje</span>",
-      "css": ".ds-status{font-family:Manrope,sans-serif;display:inline-block;font-size:11px;line-height:1.65;color:#36614b;background:#edf6f0;padding:5px 10px;border-radius:6px;white-space:nowrap}.ds-attention{color:#934412;background:#fff4e9}"
+      "refersTo": "validity-chip-expired",
+      "description": "Names a validity state in text, colored by tone.",
+      "html": "<span class=\"ds-chip ds-chip--bad\">Já venceu</span> <span class=\"ds-chip ds-chip--warn\">Vence hoje</span> <span class=\"ds-chip ds-chip--ok\">Em 2 dias</span>",
+      "css": ".ds-chip { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 6px; font-size: 13px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; } .ds-chip--bad { background: #fff6f5; color: #a5322a; } .ds-chip--warn { background: #fff4e9; color: #934412; } .ds-chip--ok { background: #edf6f0; color: #25623d; }"
     },
     {
-      "name": "Stage selector",
-      "kind": "nav",
-      "refersTo": "tab-active",
-      "description": "Three operational steps; active state shown with an inset white surface.",
-      "html": "<div class=\"ds-tabs\" role=\"tablist\" aria-label=\"Etapas do sistema\"><button role=\"tab\" aria-selected=\"true\">Emissão</button><button role=\"tab\" aria-selected=\"false\">Validades</button><button role=\"tab\" aria-selected=\"false\">Histórico</button></div>",
-      "css": ".ds-tabs{display:inline-flex;gap:3px;padding:4px;border-radius:10px;background:#f0f4f1}.ds-tabs button{font-family:Manrope,sans-serif;display:inline-flex;align-items:center;min-height:44px;padding:8px 14px;border:0;border-radius:7px;background:transparent;color:#5e7066;font-size:12px;font-weight:500;cursor:pointer}.ds-tabs button[aria-selected=true]{background:#fff;color:#005e36;box-shadow:0 2px 6px -2px rgb(31 69 46 / .16)}.ds-tabs button:focus-visible{outline:2px solid #007a46;outline-offset:4px;}"
-    },
-    {
-      "name": "Product container",
+      "name": "Card",
       "kind": "card",
-      "refersTo": "tour",
-      "description": "Main bordered container; sample demonstrates the material and header.",
-      "html": "<section class=\"ds-tour\"><header class=\"ds-tour-head\"><strong>Sua rotina, por dentro</strong><span>Exemplo interativo · dados fictícios</span></header><div class=\"ds-tour-body\">Uma amostra da experiência do TiNutri.</div></section>",
-      "css": ".ds-tour{font-family:Manrope,sans-serif;border:1px solid #dce6df;border-radius:18px;background:#fff;color:#253a30;box-shadow:0 12px 40px -24px rgb(31 69 46 / .22)}.ds-tour-head{padding:19px 25px;border-bottom:1px solid #e2eae5}.ds-tour-head strong{display:block;font-size:13px;font-weight:600}.ds-tour-head span{display:block;margin-top:2px;color:#5e7066;font-size:11px}.ds-tour-body{padding:32px 40px;font-size:13px}@media(max-width:720px){.ds-tour{border-radius:13px}.ds-tour-head{padding:17px}.ds-tour-body{padding:25px 20px}}"
+      "refersTo": "card",
+      "description": "White lifted panel on the kitchen ground.",
+      "html": "<div class=\"ds-ground\"><section class=\"ds-card\"><h2>Nos próximos 3 dias</h2><strong>0</strong><p>0 etiquetas para acompanhar</p></section></div>",
+      "css": ".ds-ground { background: #f3f5f4; padding: 16px; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; } .ds-card { padding: 20px; border: 1px solid #e5ebe7; border-radius: 22px; background: #fff; color: #1d2b24; box-shadow: 0 1px 2px rgb(16 40 28 / 5%), 0 8px 18px -12px rgb(16 40 28 / 16%); } .ds-card h2 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.02em; } .ds-card strong { display: block; margin-top: 8px; font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; } .ds-card p { margin: 4px 0 0; font-size: 12px; color: #63736a; }"
+    },
+    {
+      "name": "Alert Strip",
+      "kind": "custom",
+      "refersTo": "alert-strip-bad",
+      "description": "Persistent strip while labels are expired or due today; one action on phones.",
+      "html": "<section class=\"ds-alert\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/></svg><strong>5 etiquetas vencidas</strong><button>Ver vencidas</button></section>",
+      "css": ".ds-alert { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #f1d8d6; border-radius: 14px; background: #fff6f5; color: #1d2b24; } .ds-alert svg { flex-shrink: 0; color: #a5322a; } .ds-alert strong { flex: 1; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; } .ds-alert button { min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px; background: #c0352b; color: #fff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; } .ds-alert button:focus-visible { outline: 2px solid #007a46; outline-offset: 2px; }"
+    },
+    {
+      "name": "Bottom Tab Bar",
+      "kind": "nav",
+      "refersTo": "tabbar",
+      "description": "Primary navigation below 1024px: raised green Emitir, urgent badge on Validades.",
+      "html": "<nav class=\"ds-tabbar\"><button class=\"ds-tab\" aria-current=\"page\"><span class=\"ds-tab__icon\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\" rx=\"1\"/><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\" rx=\"1\"/></svg></span>Início</button><button class=\"ds-tab ds-tab--emit\"><span class=\"ds-tab__icon\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\"><path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"/><path d=\"M6 9V3h12v6\"/><rect x=\"6\" y=\"14\" width=\"12\" height=\"8\" rx=\"1\"/></svg></span>Emitir</button><button class=\"ds-tab\"><span class=\"ds-tab__icon\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/></svg><span class=\"ds-tab__badge\">5</span></span>Validades</button></nav>",
+      "css": ".ds-tabbar { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); padding: 6px 4px; border-top: 1px solid #e5ebe7; background: #fff; box-shadow: 0 -8px 20px -14px rgb(16 40 28 / 22%); } .ds-tab { display: flex; min-height: 56px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0; border-radius: 12px; background: none; color: #63736a; font: inherit; font-size: 12px; font-weight: 600; letter-spacing: -0.01em; cursor: pointer; transition: color 0.15s; } .ds-tab__icon { position: relative; display: grid; width: 52px; height: 30px; place-items: center; border-radius: 999px; transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1); } .ds-tab[aria-current=\"page\"] { color: #007a46; font-weight: 700; } .ds-tab[aria-current=\"page\"] .ds-tab__icon { background: #edf6f0; } .ds-tab:active .ds-tab__icon { background: #f4f7f5; } .ds-tab--emit .ds-tab__icon { background: #007a46; color: #fff; box-shadow: 0 4px 10px -4px rgb(0 94 54 / 45%); } .ds-tab:focus-visible { outline: 2px solid #007a46; outline-offset: -2px; } .ds-tab__badge { position: absolute; top: -5px; left: calc(50% + 6px); display: grid; min-width: 20px; height: 18px; place-items: center; padding: 0 5px; border: 2px solid #fff; border-radius: 999px; background: #c0352b; color: #fff; font-size: 12px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; box-sizing: content-box; }"
+    },
+    {
+      "name": "Landing Primary Button",
+      "kind": "button",
+      "refersTo": "landing-button-primary",
+      "description": "Public landing only: WhatsApp contact action.",
+      "html": "<button class=\"ds-landing-btn\">Falar com a TiNutri</button>",
+      "css": ".ds-landing-btn { font-family: Manrope, sans-serif; min-height: 50px; padding: 13px 22px; border: 0; border-radius: 11px; background: #007a46; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: background-color 0.18s; } .ds-landing-btn:hover { background: #005e36; } .ds-landing-btn:focus-visible { outline: 2px solid #007a46; outline-offset: 4px; }"
     }
   ],
   "narrative": {
-    "northStar": "The Organized Workbench",
-    "overview": "The organized workbench brings the calm, practical character of the operational application to the public landing. White surfaces, green actions, fine divisions and compact controls make the product legible without decorative imagery.\n\nThis document covers only the public landing rendered by `src/components/landing/SystemLanding.tsx`, styled by `src/landing.css` and routed at `src/routes/sistema.tsx` (also reused at the public entry point). It does not redefine the authenticated application, shared authentication dialog, print templates or dark theme. The source implementation wins over the earlier direction contract: its division color is `colors.line`, and section headings inherit the existing DM Sans display family.",
+    "northStar": "The Kitchen Pocket App",
+    "overview": "The authenticated app is the category standard for a mobile management app, executed at full craft: a pale green-gray ground, white lifted cards, one green for action and selection, and red, amber and green only when a validity state exists. It is built for a phone held in one hand in a bright, busy kitchen and for the Arny AR-SP5 terminal (about 360 × 720 CSS px). Validity and emission are one tap away; the expiry date is always the most legible thing on the screen.\n\nThis document has three scopes. **Part A (primary system)** covers the authenticated workspace (`src/components/workspace/Workspace.tsx` and the panels it hosts), the login (`src/components/AuthLogin.tsx`, both the dialog and the full page) and the public QR consultation page (`src/routes/label.$token.tsx`), styled by `src/styles.css`. **Part B** preserves the public landing system (`src/components/landing/SystemLanding.tsx`, `src/landing.css`), which keeps its own neutrals and DM Sans section headings; its tokens carry the `landing-` prefix. **The thermal print label** (`.thermal-label`, Arial, 60 × 40 mm) is a print artifact outside both UI systems; its rules are fixed by the printer, not by this document.\n\nThe app has a dark theme (`.dark`) that remaps the same token names; the login always renders in the light tokens, even in dark mode.",
     "keyCharacteristics": [
-      "White surfaces with functional green emphasis.",
-      "Calm density, generous section spacing and compact operational controls.",
-      "Readable native controls and visible keyboard focus.",
-      "Locally interactive examples clearly identified as fictitious."
+      "One family (Manrope) in a short scale; heavy, tight page titles; tabular numerals for every date and count.",
+      "White cards with a soft downward shadow on a green-gray ground; no decorative imagery.",
+      "Green means action or selection; red, amber and green tones mean a validity state and never decorate.",
+      "Bottom tab bar below 1024px, sidebar at 1024px and above; 44–56px touch targets throughout.",
+      "Lucide stroke icons always paired with text."
     ],
     "rules": [
       {
-        "name": "The Functional Green Rule",
-        "body": "Use green for primary actions, selected controls, operational icons and concise heading emphasis. Reserve the amber pair for an attention status.",
+        "name": "The State-Only Color Rule",
+        "body": "Red, amber and state green appear only when a validity or status state exists, and always beside text that names it (\"Vencidas\", \"Já venceu\", \"Vence hoje\"). A count of zero falls back to `ink-soft`.",
         "section": "colors"
       },
       {
-        "name": "The Existing Type Rule",
-        "body": "Use the existing Manrope and DM Sans families; retain the Manrope hero override and the inherited DM Sans section headings.",
+        "name": "The One Red Rule",
+        "body": "`destructive` is the only red fill in the app; `bad-ink` is the red for text and icons on `bad-bg`. No other reds, and no Tailwind palette colors in place of the state pairs.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Family Rule",
+        "body": "Inside `.workspace-shell`, `.auth-dialog` and `.label-page`, `--font-display` resolves to Manrope; DM Sans belongs to the landing only.",
         "section": "typography"
+      },
+      {
+        "name": "The Tabular Date Rule",
+        "body": "Every date, time, count and badge number uses tabular numerals so columns and countdowns never jitter.",
+        "section": "typography"
+      },
+      {
+        "name": "The Thumb Zone Rule",
+        "body": "Primary navigation lives in the bottom bar on phones and the AR-SP5; nothing essential is hidden behind a top hamburger. Tabs are at least 56px tall; every other control at least 44px (inputs 46–48px, settlement choices 48–68px).",
+        "section": "layout"
+      },
+      {
+        "name": "The Soft Lift Rule",
+        "body": "Shadows are diffuse, downward and green-black at low opacity. No hard offset shadows and no heavy drop shadows on cards.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Functional Green Rule",
+        "body": "Use green for primary actions, selected controls, operational icons and concise heading emphasis. Reserve the amber pair for an attention status.",
+        "section": "landing"
+      },
+      {
+        "name": "The Existing Type Rule",
+        "body": "Use the existing Manrope and DM Sans families on the landing; retain the Manrope hero override and the inherited DM Sans section headings.",
+        "section": "landing"
       },
       {
         "name": "The Quiet Depth Rule",
         "body": "Use borders and pale tonal grounds for ordinary grouping; reserve soft shadows for the product container, selected tab and illustrative label.",
-        "section": "elevation"
+        "section": "landing"
       }
     ],
     "dos": [
-      "Do preserve the white and green operational identity and established typography.",
-      "Do keep interactive controls at least 44px tall and show visible keyboard focus.",
-      "Do retain labels, text status explanations and explicit fictitious-data notices in the demonstration.",
-      "Do stack columns and reflow rows on small screens instead of squeezing the desktop layout."
+      "**Do** keep the expiry date the most legible element of any label, row or page, in tabular numerals.",
+      "**Do** use `brand-green` for the one primary action per view and for selection; keep everything else neutral.",
+      "**Do** pair every state color with text naming the state, and use the token pairs (`bad-*`, `warn-*`, `ok-*`).",
+      "**Do** keep touch targets at 44px minimum, 56px for tabs, and inputs at 16px on phones.",
+      "**Do** keep primary navigation in the bottom bar below 1024px and in the sidebar at 1024px and above.",
+      "**Do** put useful content in the first phone viewport and move secondary filters behind an on-demand control.",
+      "**Do** respect safe areas at the top and bottom, and `prefers-reduced-motion` (all transitions collapse).",
+      "Landing: **Do** preserve the white and green operational identity and established typography.",
+      "Landing: **Do** keep interactive controls at least 44px tall and show visible keyboard focus.",
+      "Landing: **Do** retain labels, text status explanations and explicit fictitious-data notices in the demonstration.",
+      "Landing: **Do** stack columns and reflow rows on small screens instead of squeezing the desktop layout."
     ],
     "donts": [
-      "Don't introduce photography, olive colors, editorial serif faces or decorative background lettering into this landing.",
-      "Don't replace clear groups and dividers with a mosaic of promotional cards.",
-      "Don't use the illustrative label styling as a specification for physical printed labels.",
-      "Don't apply this landing document to the whole authenticated application."
+      "**Don't** use DM Sans or any second family inside the authenticated app, login or QR page.",
+      "**Don't** use red, amber or state green as decoration, or introduce a second red or Tailwind palette oranges and reds in place of the state tokens.",
+      "**Don't** use the shadcn amber `--accent` for states or hovers; it is not part of this system.",
+      "**Don't** add uppercase tracked eyebrows or kickers above page titles.",
+      "**Don't** add hard offset shadows or heavy drop shadows to cards.",
+      "**Don't** squeeze the desktop dashboard onto phones: no hidden top menus, oversized titles or filters filling the first screen.",
+      "**Don't** derive UI styling from the thermal print label, or print-label specs from the UI.",
+      "Landing: **Don't** introduce photography, olive colors, editorial serif faces or decorative background lettering into this landing.",
+      "Landing: **Don't** replace clear groups and dividers with a mosaic of promotional cards.",
+      "Landing: **Don't** use the illustrative label styling as a specification for physical printed labels."
     ]
   }
 }
