@@ -220,11 +220,24 @@ export function ContractOfferModal({
         {listing &&
           !openOffer &&
           (!commercial.success || pending.length > 0 || contract.status === "arquivada") && (
-            <p role="status" className="rounded-xl border p-4 text-sm">
-              Para preparar o link, use uma minuta não arquivada, complete todos os campos pendentes
-              e gere o documento com início na ativação e forma de pagamento definida. Minutas
-              antigas precisam ser geradas novamente.
-            </p>
+            <div role="status" className="space-y-3 rounded-xl border p-4 text-sm">
+              <p className="font-medium">Esta minuta ainda não pode virar link. Falta:</p>
+              <ul className="list-disc space-y-1.5 pl-5">
+                {contract.status === "arquivada" && <li>Usar uma minuta não arquivada.</li>}
+                {!commercial.success && (
+                  <li>
+                    Gerar o documento de novo com início na ativação e forma de pagamento definida
+                    (Pix, boleto ou cartão).
+                  </li>
+                )}
+                {pending.map((item) => (
+                  <li key={item}>
+                    <span className="first-letter:uppercase">{item}</span>
+                    <span className="text-muted-foreground"> · {pendingHint(item)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         {listing &&
           !openOffer &&
@@ -655,4 +668,11 @@ function PersonFields({
       </div>
     </section>
   );
+}
+/** Onde corrigir cada pendência marcada como [PENDENTE: ...] na minuta. */
+function pendingHint(item: string) {
+  if (item.includes("contratante")) return "preencha no cadastro da empresa e gere de novo";
+  if (/TiNutri|suporte|exportação/.test(item))
+    return "preencha em Configurações → Empresa e gere de novo";
+  return "defina no gerador de contrato e gere de novo";
 }
