@@ -59,6 +59,7 @@ const masterSections = [
   "carteira",
   "acompanhamento",
   "atividades",
+  "configuracoes",
 ] as const;
 export function masterSearch(search: Record<string, unknown>): {
   secao?: (typeof masterSections)[number];

@@ -30,6 +30,7 @@
     "signature:mail:check": "node --experimental-strip-types scripts/check-signature-mail.mjs",
     "signature:evidence:verify": "node --experimental-strip-types scripts/verify-own-signature-evidence.mjs",
     "test:traceability": "node --test tests/label-traceability-sql.test.mjs tests/label-move-sql.test.mjs",
+    "test:settings": "node --test tests/tinutri-profile-sql.test.mjs",
     "test:portfolio": "node --experimental-strip-types --test tests/portfolio.test.ts tests/portfolio-report.test.ts tests/portfolio-sql.test.mjs"
   },
   "dependencies": {

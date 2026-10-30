@@ -23,7 +23,7 @@ A data de adesão serve como sugestão inicial de vigência e pode ser alterada 
 
 Dados desconhecidos recebem marcadores `[PENDENTE: ...]`. A prévia lista essas pendências e permite salvar o rascunho. Não são criados CNPJ, razão social, contatos, SLA, encargos financeiros ou dados de representação fictícios. O prazo de solicitação de exportação e os contatos/horários de suporte também ficam pendentes até serem definidos pela prestadora.
 
-Os dados da TiNutri podem ser preenchidos opcionalmente antes de gerar. Eles são incorporados ao corpo desta minuta, sem criar um cadastro global da prestadora. Quando as informações oficiais chegarem, podem ser incluídas no gerador para novos documentos ou pelo editor de texto em documentos salvos. A geração novamente substitui o texto editado apenas quando a ação explícita é acionada.
+Os dados da TiNutri vêm do cadastro em **Configurações → Empresa** (SQL 33, 29/10/2026) e continuam editáveis antes de gerar. Eles são incorporados ao corpo desta minuta; alterar o cadastro depois não muda minutas já geradas. Quando as informações oficiais chegarem, podem ser incluídas no gerador para novos documentos ou pelo editor de texto em documentos salvos. A geração novamente substitui o texto editado apenas quando a ação explícita é acionada.
 
 O contato responsável cadastrado na empresa é utilizado como representante indicado; seus poderes de representação precisam ser conferidos antes da assinatura. O escopo descreve o software e separa equipamentos e serviços profissionais presenciais, sem assumir contratação de consultoria de alimentos ou de nutrição.
 

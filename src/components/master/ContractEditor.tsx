@@ -16,6 +16,7 @@ import {
   type ContractProvider,
 } from "@/lib/contract-template";
 import type { CommercialSnapshot } from "@/lib/contracting/domain";
+import { loadTinutriProfile, profileProvider, profileTerms } from "@/lib/tinutri-profile";
 import { MasterModal, Field, Feedback, SaveButton } from "./Shared";
 import { RemoteSelect } from "./RemoteSelect";
 
@@ -48,6 +49,19 @@ export function ContractEditor({
   const [error, setError] = useState("");
   const plan = company ? billingPlan(company.plan) : undefined;
   const pending = contractPending(body);
+  // Minuta nova: dados da TiNutri e padrões de suporte vêm de Configurações → Empresa.
+  useEffect(() => {
+    if (record) return;
+    const controller = new AbortController();
+    loadTinutriProfile(controller.signal)
+      .then((saved) => {
+        if (controller.signal.aborted || !saved) return;
+        setProvider(profileProvider(saved));
+        setTerms((previous) => ({ ...previous, ...profileTerms(saved) }));
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [record]);
   useEffect(() => {
     if (record) return;
     setCompany(null);
@@ -370,11 +384,11 @@ export function ContractEditor({
                   </section>
                   <details className="rounded-xl border p-4">
                     <summary className="cursor-pointer text-sm font-semibold">
-                      Dados da TiNutri · preenchimento opcional nesta etapa
+                      Dados da TiNutri · vindos de Configurações → Empresa
                     </summary>
                     <p className="mt-2 text-xs text-muted-foreground">
-                      Você pode completar depois. Campos vazios serão identificados como pendentes.
-                      Estes dados compõem apenas esta minuta.
+                      Preenchidos com o cadastro da TiNutri. Alterações aqui valem só para esta
+                      minuta. Campos vazios serão identificados como pendentes.
                     </p>
                     <div className="mt-4 grid gap-4 sm:grid-cols-2">
                       {(

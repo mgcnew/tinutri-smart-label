@@ -24,6 +24,7 @@ import {
 import { money } from "@/lib/billing";
 import type { ServiceContract } from "@/lib/contracts";
 import { contractPending } from "@/lib/contract-template";
+import { loadTinutriProfile } from "@/lib/tinutri-profile";
 import { MasterModal, Field, Feedback } from "./Shared";
 
 const when = (date: string) =>
@@ -66,6 +67,21 @@ export function ContractOfferModal({
   const refresh = async () => {
     setListing(await listOffers({ data: { contractId: contract.id } }));
   };
+  // Representante da TiNutri vem de Configurações → Empresa; continua editável.
+  useEffect(() => {
+    const controller = new AbortController();
+    loadTinutriProfile(controller.signal)
+      .then((saved) => {
+        if (controller.signal.aborted || !saved) return;
+        setProviderSigner((current) =>
+          current.name || current.email
+            ? current
+            : { name: saved.representative, email: saved.representative_email },
+        );
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
   useEffect(() => {
     let alive = true;
     void listOffers({ data: { contractId: contract.id } })

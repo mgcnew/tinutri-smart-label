@@ -11,6 +11,7 @@ import {
   BriefcaseBusiness,
   ClipboardList,
   History,
+  Settings,
   LogOut,
   Menu,
   ArrowLeft,
@@ -29,6 +30,7 @@ import { CarePanel } from "@/components/master/CarePanel";
 import { ActivitiesPanel } from "@/components/master/ActivitiesPanel";
 import { CompanyModal } from "@/components/master/CompanyModal";
 import { ReportModal } from "@/components/master/ReportModal";
+import { SettingsPanel } from "@/components/master/SettingsPanel";
 import { Heading } from "@/components/master/Shared";
 import type { Company } from "@/lib/management";
 import type { RecentAction } from "@/lib/dashboard";
@@ -46,6 +48,7 @@ const sections = [
   { id: "carteira", name: "Carteira", icon: BriefcaseBusiness },
   { id: "acompanhamento", name: "Acompanhamento", icon: ClipboardList },
   { id: "atividades", name: "Atividades", icon: History },
+  { id: "configuracoes", name: "Configurações", icon: Settings },
 ] as const;
 type Section = (typeof sections)[number]["id"];
 function AdminMaster() {
@@ -464,6 +467,7 @@ function AdminMaster() {
               onAction={setAudit}
             />
           )}
+          {tab === "configuracoes" && <SettingsPanel />}
         </main>
       </div>
       <ReportModal open={report} onClose={() => setReport(false)} />
