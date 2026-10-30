@@ -40,3 +40,5 @@ agent/config.json
 # Estado local da CLI do Supabase
 supabase/.temp/
 supabase/.branches/
+.vercel
+.env*
