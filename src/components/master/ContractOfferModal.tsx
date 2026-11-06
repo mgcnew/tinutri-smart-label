@@ -10,6 +10,7 @@ import {
   SIGNATURE_ISSUE_NAMES,
   OFFER_EVENT_NAMES,
   ACTIVATION_ERROR_NAMES,
+  personSchema,
   type Person,
 } from "@/lib/contracting/domain";
 import {
@@ -104,7 +105,7 @@ export function ContractOfferModal({
     try {
       await fn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Não foi possível concluir a operação.");
+      setError(readableError(e));
     } finally {
       setBusy(false);
     }
@@ -112,6 +113,18 @@ export function ContractOfferModal({
   const publish = (e: FormEvent) => {
     e.preventDefault();
     if (!reviewed) return;
+    const people: [string, Person][] = [
+      ["do representante do cliente", signer],
+      ["do representante da TiNutri", providerSigner],
+      ...(sameContact ? [] : [["do responsável pelo acesso", accessContact] as [string, Person]]),
+    ];
+    const invalid = people.find(([, person]) => !personSchema.safeParse(person).success);
+    if (invalid) {
+      setError(
+        `Confira o nome e o e-mail ${invalid[0]}. O e-mail precisa ser completo, como nome@empresa.com.br.`,
+      );
+      return;
+    }
     void run(async () => {
       const result = await publishOffer({
         data: {
@@ -675,4 +688,26 @@ function pendingHint(item: string) {
   if (/TiNutri|suporte|exportação/.test(item))
     return "preencha em Configurações → Empresa e gere de novo";
   return "defina no gerador de contrato e gere de novo";
+}
+
+const FIELD_NAMES: Record<string, string> = {
+  signer: "do representante do cliente",
+  providerSigner: "do representante da TiNutri",
+  accessContact: "do responsável pelo acesso",
+};
+/** Erros de validação do servidor chegam como JSON; mostra o campo em português. */
+function readableError(e: unknown) {
+  const message = e instanceof Error ? e.message : "";
+  try {
+    const issues = JSON.parse(message) as { path?: (string | number)[] }[];
+    const [field, key] = issues[0]?.path ?? [];
+    if (typeof field === "string" && FIELD_NAMES[field])
+      return key === "email"
+        ? `O e-mail ${FIELD_NAMES[field]} é inválido. Use um endereço completo, como nome@empresa.com.br.`
+        : `Confira o nome ${FIELD_NAMES[field]}.`;
+    if (Array.isArray(issues)) return "Confira os dados preenchidos e tente novamente.";
+  } catch {
+    // Mensagem comum, já em português.
+  }
+  return message || "Não foi possível concluir a operação.";
 }

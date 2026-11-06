@@ -7,7 +7,12 @@ import {
   saveTinutriProfile,
   type TinutriProfile,
 } from "@/lib/tinutri-profile";
+import { z } from "zod";
 import { Heading, Field, Feedback, SaveButton } from "./Shared";
+
+// Mesma regra de e-mail do servidor: o navegador aceita "nome@dominio", o contrato não.
+const validEmail = (value: string) =>
+  !value.trim() || z.string().email().safeParse(value.trim()).success;
 
 type TextKey = Exclude<keyof TinutriProfile, "export_days" | "updated_at">;
 const COMPANY: [TextKey, string, string?][] = [
@@ -54,9 +59,19 @@ export function SettingsPanel() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (busy) return;
-    setBusy(true);
     setError("");
     setNotice("");
+    const wrong = (
+      [
+        ["representative_email", "E-mail do representante"],
+        ["email", "E-mail de contato"],
+      ] as const
+    ).find(([key]) => !validEmail(profile[key]));
+    if (wrong) {
+      setError(`${wrong[1]} inválido. Use um endereço completo, como nome@empresa.com.br.`);
+      return;
+    }
+    setBusy(true);
     try {
       setProfile(await saveTinutriProfile(profile));
       setNotice("Dados salvos. Os próximos contratos já saem preenchidos.");
