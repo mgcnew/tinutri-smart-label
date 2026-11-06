@@ -709,11 +709,11 @@ input.company-fixed:focus-visible {
 .workspace-layout {
   min-height: calc(100svh - 64px);
 }
+/* Desktop aproveita a largura: margens curtas e limite só em telas muito largas. */
 .workspace-main {
   width: 100%;
-  max-width: 1280px;
-  margin-inline: auto;
-  padding: 28px 32px;
+  max-width: 1680px;
+  padding: 24px 24px 32px;
 }
 .workspace-avatar {
   display: grid;
@@ -2062,7 +2062,7 @@ label {
   color: var(--ink);
 }
 .master-workspace .workspace-main {
-  max-width: 1440px;
+  max-width: 1680px;
 }
 .master-workspace input,
 .master-workspace :is(select, .system-select-trigger),
