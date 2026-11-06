@@ -90,7 +90,7 @@ body:has(.sl-page) > div .app-footer {
 }
 .sl-brand img {
   width: 32px;
-  height: 36px;
+  height: 32px;
   object-fit: contain;
 }
 .sl-brand > span {

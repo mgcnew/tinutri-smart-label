@@ -14,7 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { useState } from "react";
-import tinutriLogo from "@/assets/tinutri-logo-ui.webp";
+import tinutriMark from "@/assets/tinutri-mark.webp";
 import { AuthLogin } from "@/components/AuthLogin";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SystemSelect } from "@/components/ui/system-select";
@@ -340,7 +340,7 @@ export function SystemLanding({ openLogin = false }: { openLogin?: boolean }) {
       <header className="sl-header">
         <div className="sl-container sl-header-inner">
           <a href="/" className="sl-brand" aria-label="TiNutri Smart Label, página inicial">
-            <img src={tinutriLogo} width={32} height={36} alt="" />
+            <img src={tinutriMark} width={32} height={32} alt="" className="rounded-md" />
             <span>
               TiNutri{" "}
               <strong>

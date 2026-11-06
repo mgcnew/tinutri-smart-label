@@ -67,7 +67,7 @@ import {
   type LabelKind,
   type PrintableLabel,
 } from "@/lib/label";
-import tinutriLogo from "@/assets/tinutri-logo-ui.webp";
+import tinutriLogo from "@/assets/tinutri-mark.webp";
 import { BUILTIN_LAYOUTS, renderLabelZpl } from "@/lib/label-render";
 import {
   enqueueJob,

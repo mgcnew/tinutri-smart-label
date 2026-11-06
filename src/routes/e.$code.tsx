@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 
-import tinutriLogo from "@/assets/tinutri-logo-ui.webp";
+import tinutriLogo from "@/assets/tinutri-mark.webp";
 
 export const CLIENT_CODE_KEY = "tinutri.client-code";
 
@@ -44,7 +44,7 @@ function ClientEntry() {
           alt="TiNutri"
           width={56}
           height={56}
-          className="mx-auto size-14 object-contain"
+          className="mx-auto size-14 rounded-xl"
         />
         <h1 className="mt-4 text-xl font-bold">Abrindo seu estabelecimento…</h1>
         <p className="mt-2 text-sm text-muted-foreground">Faça login para continuar.</p>

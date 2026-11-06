@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
 
-import tinutriLogo from "@/assets/tinutri-logo-ui.webp";
+import tinutriLogo from "@/assets/tinutri-mark.webp";
 import { supabase } from "@/integrations/supabase/client";
 import { DiscardReasonField } from "@/components/DiscardReasonField";
 import { LabelMovePanel, type MoveOption } from "@/components/LabelMovePanel";
@@ -256,7 +256,7 @@ function LabelLookup() {
             alt="TiNutri"
             width={56}
             height={56}
-            className="mx-auto size-14 object-contain"
+            className="mx-auto size-14 rounded-xl"
           />
           <h1 className="mt-4 text-xl font-bold">Etiqueta não encontrada</h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -321,7 +321,7 @@ function LabelLookup() {
             alt="TiNutri"
             width={44}
             height={44}
-            className="size-11 shrink-0 object-contain"
+            className="size-11 shrink-0 rounded-lg"
           />
           <div className="min-w-0">
             <strong className="block font-display text-base leading-tight">

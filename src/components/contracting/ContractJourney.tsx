@@ -11,7 +11,7 @@ import {
   payOffer,
   readPublicOffer,
 } from "@/lib/contracting/functions";
-import logo from "@/assets/tinutri-logo-ui.webp";
+import logo from "@/assets/tinutri-mark.webp";
 
 const contractJourneyApi = {
   read: (token: string) => readPublicOffer({ data: { token } }),
@@ -123,7 +123,7 @@ export function ContractJourney({
     <main className="min-h-screen bg-background px-4 py-7 sm:px-6 sm:py-10">
       <div className="mx-auto max-w-5xl">
         <header className="mb-8 flex items-center gap-3">
-          <img src={logo} alt="TiNutri" className="h-10 w-9 object-contain" />
+          <img src={logo} alt="TiNutri" width={40} height={40} className="size-10 rounded-lg" />
           <div>
             <strong className="block text-base">TiNutri Smart Label®</strong>
             <span className="text-xs text-muted-foreground">Sua contratação, passo a passo</span>
