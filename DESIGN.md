@@ -310,7 +310,7 @@ A single brand green on a cool green-gray ground, with three state pairs held in
 
 ### Dark theme
 
-`.dark` keeps every token name and swaps values: ground `#0f1612`, surface `#17201b`, soft surface `#1d2822`, ink `#e6efe9`, soft ink `#9db0a5`, hairline `#2a3830`; green text and rings move to `#4cc58a` (`--brand-ink`) while green fills stay `brand-green`; state inks become `#7fd4a0`, `#f3b27a` and `#f29a92` on dark grounds.
+`.dark` keeps every token name and swaps values: neutral graphite with no green cast (owner request, 06/11/2026): ground `#111214`, surface `#1a1b1e`, soft surface `#212226`, ink `#ececee`, soft ink `#a5a8ae`, hairline `#2c2e33`; hover (`--accent`) is the neutral `--tint-neutral`; green text and rings move to `#4cc58a` (`--brand-ink`) while green fills stay `brand-green`; state inks become `#7fd4a0`, `#f3b27a` and `#f29a92` on dark grounds.
 
 **The State-Only Color Rule.** Red, amber and state green appear only when a validity or status state exists, and always beside text that names it ("Vencidas", "Já venceu", "Vence hoje"). A count of zero falls back to `ink-soft`.
 

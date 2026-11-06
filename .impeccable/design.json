@@ -34,7 +34,7 @@
           "oklch(84% 0.0025 165.08)",
           "oklch(95% 0.0025 165.08)"
         ],
-        "dark": "#0f1612"
+        "dark": "#111214"
       },
       "surface": {
         "role": "neutral",
@@ -50,7 +50,7 @@
           "oklch(84% 0.0000 89.88)",
           "oklch(95% 0.0000 89.88)"
         ],
-        "dark": "#17201b"
+        "dark": "#1a1b1e"
       },
       "surface-soft": {
         "role": "neutral",
@@ -66,7 +66,7 @@
           "oklch(84% 0.0041 157.18)",
           "oklch(95% 0.0041 157.18)"
         ],
-        "dark": "#1d2822"
+        "dark": "#212226"
       },
       "tint-green": {
         "role": "primary",

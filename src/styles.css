@@ -241,18 +241,19 @@
 }
 
 .dark {
+  /* Grafite neutro: o verde fica só na marca e nos estados, nunca no fundo. */
   --brand-ink: #4cc58a;
-  --page: #0f1612;
-  --surface: #17201b;
-  --surface-soft: #1d2822;
-  --tint-green: #1f3328;
-  --tint-neutral: #25302a;
-  --ink: #e6efe9;
-  --ink-soft: #9db0a5;
-  --ink-faint: #8a9c91;
-  --line: #2a3830;
-  --line-input: #33443a;
-  --line-green: #2c5039;
+  --page: #111214;
+  --surface: #1a1b1e;
+  --surface-soft: #212226;
+  --tint-green: #25272b;
+  --tint-neutral: #2a2c30;
+  --ink: #ececee;
+  --ink-soft: #a5a8ae;
+  --ink-faint: #8f9298;
+  --line: #2c2e33;
+  --line-input: #3b3e44;
+  --line-green: #363940;
   --line-green-strong: #3f7a58;
   --ok-ink: #7fd4a0;
   --ok-bg: #16291e;
@@ -274,8 +275,8 @@
   --secondary-foreground: var(--ink);
   --muted: var(--surface-soft);
   --muted-foreground: var(--ink-soft);
-  --accent: oklch(0.45 0.08 85);
-  --accent-foreground: oklch(0.97 0.02 85);
+  --accent: var(--tint-neutral);
+  --accent-foreground: var(--ink);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.984 0.003 247.858);
   --border: var(--line);
