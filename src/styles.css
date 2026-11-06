@@ -916,6 +916,8 @@ input.company-fixed:focus-visible {
 }
 .portfolio-row {
   display: grid;
+  /* minmax(0, 1fr): botões sem quebra não podem alargar a linha além da tela. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   padding: 18px 20px;
   border-top: 1px solid var(--line);
@@ -1063,6 +1065,8 @@ input.company-fixed:focus-visible {
   }
   .portfolio-head {
     flex-direction: column;
+    /* Em coluna, flex-start deixaria o nome longo (truncate) definir a largura. */
+    align-items: stretch;
   }
   .portfolio-actions {
     justify-content: stretch;
@@ -1070,6 +1074,8 @@ input.company-fixed:focus-visible {
   }
   .portfolio-actions > button {
     flex: 1 1 100%;
+    min-width: 0;
+    white-space: normal;
   }
 }
 .dashboard-section-label > span {
