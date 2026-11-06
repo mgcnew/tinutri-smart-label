@@ -1477,7 +1477,7 @@ export function Workspace() {
         <div className="workspace-topbar flex min-w-0 items-center gap-3">
           <div className="lg:hidden">
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-              <SheetContent side="left" className="flex w-[86%] max-w-xs flex-col gap-0 p-5">
+              <SheetContent side="bottom" className="menu-sheet flex flex-col gap-0 p-5">
                 <SheetHeader className="border-b pb-4 text-left">
                   <SheetTitle>
                     <Brand />

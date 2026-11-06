@@ -265,7 +265,7 @@ function AdminMaster() {
                   <Menu />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="flex w-[86%] max-w-xs flex-col">
+              <SheetContent side="bottom" className="menu-sheet flex flex-col">
                 <SheetHeader className="mb-5 border-b pb-5 text-left">
                   <SheetTitle>Gestão TiNutri</SheetTitle>
                 </SheetHeader>
