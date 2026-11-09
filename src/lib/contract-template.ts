@@ -1,6 +1,7 @@
-import { billingPlan, displayDate, money } from "./billing.ts";
+import { billingPlan, displayDate, money, type BillingPrices } from "./billing.ts";
+import type { EquipmentOffer } from "./equipment.ts";
 
-export const CONTRACT_TEMPLATE_VERSION = "TiNutri SaaS · modelo 1.1 · 20/10/2026";
+export const CONTRACT_TEMPLATE_VERSION = "TiNutri SaaS · modelo 1.2 · 09/11/2026";
 export type ContractCompany = {
   name: string;
   legal_name: string | null;
@@ -12,6 +13,7 @@ export type ContractCompany = {
   email: string | null;
   phone: string | null;
   plan: string;
+  custom_monthly_cents?: number | null;
   subscription_started_on?: string | null;
 };
 export type ContractProvider = {
@@ -60,8 +62,10 @@ export function contractDraft(
   company: ContractCompany,
   terms: ContractTerms = { ...EMPTY_TERMS, startsOn: company.subscription_started_on ?? "" },
   provider: ContractProvider = EMPTY_PROVIDER,
+  prices?: BillingPrices,
+  equipment: EquipmentOffer | null = null,
 ) {
-  const plan = billingPlan(company.plan);
+  const plan = billingPlan(company.plan, prices, company.custom_monthly_cents);
   if (!plan)
     throw new Error(
       "Atualize o plano da empresa para mensal, trimestral ou anual antes de gerar o contrato.",
@@ -79,6 +83,36 @@ export function contractDraft(
     boleto: "boleto bancário",
     cartao: "cartão de crédito",
   }[terms.payment];
+  const units = equipment
+    ? `${equipment.quantity} ${equipment.quantity === 1 ? "unidade" : "unidades"} do equipamento ${equipment.model}`
+    : "";
+  const equipmentLine = !equipment
+    ? "não incluído."
+    : equipment.mode === "comodato"
+      ? `${units}, em comodato, conforme o Anexo I. Adicional de comodato: ${money(equipment.unitCents)} por mês por unidade, total de ${money(equipment.totalCents)} por mês (${money(equipment.totalCents * plan.months)} por ciclo), em cobrança própria. ${equipment.minMonths ? `Permanência mínima: ${equipment.minMonths} meses.` : "Sem permanência mínima."}`
+      : `${units}, em venda única, conforme o Anexo I. Valor: ${money(equipment.unitCents)} por unidade, total de ${money(equipment.totalCents)}, em cobrança própria.`;
+  const scope = equipment
+    ? "1.3. Exceto quanto ao equipamento descrito no Anexo I, o contrato não inclui fornecimento de impressoras ou manutenção de equipamentos. Também não inclui insumos, conexão à internet, desenvolvimento sob encomenda ou consultoria técnica presencial."
+    : "1.3. O contrato não inclui fornecimento de impressoras, insumos, conexão à internet, manutenção de equipamentos, desenvolvimento sob encomenda ou consultoria técnica presencial.";
+  const annex = !equipment
+    ? ""
+    : equipment.mode === "comodato"
+      ? `ANEXO I — COMODATO DE EQUIPAMENTO
+I.1. A contratada entrega à contratante, em comodato, ${units}. Os números de série constarão do termo de entrega, assinado no recebimento.
+I.2. O equipamento permanece de propriedade da contratada e destina-se ao uso com o TiNutri Smart Label no estabelecimento da contratante. É vedado emprestar, alugar, vender ou dar o equipamento em garantia a terceiros.
+I.3. Pelo comodato, a contratante pagará o adicional de ${money(equipment.unitCents)} por mês por unidade, total de ${money(equipment.totalCents)} por mês, cobrado por ciclo da assinatura em cobrança própria, separada do valor do sistema. A falta de pagamento do adicional segue o disposto na cláusula 3.3.
+I.4. ${equipment.minMonths ? `A permanência mínima é de ${equipment.minMonths} meses, contados da entrega. Se a contratante encerrar o contrato antes desse prazo sem justa causa, pagará multa proporcional aos meses restantes, equivalente ao adicional de comodato desses meses e limitada ao valor de reposição do equipamento.` : "Não há permanência mínima: a contratante pode encerrar o comodato junto com o contrato, sem multa, devolvendo o equipamento."}
+I.5. A contratante conservará o equipamento, seguirá as orientações do fabricante e comunicará sem demora defeitos, perda, furto ou roubo. A manutenção decorrente do desgaste normal cabe à contratada. Danos por mau uso, queda, contato com líquidos, perda, furto ou roubo serão ressarcidos pela contratante até o valor de reposição de ${money(equipment.replacementCents)} por unidade.
+I.6. No encerramento do contrato, a contratante devolverá o equipamento com seus acessórios em até 15 dias corridos, no estado em que o recebeu, ressalvado o desgaste natural. Sem a devolução nesse prazo, a contratada poderá cobrar o valor de reposição.
+
+`
+      : `ANEXO I — COMPRA E VENDA DE EQUIPAMENTO
+I.1. A contratada vende à contratante ${units}, por ${money(equipment.unitCents)} por unidade, total de ${money(equipment.totalCents)}, em cobrança própria, separada da assinatura do sistema. Parcelamento só se aplica se informado na cobrança.
+I.2. A propriedade passa à contratante com o pagamento integral. A entrega ocorrerá após a confirmação do pagamento, no endereço do quadro resumo, com o documento fiscal correspondente.
+I.3. O equipamento conta com a garantia legal e com a garantia do fabricante, nos termos do respectivo certificado. A contratada declara que o equipamento é compatível com o TiNutri Smart Label na data da venda.
+I.4. O encerramento da assinatura do sistema não obriga a devolução do equipamento nem gera reembolso do valor pago por ele, ressalvados os direitos legais.
+
+`;
   return `MINUTA PARA REVISÃO — NÃO ASSINADA
 CONTRATO DE LICENÇA DE USO DE SOFTWARE E PRESTAÇÃO DE SERVIÇOS
 TiNutri Smart Label®
@@ -99,7 +133,7 @@ Representante: ${fill(provider.representative, "representante da TiNutri")}.
 Contato: ${fill(provider.email, "e-mail da TiNutri")} · ${fill(provider.phone, "telefone da TiNutri")}.
 
 Plano: ${plan.name}. Período contratado: ${plan.months} ${plan.months === 1 ? "mês" : "meses"}.
-Preço mensal equivalente: ${money(plan.monthlyCents)}. Valor total por ciclo: ${money(plan.monthlyCents * plan.months)}.
+Preço mensal equivalente: ${money(plan.monthlyCents)}. Valor total por ciclo: ${money(plan.totalCents)}.
 O valor mensal equivalente é uma referência de comparação; a cobrança prevista é pelo total de cada ciclo, sem parcelamento presumido.
 Início da vigência: ${terms.startOnActivation ? "na ativação do acesso, após conclusão das assinaturas e confirmação do primeiro pagamento" : date(terms.startsOn, "data de início da vigência")}.
 Primeiro vencimento: ${terms.startOnActivation ? "conforme a cobrança disponibilizada após a assinatura, antes da ativação" : date(terms.firstDueOn, "primeiro vencimento")}. Forma de pagamento: ${payment}.
@@ -107,11 +141,12 @@ Renovação: ${terms.renewal === "manual" ? "mediante nova confirmação das par
 Suporte: ${fill(terms.supportChannel, "canal de suporte")}.
 Atendimento: ${fill(terms.supportHours, "dias e horários de suporte")}.
 Prazo para solicitar exportação após o encerramento: ${terms.exportDays ? `${terms.exportDays} dias corridos` : fill("", "prazo de exportação após encerramento")}.
+Equipamento: ${equipmentLine}
 
 1. OBJETO E LICENÇA DE USO
 1.1. A contratada disponibilizará acesso remoto ao TiNutri Smart Label, mediante licença de uso temporária, não exclusiva e sem transferência de titularidade do software, vinculada à empresa contratante identificada neste instrumento.
 1.2. O serviço compreende as funcionalidades habilitadas no sistema para cadastro de produtos e responsáveis, preparação e registro de etiquetas, acompanhamento de validades, histórico da operação e gestão de usuários conforme as permissões concedidas. Funcionalidades futuras dependem de efetiva disponibilização e das condições então acordadas.
-1.3. O contrato não inclui fornecimento de impressoras, insumos, conexão à internet, manutenção de equipamentos, desenvolvimento sob encomenda ou consultoria técnica presencial. Serviços profissionais de nutrição ou consultoria de alimentos, se contratados, dependerão de instrumento ou proposta própria.
+${scope} Serviços profissionais de nutrição ou consultoria de alimentos, se contratados, dependerão de instrumento ou proposta própria.
 
 2. ATIVAÇÃO, ACESSOS E EQUIPAMENTOS
 2.1. A ativação observará a confirmação da contratação, as condições comerciais do quadro resumo e a configuração dos acessos. O simples cadastro da empresa não comprova contratação, pagamento ou aceite.
@@ -127,7 +162,7 @@ Prazo para solicitar exportação após o encerramento: ${terms.exportDays ? `${
 4. PRAZO, RENOVAÇÃO E CANCELAMENTO
 4.1. A vigência terá início na data do quadro resumo e duração correspondente ao período contratado. A modalidade de renovação será a expressamente escolhida no mesmo quadro, sem presumir autorização de débito ou cobrança recorrente.
 4.2. O pedido de cancelamento ou de não renovação poderá ser feito pelo contato da contratada ou pelo canal de suporte. A contratada confirmará o recebimento e informará a data do encerramento, a situação das cobranças e os procedimentos de exportação.
-4.3. Os efeitos financeiros de eventual encerramento antecipado deverão observar os serviços efetivamente prestados, a legislação aplicável e as condições expressamente aprovadas pelas partes. Este modelo não estabelece multa automática ou perda integral de valores antecipados.
+4.3. Os efeitos financeiros de eventual encerramento antecipado deverão observar os serviços efetivamente prestados, a legislação aplicável e as condições expressamente aprovadas pelas partes. Este modelo não estabelece multa automática ou perda integral de valores antecipados${equipment?.mode === "comodato" && equipment.minMonths ? ", ressalvada a permanência mínima do equipamento prevista no Anexo I" : ""}.
 4.4. Ficam preservados os direitos obrigatórios aplicáveis à relação concreta, inclusive eventual direito de arrependimento nas hipóteses em que a legislação de defesa do consumidor o assegure. Nenhuma disposição deste instrumento pretende afastá-los.
 
 5. SUPORTE, MANUTENÇÃO E DISPONIBILIDADE
@@ -159,7 +194,7 @@ Prazo para solicitar exportação após o encerramento: ${terms.exportDays ? `${
 10.2. A assinatura poderá ocorrer em meio físico ou por solução eletrônica que permita comprovar a autoria e a integridade do documento, conforme o meio efetivamente adotado pelas partes. Salvar, baixar ou imprimir esta minuta não registra aceite nem assinatura.
 10.3. Este texto é um modelo inicial para revisão jurídica e comercial. Campos pendentes e condições do quadro resumo devem ser completados e aprovados antes do uso como instrumento definitivo.
 
-LOCAL, DATA E ASSINATURAS
+${annex}LOCAL, DATA E ASSINATURAS
 Local: ${company.city}/${company.state}. Data: ${terms.startOnActivation ? "registrada na conclusão das assinaturas eletrônicas" : "[PENDENTE: data da formalização]"}.
 
 Pela contratante: ${fill(company.responsible_name, "representante da contratante")}

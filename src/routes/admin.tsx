@@ -414,7 +414,37 @@ function AdminMaster() {
                           plan: before.plan,
                           subscription_started_on: before.subscription_started_on,
                           subscription_status: before.subscription_status,
+                          custom_monthly_cents: before.custom_monthly_cents,
+                          equipment_mode: before.equipment_mode,
+                          equipment_model_id: before.equipment_model_id,
+                          equipment_quantity: before.equipment_quantity,
+                          equipment_custom_cents: before.equipment_custom_cents,
+                          equipment_min_months: before.equipment_min_months,
                         },
+                        after,
+                      );
+                      changed();
+                    }}
+                    onEquipmentSaved={async (before, after) => {
+                      await activity(
+                        before ? "impressora_atualizada" : "impressora_cadastrada",
+                        null,
+                        "equipment_models",
+                        after.id,
+                        after.name,
+                        before ?? {},
+                        after,
+                      );
+                      changed();
+                    }}
+                    onPricesSaved={async (before, after) => {
+                      await activity(
+                        "valores_mensalidade_atualizados",
+                        null,
+                        "billing_prices",
+                        user.id,
+                        "Tabela de preços",
+                        before,
                         after,
                       );
                       changed();

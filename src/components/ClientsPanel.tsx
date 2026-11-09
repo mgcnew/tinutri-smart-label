@@ -1,4 +1,5 @@
 import { BILLING_PLANS, billingPlan, money, SUBSCRIPTION_STATUS } from "@/lib/billing";
+import { useBillingPrices } from "@/lib/billing-prices";
 import { SystemSelect } from "@/components/ui/system-select";
 import {
   cloneElement,
@@ -55,6 +56,7 @@ type Client = {
   phone: string | null;
   address: string | null;
   plan: string;
+  custom_monthly_cents?: number | null;
   subscription_started_on?: string | null;
   subscription_status?: string;
   public_code: string;
@@ -155,6 +157,8 @@ export function ClientsPanel({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingRecord, setEditingRecord] = useState<Client | null>(null);
   const [form, setForm] = useState(EMPTY);
+  const { prices } = useBillingPrices();
+  const formPlan = billingPlan(form.plan, prices, editingRecord?.custom_monthly_cents);
   const [saving, setSaving] = useState(false);
   const [inactivatingId, setInactivatingId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -751,11 +755,11 @@ export function ClientsPanel({
                       </FormField>
                     </>
                   )}
-                  {billingPlan(form.plan) && (
+                  {formPlan && (
                     <p className="sm:col-span-2 rounded-xl bg-secondary p-3 text-sm">
-                      {money(billingPlan(form.plan).monthlyCents)}/mês ·{" "}
-                      {money(billingPlan(form.plan).monthlyCents * billingPlan(form.plan).months)}{" "}
-                      por ciclo. Cobrança ainda não conectada.
+                      {money(formPlan.monthlyCents)}/mês · {money(formPlan.totalCents)} por ciclo
+                      {formPlan.negotiated ? " (valor negociado)" : ""}. Cobrança ainda não
+                      conectada.
                     </p>
                   )}
                   <FormField label="Situação de acesso">

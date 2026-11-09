@@ -1,4 +1,7 @@
 import { billingPlan, money, displayDate, SUBSCRIPTION_STATUS } from "@/lib/billing";
+import { useBillingPrices } from "@/lib/billing-prices";
+import { equipmentOffer, equipmentSummary } from "@/lib/equipment";
+import { useEquipmentModels } from "@/lib/equipment-models";
 import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ClientQrCard } from "@/components/ClientQrCard";
@@ -33,6 +36,10 @@ export function CompanyModal({
     after: Record<string, unknown>,
   ) => Promise<void>;
 }) {
+  const { prices } = useBillingPrices();
+  const plan = billingPlan(company.plan, prices, company.custom_monthly_cents);
+  const { models } = useEquipmentModels();
+  const equipment = equipmentOffer(company, models);
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -111,8 +118,7 @@ export function CompanyModal({
             {company.cnpj || "CNPJ não informado"} · {company.city} / {company.state}
           </p>
           <p className="mt-2 text-xs">
-            Acesso: {company.status} · Plano:{" "}
-            {billingPlan(company.plan)?.name ?? `${company.plan} (legado)`}
+            Acesso: {company.status} · Plano: {plan?.name ?? `${company.plan} (legado)`}
           </p>
           <p className="mt-2 text-xs">
             Nutricionista: {company.nutritionists?.join(", ") || "Consulte os vínculos em Carteira"}
@@ -127,12 +133,13 @@ export function CompanyModal({
           <p className="mt-2 text-muted-foreground">
             Adesão: {displayDate(company.subscription_started_on)}
           </p>
-          {billingPlan(company.plan) && (
+          {plan && (
             <p className="mt-2">
-              {money(billingPlan(company.plan).monthlyCents * billingPlan(company.plan).months)} por
-              ciclo · {money(billingPlan(company.plan).monthlyCents)}/mês
+              {money(plan.totalCents)} por ciclo · {money(plan.monthlyCents)}/mês
+              {plan.negotiated && " · negociado"}
             </p>
           )}
+          {equipment && <p className="mt-2">Impressora: {equipmentSummary(equipment)}</p>}
         </div>
         <dl className="grid gap-4 text-sm sm:grid-cols-2">
           {[

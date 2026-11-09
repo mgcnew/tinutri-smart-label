@@ -5,7 +5,16 @@ import { SystemSelect } from "@/components/ui/system-select";
 import { PageLoading, PaginationControls } from "@/components/PaginationControls";
 import { useDebouncedValue, usePaginatedQuery } from "@/hooks/use-paginated-query";
 import { supabase } from "@/integrations/supabase/client";
-import { BILLING_PLANS, billingPlan, money, displayDate, SUBSCRIPTION_STATUS } from "@/lib/billing";
+import {
+  billingPlan,
+  money,
+  displayDate,
+  SUBSCRIPTION_STATUS,
+  type BillingPrices,
+} from "@/lib/billing";
+import { useBillingPrices } from "@/lib/billing-prices";
+import { equipmentOffer, equipmentSummary, type EquipmentModel } from "@/lib/equipment";
+import { useEquipmentModels } from "@/lib/equipment-models";
 import { errorMessage } from "@/lib/management";
 import { searchColumns } from "@/lib/list-query";
 import {
@@ -13,15 +22,23 @@ import {
   type SubscriptionCompany,
   type SubscriptionChange,
 } from "./SubscriptionModal";
+import { BillingPricesCard } from "./BillingPricesCard";
+import { EquipmentCatalogCard } from "./EquipmentCatalogCard";
 export function SubscriptionsPanel({
   revision,
   onSaved,
+  onPricesSaved,
+  onEquipmentSaved,
   onContracts,
 }: {
   revision: number;
   onSaved: (before: SubscriptionCompany, after: SubscriptionChange) => Promise<void>;
+  onPricesSaved: (before: BillingPrices, after: BillingPrices) => Promise<void>;
+  onEquipmentSaved: (before: EquipmentModel | null, after: EquipmentModel) => Promise<void>;
   onContracts: (id: string) => void;
 }) {
+  const billing = useBillingPrices();
+  const equipment = useEquipmentModels();
   const [editing, setEditing] = useState<SubscriptionCompany | null>(null);
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
@@ -31,9 +48,12 @@ export function SubscriptionsPanel({
     async (offset: number, size: number, signal: AbortSignal) => {
       let query = supabase
         .from("clients")
-        .select("id,name,cnpj,plan,subscription_status,subscription_started_on,updated_at", {
-          count: "exact",
-        })
+        .select(
+          "id,name,cnpj,plan,custom_monthly_cents,subscription_status,subscription_started_on,updated_at,equipment_mode,equipment_model_id,equipment_quantity,equipment_custom_cents,equipment_min_months",
+          {
+            count: "exact",
+          },
+        )
         .order("name")
         .order("id")
         .range(offset, offset + size - 1)
@@ -44,7 +64,7 @@ export function SubscriptionsPanel({
       if (error)
         throw new Error(
           error.code === "42703" || error.code === "PGRST204"
-            ? "Este recurso aguarda ativação: aplique o SQL 19 de assinaturas e contratos neste ambiente."
+            ? "Este recurso aguarda ativação: aplique os SQLs 19 (assinaturas e contratos), 34 (valores da mensalidade) e 35 (impressoras) neste ambiente."
             : errorMessage(error),
         );
       if (count === null) throw new Error("Não foi possível consultar o total.");
@@ -55,28 +75,25 @@ export function SubscriptionsPanel({
   const listing = usePaginatedQuery(JSON.stringify([term, status]), load, revision);
   return (
     <section className="space-y-6">
-      <details className="rounded-xl border bg-card p-4">
-        <summary className="cursor-pointer text-sm font-medium">
-          Consultar planos e valores{" "}
-          <span className="ml-2 text-xs font-normal text-muted-foreground">
-            Mensal, trimestral e anual
-          </span>
-        </summary>
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          {Object.entries(BILLING_PLANS).map(([key, plan]) => (
-            <div key={key}>
-              <h2 className="font-medium">{plan.name}</h2>
-              <p className="mt-1 text-lg font-semibold">
-                {money(plan.monthlyCents)}
-                <span className="text-xs font-normal">/mês</span>
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {money(plan.monthlyCents * plan.months)} por ciclo
-              </p>
-            </div>
-          ))}
-        </div>
-      </details>
+      <BillingPricesCard
+        key={JSON.stringify(billing.prices)}
+        prices={billing.prices}
+        installed={billing.installed && !billing.loading && !billing.error}
+        onSaved={async (before, after) => {
+          await onPricesSaved(before, after);
+          billing.reload();
+        }}
+      />
+      {billing.error && <p className="text-sm text-destructive">{billing.error}</p>}
+      <EquipmentCatalogCard
+        models={equipment.models}
+        installed={equipment.installed && !equipment.loading && !equipment.error}
+        onSaved={async (before, after) => {
+          await onEquipmentSaved(before, after);
+          equipment.reload();
+        }}
+      />
+      {equipment.error && <p className="text-sm text-destructive">{equipment.error}</p>}
       {notice && (
         <p role="status" className="clients-notice flex items-center gap-2">
           <CheckCircle2 className="size-4" />
@@ -112,7 +129,7 @@ export function SubscriptionsPanel({
       ) : (
         <div className="space-y-3">
           {listing.rows.map((company) => {
-            const plan = billingPlan(company.plan);
+            const plan = billingPlan(company.plan, billing.prices, company.custom_monthly_cents);
             return (
               <article key={company.id} className="rounded-2xl border bg-card p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -128,14 +145,25 @@ export function SubscriptionsPanel({
                     ] ?? "Aguardando revisão"}
                   </span>
                 </div>
-                <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-3">
+                <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
                   {[
                     ["Plano", plan?.name ?? `${company.plan} (legado)`],
                     [
                       "Valor por ciclo",
-                      plan ? money(plan.monthlyCents * plan.months) : "Revisar plano",
+                      plan
+                        ? `${money(plan.totalCents)}${plan.negotiated ? " · negociado" : ""}`
+                        : "Revisar plano",
                     ],
                     ["Adesão", displayDate(company.subscription_started_on)],
+                    [
+                      "Impressora",
+                      company.equipment_mode === "nenhum" || equipment.loading
+                        ? equipmentSummary(null)
+                        : (() => {
+                            const offer = equipmentOffer(company, equipment.models);
+                            return offer ? equipmentSummary(offer) : "Revisar impressora";
+                          })(),
+                    ],
                   ].map(([label, value]) => (
                     <div key={label}>
                       <dt className="text-xs text-muted-foreground">{label}</dt>
@@ -165,6 +193,8 @@ export function SubscriptionsPanel({
       {editing && (
         <SubscriptionModal
           company={editing}
+          prices={billing.prices}
+          models={equipment.models}
           onClose={() => setEditing(null)}
           onSaved={async (before, after) => {
             await onSaved(before, after);

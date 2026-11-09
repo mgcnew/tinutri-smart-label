@@ -58,6 +58,27 @@ export type Database = {
           },
         ]
       }
+      billing_prices: {
+        Row: {
+          cycle: string
+          monthly_cents: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          cycle: string
+          monthly_cents: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          cycle?: string
+          monthly_cents?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           active: boolean
@@ -65,7 +86,13 @@ export type Database = {
           city: string
           cnpj: string | null
           created_at: string
+          custom_monthly_cents: number | null
           email: string | null
+          equipment_custom_cents: number | null
+          equipment_min_months: number
+          equipment_mode: string
+          equipment_model_id: string | null
+          equipment_quantity: number
           id: string
           legal_name: string | null
           name: string
@@ -85,7 +112,13 @@ export type Database = {
           city?: string
           cnpj?: string | null
           created_at?: string
+          custom_monthly_cents?: number | null
           email?: string | null
+          equipment_custom_cents?: number | null
+          equipment_min_months?: number
+          equipment_mode?: string
+          equipment_model_id?: string | null
+          equipment_quantity?: number
           id?: string
           legal_name?: string | null
           name: string
@@ -105,7 +138,13 @@ export type Database = {
           city?: string
           cnpj?: string | null
           created_at?: string
+          custom_monthly_cents?: number | null
           email?: string | null
+          equipment_custom_cents?: number | null
+          equipment_min_months?: number
+          equipment_mode?: string
+          equipment_model_id?: string | null
+          equipment_quantity?: number
           id?: string
           legal_name?: string | null
           name?: string
@@ -164,6 +203,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      equipment_models: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          loan_monthly_cents: number
+          name: string
+          replacement_cents: number
+          sale_cents: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          loan_monthly_cents: number
+          name: string
+          replacement_cents: number
+          sale_cents: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          loan_monthly_cents?: number
+          name?: string
+          replacement_cents?: number
+          sale_cents?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       issued_labels: {
         Row: {

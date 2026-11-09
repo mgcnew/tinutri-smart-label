@@ -5,6 +5,9 @@ import { SystemSelect } from "@/components/ui/system-select";
 import { supabase } from "@/integrations/supabase/client";
 import { careUnavailable, errorMessage, type Company } from "@/lib/management";
 import { billingPlan, money } from "@/lib/billing";
+import { useBillingPrices } from "@/lib/billing-prices";
+import { equipmentOffer, equipmentSummary } from "@/lib/equipment";
+import { useEquipmentModels } from "@/lib/equipment-models";
 import { contracts, printContract, CONTRACT_STATUS, type ServiceContract } from "@/lib/contracts";
 import {
   contractDraft,
@@ -47,7 +50,13 @@ export function ContractEditor({
   const [loading, setLoading] = useState(!record && Boolean(initialClient));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const plan = company ? billingPlan(company.plan) : undefined;
+  const billing = useBillingPrices();
+  const plan = company
+    ? billingPlan(company.plan, billing.prices, company.custom_monthly_cents)
+    : undefined;
+  const equipmentModels = useEquipmentModels();
+  const equipment = company ? equipmentOffer(company, equipmentModels.models) : null;
+  const equipmentMissing = Boolean(company && company.equipment_mode !== "nenhum" && !equipment);
   const pending = contractPending(body);
   // Minuta nova: dados da TiNutri e padrões de suporte vêm de Configurações → Empresa.
   useEffect(() => {
@@ -105,10 +114,16 @@ export function ContractEditor({
     return () => controller.abort();
   }, [client, record]);
   const generate = () => {
-    if (!company || busy || loading) return;
+    if (!company || busy || loading || billing.loading || equipmentModels.loading) return;
     try {
-      setBody(contractDraft(company, terms, provider));
-      const selected = billingPlan(company.plan)!;
+      if (billing.error) throw new Error(billing.error);
+      if (equipmentMissing)
+        throw new Error(
+          equipmentModels.error ||
+            "A impressora desta assinatura não foi encontrada no catálogo. Revise em Assinaturas → Gerenciar assinatura.",
+        );
+      setBody(contractDraft(company, terms, provider, billing.prices, equipment));
+      const selected = plan!;
       setCommercial(
         terms.startOnActivation && terms.payment !== "a_definir"
           ? {
@@ -119,7 +134,7 @@ export function ContractEditor({
                 cycle: company.plan as CommercialSnapshot["plan"]["cycle"],
                 months: selected.months,
                 monthly_cents: selected.monthlyCents,
-                total_cents: selected.monthlyCents * selected.months,
+                total_cents: selected.totalCents,
               },
             }
           : null,
@@ -279,11 +294,20 @@ export function ContractEditor({
                       {company.cnpj || "CNPJ pendente"} · {company.city}/{company.state}
                     </p>
                     <p className="mt-3 text-sm">
-                      {plan?.name} · {plan && money(plan.monthlyCents * plan.months)} por ciclo (
-                      {plan?.months} {plan?.months === 1 ? "mês" : "meses"})
+                      {plan?.name} · {plan && money(plan.totalCents)} por ciclo ({plan?.months}{" "}
+                      {plan?.months === 1 ? "mês" : "meses"})
                     </p>
+                    {company.equipment_mode !== "nenhum" && (
+                      <p className="mt-1 text-sm">
+                        Impressora:{" "}
+                        {equipment ? equipmentSummary(equipment) : "não encontrada no catálogo"}
+                        {equipment && " · cobrança à parte"}
+                      </p>
+                    )}
                     <p className="mt-1 text-xs text-muted-foreground">
-                      O plano e o valor vêm do cadastro da assinatura.
+                      {plan?.negotiated
+                        ? "Valor negociado no cadastro da assinatura."
+                        : "O plano vem do cadastro da assinatura e o valor, da tabela de preços."}
                     </p>
                   </div>
                   <section className="space-y-4">

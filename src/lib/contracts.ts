@@ -16,6 +16,8 @@ export type ServiceContract = {
   status: keyof typeof CONTRACT_STATUS;
   company_snapshot: Json;
   plan_snapshot: Json;
+  /** Impressora da minuta (SQL 35); ausente antes da instalação. */
+  equipment_snapshot?: Json;
   commercial_snapshot?: Json | null;
   created_by: string;
   created_at: string;
