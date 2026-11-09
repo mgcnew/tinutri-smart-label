@@ -118,7 +118,7 @@ Aplicado em 29/10/2026 no projeto `ylkiyncsqubuxrtwyxwv` pelo usuário, no SQL E
 
 `34-valores-da-mensalidade.sql` tira os preços do código. Cria `billing_prices` (preço mensal equivalente de mensal, trimestral e anual, começando em R$ 59,90 / 54,90 / 49,90) e `clients.custom_monthly_cents` (valor mensal negociado, opcional, por empresa). Também redefine `private.tinutri_contract_guard` (SQL 19), que passa a gravar no `plan_snapshot` o valor negociado da empresa ou, sem ele, o da tabela. Qualquer usuário autenticado lê a tabela; só o Master altera preços e o valor negociado (gatilho `tinutri_custom_price_guard`). Decisão de 09/11/2026: um aumento vale só para contratos gerados depois dele. Contratos e ofertas já gerados mantêm o valor assinado até a renovação. Reaplicar o arquivo não sobrescreve os preços já editados. A Área Master ganha **Assinaturas → Planos e valores → Alterar valores** e o campo **Valor mensal negociado** em *Gerenciar assinatura*; as duas alterações ficam no histórico de atividades. Sem o SQL 34, a lista de assinaturas avisa que falta a instalação. Testes: `npm run test:billing` (PGlite).
 
-Pendente: aplicar no projeto `ylkiyncsqubuxrtwyxwv`.
+Aplicado pelo usuário no projeto `ylkiyncsqubuxrtwyxwv`; conferido pela API em 09/11/2026: `billing_prices` com mensal 5990, trimestral 5490 e anual 4990; `clients.custom_monthly_cents` presente; a chave pública recebe 42501 ao ler a tabela.
 
 ## Impressora junto do plano: comodato ou venda (SQL 35)
 
@@ -126,4 +126,4 @@ Pendente: aplicar no projeto `ylkiyncsqubuxrtwyxwv`.
 
 Decisões de 09/11/2026: comodato como adicional mensal, 12 meses de permanência mínima por padrão, catálogo com vários modelos. O contrato (modelo 1.2) ganha a linha "Equipamento" no quadro resumo e o Anexo I (comodato ou compra e venda); as cláusulas são texto inicial para revisão jurídica, como o restante do modelo. Na Fase 1 o aparelho é cobrado **à parte e manualmente**: a cobrança online e a ativação continuam cobrando e conferindo só o valor do sistema. Fase 2: cobrança do aparelho no Asaas. Fase 3: controle de aparelhos por número de série. Venda exige NF-e de produto e comodato, nota de remessa; confirmar com o contador. Testes: `npm run test:billing` (PGlite).
 
-Pendente: aplicar no projeto `ylkiyncsqubuxrtwyxwv`, depois do 34.
+Aplicado pelo usuário no projeto `ylkiyncsqubuxrtwyxwv`; conferido pela API em 09/11/2026: `equipment_models` existe (vazia), as colunas `equipment_*` de `clients` estão presentes (empresas em `nenhum`) e o contrato existente recebeu `equipment_snapshot` `{"mode":"nenhum"}`. O corpo de `tinutri_contract_guard` não foi conferido por hash.
