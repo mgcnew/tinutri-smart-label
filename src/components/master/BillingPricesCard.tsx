@@ -63,13 +63,9 @@ export function BillingPricesCard({
     }
   };
   return (
-    <details className="rounded-xl border bg-card p-4" open={editing || undefined}>
-      <summary className="cursor-pointer text-sm font-medium">
-        Planos e valores{" "}
-        <span className="ml-2 text-xs font-normal text-muted-foreground">
-          Mensal, trimestral e anual
-        </span>
-      </summary>
+    <section className="rounded-xl border bg-card p-4">
+      <h2 className="font-semibold">Planos e valores</h2>
+      <p className="mt-1 text-xs text-muted-foreground">Mensal, trimestral e anual</p>
       {editing ? (
         <form onSubmit={(e) => void save(e)} className="clients-toolbar mt-4 space-y-4">
           <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-3">
@@ -124,7 +120,7 @@ export function BillingPricesCard({
               const plan = billingPlan(cycle, prices)!;
               return (
                 <div key={cycle}>
-                  <h2 className="font-medium">{plan.name}</h2>
+                  <h3 className="font-medium">{plan.name}</h3>
                   <p className="mt-1 text-lg font-semibold">
                     {money(plan.monthlyCents)}
                     <span className="text-xs font-normal">/mês</span>
@@ -154,6 +150,6 @@ export function BillingPricesCard({
           </div>
         </>
       )}
-    </details>
+    </section>
   );
 }

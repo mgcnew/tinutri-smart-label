@@ -71,13 +71,9 @@ export function EquipmentCatalogCard({
     }
   };
   return (
-    <details className="rounded-xl border bg-card p-4" open={editing ? true : undefined}>
-      <summary className="cursor-pointer text-sm font-medium">
-        Impressoras{" "}
-        <span className="ml-2 text-xs font-normal text-muted-foreground">
-          Comodato ou venda junto do plano
-        </span>
-      </summary>
+    <section className="rounded-xl border bg-card p-4">
+      <h2 className="font-semibold">Impressoras</h2>
+      <p className="mt-1 text-xs text-muted-foreground">Comodato ou venda junto do plano</p>
       {editing ? (
         <form onSubmit={(e) => void save(e)} className="clients-toolbar mt-4 space-y-4">
           <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
@@ -193,6 +189,6 @@ export function EquipmentCatalogCard({
           </div>
         </>
       )}
-    </details>
+    </section>
   );
 }
