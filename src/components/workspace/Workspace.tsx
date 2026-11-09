@@ -97,6 +97,7 @@ import { shelfDaysFor } from "@/lib/shelf-life";
 import { settleLabelRecord } from "@/lib/settlement-actions";
 import { printThermalBatch } from "@/lib/print-thermal";
 import { rankPortfolio, type PortfolioRow } from "@/lib/portfolio";
+import { UserAvatar } from "@/components/UserAvatar";
 
 // Cada painel vira um arquivo à parte: quem abre o dashboard não baixa clientes, produtos, histórico etc.
 const CarePanel = lazy(() =>
@@ -1485,9 +1486,7 @@ export function Workspace() {
                 </SheetHeader>
                 {role && (
                   <div className="mt-4 flex items-center gap-3 rounded-xl bg-secondary px-3 py-2.5">
-                    <span className="workspace-avatar shrink-0" aria-hidden="true">
-                      {(userName || "U").slice(0, 1).toUpperCase()}
-                    </span>
+                    <UserAvatar userId={userId} name={userName} />
                     <div className="min-w-0">
                       <strong className="block truncate text-sm font-semibold">
                         {userName || "Sua conta"}
@@ -1519,6 +1518,7 @@ export function Workspace() {
           </div>
           <Brand />
           <UserStrip
+            userId={userId}
             userName={userName}
             role={role}
             clientName={
@@ -2500,10 +2500,12 @@ function WorkspaceActions({
 }
 
 function UserStrip({
+  userId,
   userName,
   role,
   clientName,
 }: {
+  userId: string | null;
   userName: string;
   role: AppRole | null;
   clientName: string | null;
@@ -2514,9 +2516,7 @@ function UserStrip({
       className="workspace-user ml-auto flex min-w-0 items-center gap-2 text-xs text-muted-foreground"
       title={[userName, ROLE_LABEL[role], clientName].filter(Boolean).join(" · ")}
     >
-      <span className="workspace-avatar shrink-0" aria-hidden="true">
-        {(userName || "U").slice(0, 1).toUpperCase()}
-      </span>
+      <UserAvatar userId={userId} name={userName} editable />
       <div className="hidden min-w-0 text-right sm:block">
         <strong className="block truncate font-semibold text-foreground">
           {userName || "Sua conta"}

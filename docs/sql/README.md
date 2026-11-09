@@ -127,3 +127,9 @@ Aplicado pelo usuário no projeto `ylkiyncsqubuxrtwyxwv`; conferido pela API em 
 Decisões de 09/11/2026: comodato como adicional mensal, 12 meses de permanência mínima por padrão, catálogo com vários modelos. O contrato (modelo 1.2) ganha a linha "Equipamento" no quadro resumo e o Anexo I (comodato ou compra e venda); as cláusulas são texto inicial para revisão jurídica, como o restante do modelo. Na Fase 1 o aparelho é cobrado **à parte e manualmente**: a cobrança online e a ativação continuam cobrando e conferindo só o valor do sistema. Fase 2: cobrança do aparelho no Asaas. Fase 3: controle de aparelhos por número de série. Venda exige NF-e de produto e comodato, nota de remessa; confirmar com o contador. Testes: `npm run test:billing` (PGlite).
 
 Aplicado pelo usuário no projeto `ylkiyncsqubuxrtwyxwv`; conferido pela API em 09/11/2026: `equipment_models` existe (vazia), as colunas `equipment_*` de `clients` estão presentes (empresas em `nenhum`) e o contrato existente recebeu `equipment_snapshot` `{"mode":"nenhum"}`. O corpo de `tinutri_contract_guard` não foi conferido por hash.
+
+## Foto do usuário no avatar (SQL 36)
+
+`36-foto-do-usuario.sql` cria o bucket privado `avatars` (até 512 KB, JPEG ou WebP) e as políticas de `storage.objects`: cada pessoa só envia, vê, troca e remove o próprio arquivo `<id do usuário>/avatar`. Não cria coluna. O app recorta a foto em quadrado de 256 px antes de enviar e a mostra por link temporário (1 h). Clicar no avatar do topo (painel e Área Master) abre **Adicionar foto / Trocar foto / Remover foto**; no menu do celular a foto só aparece. Sem o SQL 36, o avatar continua com a inicial e o envio informa erro. Testes: `npm run test:avatar` (PGlite).
+
+Pendente: aplicar no projeto `ylkiyncsqubuxrtwyxwv`.

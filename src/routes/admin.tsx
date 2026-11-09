@@ -35,6 +35,7 @@ import { Heading } from "@/components/master/Shared";
 import type { Company } from "@/lib/management";
 import type { RecentAction } from "@/lib/dashboard";
 import logo from "@/assets/tinutri-mark.webp";
+import { UserAvatar } from "@/components/UserAvatar";
 export const Route = createFileRoute("/admin")({
   validateSearch: masterSearch,
   head: () => ({ meta: [{ title: "Área Master · TiNutri Smart Label®" }] }),
@@ -277,7 +278,7 @@ function AdminMaster() {
           <img src={logo} alt="TiNutri" width={36} height={36} className="size-9 rounded-lg" />
           <span className="text-sm font-semibold">Área Master</span>
           <div className="workspace-user ml-auto flex min-w-0 items-center gap-2">
-            <span className="workspace-avatar shrink-0">{user.name.slice(0, 1).toUpperCase()}</span>
+            <UserAvatar userId={user.id} name={user.name} editable />
             <div className="min-w-0">
               <p className="truncate text-xs font-medium">{user.name}</p>
               <p className="text-xs text-muted-foreground">Admin Master</p>
